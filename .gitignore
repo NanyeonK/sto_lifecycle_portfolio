@@ -1,0 +1,80 @@
+# Python
+__pycache__/
+*.py[cod]
+*\$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual env
+.venv/
+venv/
+env/
+ENV/
+
+# Notebook
+.ipynb_checkpoints/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Project
+output/logs/*
+output/diagnostics/*
+!output/logs/.gitkeep
+!output/diagnostics/.gitkeep
+
+# Large model artifacts
+output/models/*.pkl
+output/models/*.npz
+output/models/*.h5
+
+# Data — keep raw checked unless explicitly tracked
+data/raw/*
+!data/raw/.gitkeep
+data/interim/*
+!data/interim/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+
+# LaTeX
+*.aux
+*.log
+*.out
+*.toc
+*.bbl
+*.blg
+*.synctex.gz
+*.fls
+*.fdb_latexmk
+
+# Secrets
+.env
+.env.local
+*.pem
+*.key
+
+# OS
+Thumbs.db
+
+# Claude Code local settings (auto-generated)
+.claude/
