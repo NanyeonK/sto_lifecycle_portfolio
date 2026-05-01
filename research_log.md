@@ -916,3 +916,78 @@ either, the paper's RFS-credible mechanism is exhausted within v3
 framework. REE/JHE submission with continuous-x channel is the
 realistic target.
 
+
+## 2026-05-02 — Path B (tau_buy Option 3) FINAL: hedge dead, tx-cost channel alive
+
+Cloud agent overnight delivered 6 redundant feature branches (cron at
+2h cycle, no inter-fire state awareness). Selected
+`auto/2026-05-01-tau-buy-sensitivity-sweeps` (cleanest tau_buy
+approximation), merged with `fix/2026-05-01-housing-cost-only-occupied`
+(housing cost rule fix) into main. Merge commit 186da13.
+
+Implementation: `apply_tau_buy_at_reloc::Bool` flag added to
+`ModelParams_v3`. When `APPLY_TAU_BUY=1` env var set + regime is
+E1_2L + relocating owner (x_ell ≥ 1): apply `buy_ded_reloc = tau_buy`
+deduction at relocation event. E2_2L tokens are portable so no
+deduction (the cost asymmetry is the proposed hedge channel).
+
+**Empirical result under fixed kappa + Option 3 tau_buy active:**
+
+V_t1_midpoint_ellA:
+- E1_2L old (tau_sell=6%, tau_buy=0):       -1408.63
+- E1_2L full (tau_sell=6%, tau_buy=2.5%):   -1422.78  <-- realistic
+- E1_2L_NOTX (tau_sell=0):                  -1377.26
+- E2_2L (fixed, tx=0 on tokens):            -1204.34
+
+CEV(E2_2L vs E1_2L_full) = **+4.255%** at midpoint.
+
+**Channel decomposition**:
+- Continuous-x (vs E1_NOTX, no tx cost):    +3.411% (80%)
+- Round-trip tx-cost avoidance:              +0.816% (19%)
+  - tau_sell burden in E1:                  +0.566%
+  - tau_buy burden in E1:                   +0.250%
+- Cross-location hedge (mean_xB > 0):       **0%** (mean_xB STILL 0)
+
+**Mechanism status**:
+
+- v3 cross-location hedge channel: STILL DEAD even with tau_buy
+  asymmetry. Option 3 makes E1_2L MORE expensive on relocation but
+  doesn't motivate E2_2L household to pre-hold x_B.
+- The +0.82% tx-cost-avoidance channel IS structurally novel vs
+  Liu (2021): Liu has no relocation, so no tx cost channel. Tokens
+  uniquely portable across moves.
+- The +3.41% continuous-x channel is Liu 2021 territory.
+
+**Total contribution at realistic calibration**: +4.26%
+
+**Asset use under tau_buy active**:
+- E1_2L: mean_xA=0.548, mean_xB=0.000 (binary admissibility)
+- E2_2L: mean_xA=1.748, mean_xB=0.000 (concentrated in occupied)
+
+**FINAL STRATEGIC ASSESSMENT**:
+
+After 1.5 days of exhaustive empirical exploration, including 4
+referee rounds, 3 model spec iterations, and 25+ regime calibrations:
+
+- v3 "Tokens decouple location from housing exposure" framing as
+  proposed: cross-location hedge is empirically zero
+- The actually-living mechanisms are:
+  (i) Continuous fractional ownership of one's residence
+      (3.4% — Liu 2021 territory)
+  (ii) Round-trip transaction-cost avoidance via portability
+       (0.8% — cleanly novel vs Liu)
+- Total: +4.26% lifetime CEV
+
+**RFS path requires**: Option 1 full state extension (~25x compute,
+~2-4 weeks) which would add at most +1-2% from genuine pre-buy hedge,
+giving total ~5-6% — RFS-MARGINAL not RFS-clear.
+
+**REE/JHE path**: +4.26% with two cleanly-decomposed channels is
+publishable today after manuscript drafting (~4-6 weeks). The
+tx-cost-avoidance channel is genuinely outside Liu and gives the
+paper a clean mechanism distinction.
+
+**Recommendation**: PATH D — finalize current evidence for REE/JHE.
+Multi-property tokens (alpha'') as separate companion paper if RFS
+target preserved.
+
