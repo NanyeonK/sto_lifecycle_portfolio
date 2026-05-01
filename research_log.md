@@ -991,3 +991,93 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-05-02 — v4 solver (Option 1 full state extension) implemented
+
+**Action picked**: P0 — create `src/vfi_solver_v4.jl` implementing the full 6D
+state extension per `handoff/tau_buy_option1_spec.md`. This is the correct
+implementation to test whether the cross-location hedge mechanism activates when
+tau_buy is charged on per-period deltas (rather than as a one-time approximation
+at relocation as in v3 Option 3).
+
+**Branch**: `auto/2026-05-02-option1-state-extension`
+
+**Core design (6D state, per-period tx_cost)**:
+
+State: `(t, w, z, ell, x_A_prev, x_B_prev)` — 6D.
+Controls: `(c, b, s, x_A_new, x_B_new)` with `x_new ∈ x_prev_grid` (discrete).
+
+Transaction cost formula (charged from current-period budget):
+```
+delta_A   = x_A_new - x_A_prev
+delta_B   = x_B_new - x_B_prev
+sell_cost = tau_sell (E1_2L) | tau_token (E2_2L)
+tx_cost   = tau_buy * (max(δA,0) + max(δB,0))
+          + sell_cost * (max(-δA,0) + max(-δB,0))
+Budget: c + kappa(x_ell_new) + x_A_new + x_B_new + tx_cost + b + s = w
+```
+
+Wealth transition has NO sell_factor (all friction in budget tx_cost), in
+contrast to v3 where sell_factor was applied to the capital-gain-inclusive
+asset return at the relocation event.
+
+**Why this should resurrect the hedge channel:**
+- E1_2L: admissibility forces `x_B=0` at ell=A. Relocation to B forces
+  delta_A = -1 (sell, pay tau_sell=6%) + delta_B = +1 (buy, pay tau_buy=2.5%)
+  = 8.5% round-trip every relocation event.
+- E2_2L: pre-holding `x_B > 0` at ell=A is legal. If household holds
+  `x_B_prev = x_B_target`, relocation incurs ZERO additional tx_cost for x_B.
+  Expected per-period hedge saving: `p_reloc * tau_buy ≈ 0.06 * 0.025 = 0.15%/yr`
+  per unit of x_B pre-held. Over a 40-year working life at 6% discount: ~2.5%
+  present-value hedge benefit per unit x_B pre-held.
+
+**Key implementation decisions:**
+
+1. `x_new` choices are constrained to `x_prev_grid` (discrete, N_X_PREV=3 default:
+   {0.0, 0.5, 1.0}). This ensures next-period's `x_prev` state is always a grid
+   point, avoiding interpolation in the x_prev dimensions and keeping the
+   continuation value computation at bilinear-in-(w,z) only.
+
+2. `x_prev_grid` default: {0.0, 0.5, 1.0} (N_X_PREV=3, X_PREV_MAX=1.0).
+   E1_2L "own" = last grid point (value 1.0 exactly) — admissibility enforced
+   via `cands_ixA = [1, n_xp]` at ell=A.
+
+3. Continuation value: `V_stay = V(ell, ix_A_new, ix_B_new)`,
+   `V_reloc = V(ell_alt, ix_A_new, ix_B_new)`, both at the same wealth
+   (no split). Only ell changes at relocation. Clean and efficient.
+
+4. Housing cost rule: fixed occupied-only kappa (v3 falsification-confirmed):
+   E2_2L: `kappa = rho - x_ell_local * (rho - m)` (only occupied token saves rent).
+
+5. Memory at defaults (T=57, N_W=15, N_Z=5, N_ell=2, N_xp=3×3):
+   57 × 15 × 5 × 2 × 3 × 3 = 77,130 elements per policy array.
+   6 Float64 arrays ≈ 3.7 MB — very manageable.
+
+**Files created:**
+- `src/vfi_solver_v4.jl` (932 LOC): full v4 solver with E0/E1_2L/E2_2L regimes,
+  smoke test stub (`--smoke-test` flag), summary + JSON output.
+- `scripts/run_option1_e1.sh`: E1_2L baseline run script for server1.
+- `scripts/run_option1_e2.sh`: E2_2L baseline run script + CEV computation note.
+
+**Smoke test**: calls `smoke_test_v4()` (no VFI). Checks:
+  - sigma decomposition invariant
+  - shock block size and weight sum
+  - 6D array allocation (prints memory estimate)
+  - terminal slice feasibility
+  - tx_cost spot-checks (E1_2L buy/sell, round-trip, E2_2L no-change, partial buy)
+  - hedge incentive calculation printed
+  - E1_2L own-index check (x_prev_grid[end] == 1.0)
+  - housing_cost_v4 rule spot-checks
+
+**Compute estimate (per spec):**
+  - Per-state evaluations: n_xp^2 × na^2 = 9 × 81 = 729 (x × b-s grid)
+  - Each evaluation: 2187 quadrature points
+  - State space per period: 15 × 5 × 2 × 3 × 3 = 1350
+  - Total: 729 × 2187 × 1350 × 57 ≈ 122B ops → ~2-3 hr wall on server1 (1 thread)
+
+**Next actions (all require server1):**
+1. Run `julia src/vfi_solver_v4.jl --smoke-test` (fast, no VFI).
+2. Run `bash scripts/run_option1_e1.sh` → `output/diagnostics/p6_option1_e1.json`.
+3. Run `bash scripts/run_option1_e2.sh` → `output/diagnostics/p6_option1_e2.json`.
+4. Compute `CEV(E2_2L_v4 vs E1_2L_v4)` and verify hypotheses H1–H3.
+5. If H1+H2+H3 hold: proceed to sensitivity sweeps (rho_AB, p_relocate, asymmetric).
+
