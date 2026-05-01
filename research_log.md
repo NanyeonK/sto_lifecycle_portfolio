@@ -794,3 +794,64 @@ next fire (~10:08 UTC) can implement and queue runs.
 +4.23% total) and additive separability empirically confirmed, the
 mechanism distinction from Liu (2021) MHS / KMW (2018) habit / Cocco
 (2005) is *both structural AND quantitative*. RFS-credible.
+
+## 2026-05-01 — Round 4 falsification + housing-cost rule fix
+
+**Round 4 P1 falsification tests** under original (over-generous) kappa
+rule `kappa = rho - (x_A + x_B) * delta_own` revealed the headline
++4.23% was an artifact:
+
+| Test (OLD rule) | CEV vs E1_2L | mean_xB at ellA | Pass? |
+|---|---|---|---|
+| baseline (p=0.06) | 4.231% | 0.907 | (baseline) |
+| **p_relocate = 0** | **4.231%** | **0.907** | **FAIL** (referee r) |
+| **rho_AB = 0.95** | **4.016%** | **0.943** | **FAIL** (referee m) |
+
+Both P1 falsification tests FAILED. Cross-location holding (mean_xB)
+was driven by the kappa rule treating x_{not-ell} as rental-income
+contributing equally to rent reduction — Round 4 referee (h)
+"moral hazard / rental-management externality" emerging as numerical
+artifact.
+
+**Model fix on feature branch `fix/2026-05-01-housing-cost-only-occupied`**:
+```julia
+# OLD: return p.rho - (x_A + x_B) * (p.rho - p.m)
+# FIX: x_ell_local = ell == LOC_A ? x_A : x_B
+#      return p.rho - x_ell_local * (p.rho - p.m)
+```
+Only the occupied-location token reduces rent (correct economic
+interpretation; non-occupied token is purely financial / capital-gain
+asset).
+
+**Re-runs under fixed kappa rule:**
+
+| Test (FIXED rule) | CEV vs E1_2L | mean_xA | mean_xB at ellA | Notes |
+|---|---|---|---|---|
+| baseline (p=0.06) | **3.995%** | 1.748 | **0.000** | xA concentrates |
+| p_relocate = 0 | 3.989% | 1.748 | 0.000 | identical |
+| Hedge channel | **0.006%** | — | — | **near zero** |
+
+**Verdict**: under correct model spec, the v3 cross-location hedge
+mechanism delivers **near-zero welfare** at this calibration. The +4.0%
+headline is entirely the continuous-x rent-saving channel (Liu 2021
+territory). The "Tokens decouple location from housing exposure"
+mechanism *as currently designed* does not produce RFS-magnitude hedge
+welfare beyond Liu's MHS framework.
+
+This is the Round 4 referee (m)+(r) prediction empirically realized.
+The cross-location holding mean_xB=0.907 in the original was a
+rental-income artifact, not a hedge.
+
+**Path-saving options queued**:
+
+(A) Higher p_relocate sensitivity (P_RELOCATE_WORKING=0.30 testing now)
+(B) tau_buy proper state extension (defer to cloud agent next fire;
+    per agent's original deferral note, requires "did household just
+    relocate" state flag)
+(C) Asymmetric calibration: location-specific income shocks correlated
+    with location returns -> x_B becomes genuine hedge against
+    location-A income drops
+
+Next decision after (A) result: if hedge channel emerges at high
+p_relocate, mechanism is real but calibration-sensitive (REE-OK,
+RFS-questionable). If still 0, mechanism is dead and need (B) or (C).

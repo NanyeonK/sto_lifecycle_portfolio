@@ -336,7 +336,7 @@ end
         x_ell = ell == LOC_A ? x_A : x_B
         return x_ell >= 1.0 ? p.m : p.rho
     else   # E2_2L
-        return p.rho - (x_A + x_B) * (p.rho - p.m)
+        x_ell_local = ell == LOC_A ? x_A : x_B; return p.rho - x_ell_local * (p.rho - p.m)
     end
 end
 
