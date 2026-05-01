@@ -1,69 +1,82 @@
-# Next Actions (v3 — post Round 4 falsification, path B chosen)
+# Next Actions (Path B Option 1 in flight, ASAP-tempered to 6h cron)
 
 Project: sto_lifecycle_portfolio
-Updated: 2026-05-01 (path B: tau_buy state extension chosen by user)
+Updated: 2026-05-02
 
-## P0 - Mechanism-saving (path B): tau_buy state extension
+## ⭐ P0 — Option 1 full state extension (USER CHOSE B, OPTION 1)
 
-User chose path B from `handoff/decisions_needed.md`. Detailed spec in
-`handoff/tau_buy_state_extension_spec.md`.
+User confirmed 2026-05-02: proceed with full state extension for
+proper tau_buy hedge mechanism.
 
-Cloud agent execution order:
+**SPEC: `handoff/tau_buy_option1_spec.md`** — read this first.
 
-1. **Option 3 cheapest test first**: add synthetic R_B premium
-   `saving = p_relocate * tau_buy` to existing v3 solver. ~1h total.
-   If mean_xB still 0, mechanism is dead → fall back to path D (REE).
-2. **If Option 3 shows hedge activation**: proceed to Option 1 (full
-   state extension `x_A_prev, x_B_prev`). ~1-2 weeks code + 4-8h
-   compute (state space 25x larger).
+| Step | Action | Owner | Done artifact |
+|---|---|---|---|
+| 1 | Open new branch `auto/2026-05-02-option1-state-extension` | cloud agent | branch on origin |
+| 2 | Create `src/vfi_solver_v4.jl`: 6D state `(t, w, z, ell, x_A_prev, x_B_prev)` + tx_cost on deltas | cloud agent | file pushed |
+| 3 | Use coarse `x_prev` grid: `N_X_PREV=3` (e.g., {0, 0.5, 1.0}); reduce N_W=15, N_Z=5 to compensate | cloud agent | env-var configurable |
+| 4 | Smoke test stub `smoke_test_v4()` checking 6D allocation, tx_cost computation, state update consistency | cloud agent | callable via `--smoke-test` |
+| 5 | Smoke test on server1 (USER) | user/me | `output/diagnostics/p6_option1_smoke.md` |
+| 6 | Run E1_2L_v4 + E2_2L_v4 baselines (USER) | user/me | `p6_option1_e*.json` |
+| 7 | Compute decomposition + write up | user/me | `p6_option1_decomposition.md` |
 
-| Priority | Action | Done artifact |
-|---|---|---|
-| **P0** | Option 3 quick test on `fix/` branch | `p5_tau_buy_option3.json` |
-| P0 | If Option 3 positive: Option 1 full state extension | `p5_tau_buy_option1.json` |
-| P0 | Channel decomposition under tau_buy | `p5_tau_buy_decomposition.md` |
-| P0 | If Options 1+3 both fail: write `path_D_REE_pivot.md` recommending fallback | handoff doc |
+## Hypotheses to test (after step 6)
 
-## P1 (after path B resolves)
+- H1: mean_xB > 0 at ellA (hedge mechanism activates with proper state)
+- H2: CEV(E2_2L_v4 vs E1_2L_v4) > 4.255% (Option 3 baseline)
+- H3: Hedge channel `CEV(E2_2L_v4 vs E2_2L_v3)` ≈ 0.5-1.5% (RFS-marginal additional)
 
-| Priority | Action |
-|---|---|
-| P1 | rho_AB sensitivity sweep (referee P1 still pending under fixed rule) |
-| P1 | Asymmetric robustness (`p(A→B) ≠ p(B→A)`, `mu_A ≠ mu_B`) |
-| P1 | Mortgage activation (`ltv_max ∈ {0.5, 0.8}`) |
-| P1 | CEV across (t,w,z) state space, not just midpoint |
+If H1+H2+H3 all hold: RFS-credible. Continue to Phase 2 (calibration,
+sensitivity, manuscript prep).
 
-## DONE
+If any fails: fall back to Path D (REE/JHE) at +4.26%.
+
+## DONE (Path B Option 3 chain)
 
 | Status | Action |
 |---|---|
-| DONE | v3 solver skeleton (881 LOC, 6 Phase 1 items) — cloud agent first fire |
-| DONE | Smoke test PASS in 3.3s |
+| DONE | v3 solver (881 LOC) — cloud first fire |
+| DONE | Smoke test on server1 |
 | DONE | Reduced + full-grid baselines |
-| DONE | Channel decomposition (under OLD kappa rule) — hedge claim 87% |
-| DONE | Round 4 P1 falsification (rho_AB=0.95, p_relocate=0) — BOTH FAIL |
-| DONE | Model fix: kappa = rho - x_ell * delta_own (only occupied unit) |
-| DONE | Fixed-rule baselines (p_relocate ∈ {0, 0.06, 0.30}) — mean_xB=0 always |
-| DONE | Decisions_needed.md with paths B/C/D + recommendation |
+| DONE | Round 4 referee — MAJOR REVISION with credit |
+| DONE | Channel decomposition (under OLD kappa) |
+| DONE | Round 4 (m)+(r) falsification — both FAIL → kappa rule fix |
+| DONE | Fixed kappa rule + p_relocate sweep — confirmed hedge dead |
+| DONE | Cloud agent overnight: 6 redundant auto branches |
+| DONE | Selected best: tau_buy Option 3 + sensitivity scripts |
+| DONE | Merged fix + Option 3 into main (commit 186da13) |
+| DONE | E1_2L with tau_buy active: CEV(E2_2L vs E1_2L_full) = +4.255% |
+| DONE | Final Path B Option 3 verdict: continuous-x 3.4% + tx-cost 0.8% = 4.26% |
+
+## P1 (after Option 1 resolves)
+
+| Priority | Action |
+|---|---|
+| P1 | Sensitivity sweep: rho_AB ∈ {0, 0.25, 0.5, 0.75, 0.95} on best v4 |
+| P1 | Sensitivity: p_relocate ∈ {0, 0.06, 0.12, 0.30} on best v4 |
+| P1 | Asymmetric robustness (mu_A != mu_B, p_AB != p_BA) |
+| P1 | Mortgage activation (ltv_max ∈ {0.5, 0.8}) |
+| P1 | Liu/YZ/Cocco/KMW comparison table |
+| P2 | If Option 1 successful: writing kickoff |
+
+## Cleanup queue (non-critical)
+
+- 5 redundant `auto/` branches (similar work, only one merged) —
+  delete after Option 1 confirms direction
+- Cron tuned: now `0 */6 * * *` (every 6h)
 
 ## Cloud routine
 
 - ID: `trig_013fH7bjrudxtrb6hkhz4Nkj`
-- Cron: `0 */2 * * *` (every 2 hours, ASAP mode)
-- Next fire: ~10:08 UTC (~19:08 KST today)
+- Cron: `0 */6 * * *` (every 6 hours, ASAP-tempered)
+- Next fire: per cron schedule
+- **Option 1 is P0** — agent should pick this up
 
 ## Human gates
 
-- (H1') Title approval — defer
-- (H2') Calibration anchor approval — defer
+- (H1') Title — defer
+- (H2') Calibration anchor — defer
 - (H3') Framing approval at writing kickoff — defer
 - (H4') Submission decision — defer
-- **NEW: path B/C/D decision DONE 2026-05-01: chose B**
-
-## Branch state
-
-- `main`: through `3004841` (full-grid + decomposition)
-- `fix/2026-05-01-housing-cost-only-occupied`: `7c2e4d6` — adds fixed
-  kappa rule + falsification evidence + decisions_needed.md
-- Cloud agent: continue on `fix/` or new `auto/` branch
-- No main commits until path B resolution
+- B/C/D decision DONE 2026-05-01 → chose B
+- B Option 1 vs Option 3 decision DONE 2026-05-02 → Option 1
