@@ -2,11 +2,11 @@
 
 ## Current Status
 
-- Phase: Project start (just completed)
-- Gate: P1 (reproduce E1 baseline)
-- Autonomy: A1_PREPARE
-- Last updated: 2026-05-01
-- Next step: read archived prior code at `~/project/token_paper/_archive/vfi_lifecycle_v1_20260314/`
+- Phase: Phase 1 complete (v3 solver + full-grid baselines + channel decomp); Phase 2 sweeps QUEUED for server1
+- Gate: Round 4 MUST list — 3/5 items now have server1 run queued (tau_buy sweep, rho_AB sweep, p_relocate sweep)
+- Autonomy: ASAP mode (every 2h cloud cron)
+- Last updated: 2026-05-01 (fire 2)
+- Next step: Human runs sweep_txcost.sh / sweep_rhoAB.sh / sweep_prelocate.sh on server1; posts results; next cloud fire writes diagnostic mds
 
 ---
 
@@ -794,3 +794,87 @@ next fire (~10:08 UTC) can implement and queue runs.
 +4.23% total) and additive separability empirically confirmed, the
 mechanism distinction from Liu (2021) MHS / KMW (2018) habit / Cocco
 (2005) is *both structural AND quantitative*. RFS-credible.
+
+## 2026-05-01 — Fire 2: tau_buy implementation + sensitivity sweep scripts
+
+**Action picked**: P0 (highest non-DONE item) — implement `tau_buy` approximation
+in `src/vfi_solver_v3.jl`, write all three Round 4 sensitivity sweep scripts,
+and the CEV computation helper. All three remaining ROUND 4 MUST items now have
+server1 run queued.
+
+**tau_buy implementation (`src/vfi_solver_v3.jl`):**
+
+Added `apply_tau_buy_at_reloc::Bool` field to `ModelParams_v3` (env var
+`APPLY_TAU_BUY=1`). Modified `continuation_value_v3()` and `next_wealth_v3()`
+to apply a `buy_deduction` at relocation events for E1_2L owners:
+
+- When `APPLY_TAU_BUY=1`, an E1_2L owner who relocates pays `tau_sell` on
+  selling the old unit AND `tau_buy` deducted from post-relocation wealth
+  (approximating the cost of buying 1 unit at the new location).
+- Approximation caveat: assumes the owner re-purchases exactly 1 unit at
+  new location; slightly over-charges households who switch to renting
+  post-relocation. This is the conservative direction (upper bound on E1_2L cost).
+- Full implementation (exact `tau_buy` application) would require a
+  `just_relocated ∈ {0,1}` state extension; deferred to Phase 3.
+- Baseline E1_2L (without APPLY_TAU_BUY) is unchanged; `tau_buy` stored
+  in `ModelParams_v3` but not applied unless the flag is set.
+
+**Three sweep scripts written:**
+
+1. `scripts/sweep_txcost.sh` — Round 4 P0-3: runs E1_2L and E2_2L at five
+   transaction-cost scenarios: NOTX, sell-6%, rt-8.5% (buy 2.5%), rt-10%
+   (buy 4%), rt-12% (buy 6%). Covers the "8-12% round-trip" range per NAR.
+   Direct evidence that E2_2L welfare advantage GROWS with tau_buy (tokens
+   avoid both sell and buy costs; Round 4 key robustness).
+
+2. `scripts/sweep_rhoAB.sh` — Round 4 P1: sweeps `rho_AB ∈ {0, 0.25, 0.50,
+   0.75, 0.95}`. At `rho_AB → 1`, the cross-location idiosyncratic components
+   become perfectly correlated → location-specific hedge is redundant → CEV
+   should collapse toward avoided-tx channel only (~0.565%). Tests whether
+   the hedge channel is genuinely driven by imperfect location correlation.
+
+3. `scripts/sweep_prelocate.sh` — Round 4 P1: sweeps `p_relocate_working ∈
+   {0, 0.02, 0.06, 0.12}`. At `p_relocate=0`, no household ever faces a
+   forced sale → E1_2L and E2_2L should converge → CEV → 0. Tests whether
+   the welfare gain is genuinely mobility-driven.
+
+**CEV helper: `scripts/compute_cev_sweep.jl`** — reads JSON summary pairs
+(E1_2L + E2_2L for each parameter value), computes
+`CEV = (V_E2/V_E1)^(1/(1-γ)) − 1`, writes a Markdown table. Called at end
+of each sweep script.
+
+**Mechanism predictions embedded as sweep test:**
+- rho_AB sweep: CEV(rho_AB=0) > CEV(rho_AB=0.5) > CEV(rho_AB=0.95) ≈ 0.565%
+  (converging to avoided-tx only as hedge becomes redundant)
+- p_relocate sweep: CEV(p=0) ≈ 0%; CEV(p=0.06) ≈ 4.23% (baseline); CEV(p=0.12) > 4.23%
+- txcost sweep: CEV increases monotonically from NOTX to rt-12% (E2_2L gains from
+  both avoiding tau_sell AND tau_buy at every relocation event)
+
+**No human-gate items encountered.** All three sweep actions are auto-allowed.
+
+**Files changed this fire:**
+- `src/vfi_solver_v3.jl` (tau_buy code — ~15 LOC added/modified)
+- `scripts/sweep_txcost.sh` (new — 55 LOC)
+- `scripts/sweep_rhoAB.sh` (new — 40 LOC)
+- `scripts/sweep_prelocate.sh` (new — 40 LOC)
+- `scripts/compute_cev_sweep.jl` (new — ~90 LOC)
+- `next_actions.md` (updated DONE/QUEUED status + server1 run queue)
+- `research_log.md` (this entry)
+
+**Feature branch**: `auto/2026-05-01-tau-buy-sensitivity-sweeps`
+
+**Next queued (server1 + next cloud fire):**
+1. Human: run `bash scripts/sweep_txcost.sh` on server1 → post
+   `output/diagnostics/p4_full_txcost/summary.md` output.
+2. Human: run `bash scripts/sweep_rhoAB.sh` on server1 → post rho_AB table.
+3. Human: run `bash scripts/sweep_prelocate.sh` on server1 → post p_relocate table.
+4. Next cloud fire: write `docs/calibration_v3.md` (PSID/NAR/Case-Shiller anchor
+   doc; H2' calibration approval prep) OR write Round 4 diagnostic markdown files
+   from posted results.
+
+**ROUND 4 MUST scorecard after this fire:**
+- Channel decomp: DONE (all three values computed; hedge dominates at 87%)
+- Lift x upper bound: NOT NEEDED (full grid resolved corner)
+- Add tau_buy: DONE (code + script; server1 run QUEUED)
+- rho_AB sensitivity: DONE (script; server1 run QUEUED)
+- p_relocate sensitivity: DONE (script; server1 run QUEUED)

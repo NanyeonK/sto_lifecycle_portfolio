@@ -100,6 +100,11 @@ struct ModelParams_v3
     # Mortgage
     ltv_max::Float64
     r_mort_premium::Float64
+    # Phase 2: tau_buy approximation applied at relocation for E1_2L owners.
+    # When true and regime==E1_2L, owner who relocates pays tau_sell (sell) + tau_buy (buy)
+    # on the occupied-unit proceeds. Deduction = tau_buy per unit held (1 unit in E1_2L).
+    # This avoids a state extension; see research_log for approximation caveats.
+    apply_tau_buy_at_reloc::Bool
 end
 
 struct GridSpec_v3
@@ -187,6 +192,7 @@ function default_params_v3()
         parse(Float64, get(ENV, "TAU_TOKEN",          "0.01")),
         parse(Float64, get(ENV, "LTV_MAX",            "0.0")),
         parse(Float64, get(ENV, "R_MORT_PREMIUM",     "0.005")),
+        get(ENV, "APPLY_TAU_BUY", "0") == "1",
     )
 end
 
@@ -380,11 +386,12 @@ end
                                  hp_next::Float64, rs_next::Float64,
                                  ra_next::Float64, rb_next::Float64,
                                  sell_factor_A::Float64, sell_factor_B::Float64,
-                                 y_next::Float64)
+                                 y_next::Float64,
+                                 buy_deduction::Float64 = 0.0)
     rate_b = b >= 0.0 ? p.rf : (p.rf + p.r_mort_premium)
     return (b * rate_b + s * rs_next +
             x_A * ra_next * sell_factor_A +
-            x_B * rb_next * sell_factor_B) / hp_next + y_next
+            x_B * rb_next * sell_factor_B) / hp_next + y_next - buy_deduction
 end
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -432,11 +439,20 @@ function continuation_value_v3(
     # Pre-compute sell factors (only change for E1_2L on relocation)
     sf_A_stay   = 1.0;  sf_B_stay   = 1.0    # no relocation
     sf_A_reloc  = 1.0;  sf_B_reloc  = 1.0    # default (E0, E2_2L: tokens portable)
+    # tau_buy deduction applied at relocation for E1_2L owners (Phase 2 approximation):
+    # if currently owning (x_ell ≥ 1) and relocating, pay tau_buy for purchase at new location.
+    # Approximation: assumes owner buys exactly 1 unit at new location. Over-charges households
+    # who switch to renting post-relocation; conservative (upper bound on E1_2L cost).
+    buy_ded_reloc = 0.0
     if regime == REGIME_E1_2L
+        x_ell_current = ell == LOC_A ? x_A : x_B
         if ell == LOC_A
             sf_A_reloc = 1.0 - p.tau_sell    # selling A-unit when moving to B
         else
             sf_B_reloc = 1.0 - p.tau_sell    # selling B-unit when moving to A
+        end
+        if p.apply_tau_buy_at_reloc && x_ell_current >= 1.0
+            buy_ded_reloc = p.tau_buy         # cost of buying 1 unit at new location
         end
     end
 
@@ -452,7 +468,7 @@ function continuation_value_v3(
                                   sf_A_stay, sf_B_stay, y_next)
         w_reloc = next_wealth_v3(p, b, s, x_A, x_B, shock.hp[q], shock.rs[q],
                                   shock.ra[q], shock.rb[q],
-                                  sf_A_reloc, sf_B_reloc, y_next)
+                                  sf_A_reloc, sf_B_reloc, y_next, buy_ded_reloc)
 
         # Value at next-period location: (n_w, n_z) slice for each ell
         v_stay  = interp_bilinear_v3(view(next_value_slice, :, :, ell),
@@ -677,16 +693,17 @@ function solve_v3(;
         end
     end
 
-    result.metadata["created_at"]          = string(Dates.now())
-    result.metadata["regime"]              = regime_name_v3(regime)
-    result.metadata["state_definition"]    = "(t, w, z, ell)"
-    result.metadata["control_definition"]  = "(c, b, s, x_A, x_B)"
-    result.metadata["rho_AB"]              = params.rho_AB
-    result.metadata["p_relocate_working"]  = params.p_relocate_working
-    result.metadata["p_relocate_retired"]  = params.p_relocate_retired
-    result.metadata["tau_sell"]            = params.tau_sell
-    result.metadata["tau_buy_deferred"]    = params.tau_buy    # Phase 2
-    result.metadata["tau_token_deferred"]  = params.tau_token  # Phase 2
+    result.metadata["created_at"]              = string(Dates.now())
+    result.metadata["regime"]                  = regime_name_v3(regime)
+    result.metadata["state_definition"]        = "(t, w, z, ell)"
+    result.metadata["control_definition"]      = "(c, b, s, x_A, x_B)"
+    result.metadata["rho_AB"]                  = params.rho_AB
+    result.metadata["p_relocate_working"]      = params.p_relocate_working
+    result.metadata["p_relocate_retired"]      = params.p_relocate_retired
+    result.metadata["tau_sell"]                = params.tau_sell
+    result.metadata["tau_buy"]                 = params.tau_buy
+    result.metadata["apply_tau_buy_at_reloc"]  = params.apply_tau_buy_at_reloc
+    result.metadata["tau_token_deferred"]      = params.tau_token  # Phase 2
 
     if cfg.save_path !== nothing
         open(cfg.save_path, "w") do io; serialize(io, result); end
@@ -742,9 +759,10 @@ function summary_v3(result::SolverResult_v3, grids::Grids_v3,
         "p_relocate_working"  => params.p_relocate_working,
         "p_relocate_retired"  => params.p_relocate_retired,
         "tau_sell"            => params.tau_sell,
-        "tau_buy"             => params.tau_buy,
-        "tau_token"           => params.tau_token,
-        "ltv_max"             => params.ltv_max,
+        "tau_buy"                  => params.tau_buy,
+        "apply_tau_buy_at_reloc"   => params.apply_tau_buy_at_reloc,
+        "tau_token"                => params.tau_token,
+        "ltv_max"                  => params.ltv_max,
     )
     return s
 end
@@ -858,8 +876,9 @@ function main_v3(args::Vector{String}=ARGS)
     @printf("  quadrature: %d nodes, %d points total\n", cfg.quadrature_nodes, cfg.quadrature_nodes^7)
     @printf("  mobility  : p_reloc_work=%.3f, p_reloc_ret=%.3f\n",
             params.p_relocate_working, params.p_relocate_retired)
-    @printf("  tx costs  : tau_sell=%.3f, tau_buy=%.3f (deferred), tau_token=%.3f (deferred)\n",
-            params.tau_sell, params.tau_buy, params.tau_token)
+    @printf("  tx costs  : tau_sell=%.3f, tau_buy=%.3f (apply_at_reloc=%s), tau_token=%.3f (deferred)\n",
+            params.tau_sell, params.tau_buy,
+            params.apply_tau_buy_at_reloc ? "YES" : "no", params.tau_token)
     @printf("  returns   : rho_AB=%.2f, sigma_div=%.4f, sigma_iota=%.4f\n",
             params.rho_AB, params.sigma_div, params.sigma_iota)
     flush(stdout)

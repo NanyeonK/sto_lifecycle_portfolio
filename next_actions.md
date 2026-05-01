@@ -1,7 +1,7 @@
 # Next Actions (v3 — post Round 4 referee, ASAP mode)
 
 Project: sto_lifecycle_portfolio
-Updated: 2026-05-01 (Round 4 + ASAP cron)
+Updated: 2026-05-01 (fire 2 — tau_buy + sweep scripts)
 
 ## ROUND 4 MUST list (cloud agent + server1 hybrid)
 
@@ -10,11 +10,32 @@ RFS-quality submission. Ordered by impact + ease.
 
 | Priority | Action | Cloud agent? | Server1 run? | Done artifact |
 |---|---|---|---|---|
-| **P0** | **Channel decomposition**: implement counterfactual `E1_2L_NOTX` regime (tau_sell=0). Solve and compute `CEV(E2_2L vs E1_2L_NOTX)`. The residual CEV is the maintained-hedge channel; the difference vs `CEV(E2_2L vs E1_2L)` is the avoided-tx channel. **Most important Round 4 item.** | yes (code + counterfactual regime) | yes (run) | `output/diagnostics/p4_channel_decomposition.md` |
-| P0 | **Lift `x` upper bound**: re-parameterize x grid to `x_max ∈ {1.5, 2, 3}` (env var `X_MAX`). Re-solve E2_2L. If `mean_x` still pins at corner, add maintenance / property tax / agency cost on `x_{¬ell}` (curvature mechanism per Round 4 (h)+(p)). | yes (code) | yes (run) | `output/diagnostics/p4_xmax_sensitivity.md` |
-| P0 | **Add `tau_buy`**: lift to round-trip 8-12% per NAR + closing costs. Apply at relocation in E1_2L (sell at A + buy at B). Re-run baseline. | yes (code) | yes (run) | `output/diagnostics/p4_full_txcost.md` |
-| P1 | **`rho_AB` sensitivity**: sweep `{0, 0.25, 0.5, 0.75, 0.95}`. Hedge channel must collapse at `rho_AB → 1`. | yes (script) | yes (5 runs) | `output/diagnostics/p4_rhoAB_sweep.md` |
-| P1 | **`p_relocate` sensitivity**: sweep `{0, 0.02, 0.06, 0.12}`. Cross-location holding must collapse at `p_relocate=0`. | yes (script) | yes (4 runs) | `output/diagnostics/p4_prelocate_sweep.md` |
+| ~~P0~~ **DONE** | **Channel decomposition**: CEV(E2_2L vs E1_2L) = +4.231%; hedge channel 87% (+3.645%). Avoided-tx 13% (+0.565%). Cross-term +0.021% (channels additive). | DONE | DONE | `output/diagnostics/p4_channel_decomposition.md` |
+| ~~P0~~ **NOT NEEDED** | **Lift `x` upper bound**: Full-grid run resolved corner artifact. mean_x=0.91 at full grid (interior; well below wealth-adaptive max). E2_2L max_X is wealth-adaptive, not [0,1] hardcap. | DONE | DONE | — |
+| ~~P0~~ **DONE (code)** | **Add `tau_buy`**: approximation implemented in `src/vfi_solver_v3.jl` (APPLY_TAU_BUY=1 env var; owner who relocates pays tau_sell+tau_buy). Sweep script written: `scripts/sweep_txcost.sh`. | DONE (code) | **QUEUED** | `output/diagnostics/p4_full_txcost/summary.md` |
+| ~~P1~~ **DONE (script)** | **`rho_AB` sensitivity**: sweep script written `scripts/sweep_rhoAB.sh`. Runs E1_2L+E2_2L at {0, 0.25, 0.50, 0.75, 0.95}. | DONE (script) | **QUEUED** | `output/diagnostics/p4_rhoAB_sweep/summary.md` |
+| ~~P1~~ **DONE (script)** | **`p_relocate` sensitivity**: sweep script written `scripts/sweep_prelocate.sh`. Runs E1_2L+E2_2L at {0, 0.02, 0.06, 0.12}. | DONE (script) | **QUEUED** | `output/diagnostics/p4_prelocate_sweep/summary.md` |
+
+## Server1 run queue (next human action)
+
+Run these on server1 in the `sto_lifecycle_portfolio` tmux session, in order:
+
+```bash
+cd /home/nanyeon99/project/sto_lifecycle_portfolio
+git pull origin auto/2026-05-01-tau-buy-sensitivity-sweeps
+
+# P0: round-trip transaction cost sweep (tau_buy Round 4 item)
+bash scripts/sweep_txcost.sh
+
+# P1: rho_AB sensitivity (hedge channel must collapse at rho_AB→1)
+bash scripts/sweep_rhoAB.sh
+
+# P1: p_relocate sensitivity (cross-loc holding must collapse at p_reloc→0)
+bash scripts/sweep_prelocate.sh
+```
+
+After runs complete, post result summaries so next cloud fire can update
+`output/diagnostics/p4_full_txcost.md`, `p4_rhoAB_sweep.md`, `p4_prelocate_sweep.md`.
 
 ## ROUND 4 SHOULD list
 
@@ -38,7 +59,11 @@ RFS-quality submission. Ordered by impact + ease.
 | DONE | Smoke test PASS in 3.3s |
 | DONE | Reduced-grid baseline: CEV +5.93% (corner-loaded artifact) |
 | DONE | Full-grid E1_2L baseline (V=-1408.63, mean_x=0.556, less corner) |
-| IN-FLIGHT | Full-grid E2_2L baseline |
+| DONE | Full-grid E2_2L baseline (V=-1193.49) + E1_2L_NOTX (V=-1377.29) |
+| DONE | Channel decomposition: hedge +3.645% (87%), avoided-tx +0.565% (13%) |
+| DONE (code) | tau_buy approximation in solver (APPLY_TAU_BUY env var) |
+| DONE (script) | Sweep scripts: sweep_rhoAB.sh, sweep_prelocate.sh, sweep_txcost.sh |
+| DONE (script) | CEV helper: scripts/compute_cev_sweep.jl |
 
 ## Cloud routine
 
