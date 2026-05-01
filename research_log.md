@@ -794,3 +794,77 @@ next fire (~10:08 UTC) can implement and queue runs.
 +4.23% total) and additive separability empirically confirmed, the
 mechanism distinction from Liu (2021) MHS / KMW (2018) habit / Cocco
 (2005) is *both structural AND quantitative*. RFS-credible.
+
+## 2026-05-01 — tau_buy wired + rho_AB / p_relocate sweep scripts
+
+**Action picked**: P0 — Add `tau_buy` (Round 4 MUST list, highest-priority
+non-DONE auto-allowed action). All previous P0 items (channel decomposition,
+x-upper-bound lift) were confirmed done per prior research_log entries;
+`next_actions.md` updated to mark them DONE.
+
+**tau_buy implementation (src/vfi_solver_v3.jl)**
+
+The `tau_buy` field was already stored in `ModelParams_v3` but unused (marked
+"deferred Phase 2" in comments and metadata). Implementation design:
+
+- **Approximation**: apply the full round-trip cost `tau_sell + tau_buy` at the
+  forced-sale relocation event in E1_2L. Conceptual justification: when a
+  traditional owner relocates from A to B, they incur (i) selling cost at A and
+  (ii) buying cost at B. Since the next-period buy decision is a forward-looking
+  optimization, applying buy cost at the relocation event is a standard
+  approximation (assumes the household buys a unit of the same size at the new
+  location — the `mean_xA` evidence from prior runs supports this).
+- **Code change** in `continuation_value_v3`: replaced `sf_A_reloc = 1.0 - p.tau_sell`
+  with `tau_roundtrip = p.tau_sell + p.tau_buy; sf_A_reloc = 1.0 - tau_roundtrip`.
+  Symmetric for ell=B. E2_2L unaffected (tokens portable).
+- **Default calibration**: `TAU_SELL=0.06` (NAR) + `TAU_BUY=0.025` (closing costs)
+  = `tau_roundtrip = 0.085` = 8.5%, within the Round-4 referee's 8-12% range.
+- **Smoke-test assertion added**: checks `tau_roundtrip ∈ [0.08, 0.12]` at
+  default params.
+- **Metadata**: `tau_buy_deferred` label removed; now logged as `tau_buy` and
+  `tau_roundtrip_E1_2L` in the JSON summary.
+
+**Implication for CEV**: The prior full-grid result `CEV(E2_2L vs E1_2L) = +4.231%`
+used only tau_sell=6% in E1_2L. With tau_roundtrip=8.5%, the E1_2L relocation
+cost increases, making E1_2L worse and E2_2L (no relocation cost) better.
+Expected direction: CEV increases. Server1 must re-run both regimes to confirm.
+The channel decomposition structure (hedge=87%, avoided-tx=13%) may shift
+slightly since avoided-tx now captures more of the total round-trip.
+
+**Two P1 sensitivity sweep scripts written**:
+
+1. `scripts/run_rhoAB_sweep.sh`
+   - Sweeps `rho_AB` in `{0, 0.25, 0.50, 0.75, 0.95}` (Round 4 referee P1).
+   - For each value: runs E1_2L + E2_2L (10 runs total).
+   - Output: `output/diagnostics/rhoAB_sweep/<label>.json`.
+   - Python summary block: prints CEV% and `mean_xB_t1_feasible_ellA` per rho_AB.
+   - Falsification check: at `rho_AB=0.95`, cross-location hedge should approach
+     zero (xB nearly redundant with xA; CEV should collapse toward avoided-tx only).
+
+2. `scripts/run_prelocate_sweep.sh`
+   - Sweeps `p_relocate_working` in `{0, 0.02, 0.06, 0.12}` (Round 4 referee P1).
+   - For each value: runs E1_2L + E2_2L (8 runs total).
+   - Output: `output/diagnostics/prelocate_sweep/<label>.json`.
+   - Falsification check: at `p_relocate=0`, CEV should approach 0 (no relocation
+     event means no forced sale, no benefit to tokens).
+   - Both scripts: `set -euo pipefail`; log to sweep.log; Python summary inline.
+
+**Files modified**:
+- `src/vfi_solver_v3.jl` — tau_buy wired (round-trip cost in E1_2L)
+- `next_actions.md` — marked P0 items DONE; updated P1 scripts status
+- `scripts/run_rhoAB_sweep.sh` — new
+- `scripts/run_prelocate_sweep.sh` — new
+- `research_log.md` — this entry
+
+**Feature branch**: `auto/2026-05-01-tau-buy-sweeps`
+
+**Server1 queued (run after this commit arrives)**:
+1. `bash scripts/run_rhoAB_sweep.sh` — 10 runs, ~20-30 min
+2. `bash scripts/run_prelocate_sweep.sh` — 8 runs, ~15-25 min
+3. Re-run E1_2L + E2_2L baseline at default params (tau_buy=0.025 now active)
+   → `output/diagnostics/p4_full_txcost.md`
+
+**Remaining Round 4 MUST items** (all now code-complete; server1 runs pending):
+- rho_AB sensitivity: script ready
+- p_relocate sensitivity: script ready
+- tau_buy baseline re-run: code ready, server1 queued
