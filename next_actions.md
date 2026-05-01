@@ -1,60 +1,69 @@
-# Next Actions (v3 — post Round 4 referee, ASAP mode)
+# Next Actions (v3 — post Round 4 falsification, path B chosen)
 
 Project: sto_lifecycle_portfolio
-Updated: 2026-05-01 (Round 4 + ASAP cron)
+Updated: 2026-05-01 (path B: tau_buy state extension chosen by user)
 
-## ROUND 4 MUST list (cloud agent + server1 hybrid)
+## P0 - Mechanism-saving (path B): tau_buy state extension
 
-These are the items Round 4 referee said MUST happen before any
-RFS-quality submission. Ordered by impact + ease.
+User chose path B from `handoff/decisions_needed.md`. Detailed spec in
+`handoff/tau_buy_state_extension_spec.md`.
 
-| Priority | Action | Cloud agent? | Server1 run? | Done artifact |
-|---|---|---|---|---|
-| **P0** | **Channel decomposition**: implement counterfactual `E1_2L_NOTX` regime (tau_sell=0). Solve and compute `CEV(E2_2L vs E1_2L_NOTX)`. The residual CEV is the maintained-hedge channel; the difference vs `CEV(E2_2L vs E1_2L)` is the avoided-tx channel. **Most important Round 4 item.** | yes (code + counterfactual regime) | yes (run) | `output/diagnostics/p4_channel_decomposition.md` |
-| P0 | **Lift `x` upper bound**: re-parameterize x grid to `x_max ∈ {1.5, 2, 3}` (env var `X_MAX`). Re-solve E2_2L. If `mean_x` still pins at corner, add maintenance / property tax / agency cost on `x_{¬ell}` (curvature mechanism per Round 4 (h)+(p)). | yes (code) | yes (run) | `output/diagnostics/p4_xmax_sensitivity.md` |
-| P0 | **Add `tau_buy`**: lift to round-trip 8-12% per NAR + closing costs. Apply at relocation in E1_2L (sell at A + buy at B). Re-run baseline. | yes (code) | yes (run) | `output/diagnostics/p4_full_txcost.md` |
-| P1 | **`rho_AB` sensitivity**: sweep `{0, 0.25, 0.5, 0.75, 0.95}`. Hedge channel must collapse at `rho_AB → 1`. | yes (script) | yes (5 runs) | `output/diagnostics/p4_rhoAB_sweep.md` |
-| P1 | **`p_relocate` sensitivity**: sweep `{0, 0.02, 0.06, 0.12}`. Cross-location holding must collapse at `p_relocate=0`. | yes (script) | yes (4 runs) | `output/diagnostics/p4_prelocate_sweep.md` |
+Cloud agent execution order:
 
-## ROUND 4 SHOULD list
+1. **Option 3 cheapest test first**: add synthetic R_B premium
+   `saving = p_relocate * tau_buy` to existing v3 solver. ~1h total.
+   If mean_xB still 0, mechanism is dead → fall back to path D (REE).
+2. **If Option 3 shows hedge activation**: proceed to Option 1 (full
+   state extension `x_A_prev, x_B_prev`). ~1-2 weeks code + 4-8h
+   compute (state space 25x larger).
+
+| Priority | Action | Done artifact |
+|---|---|---|
+| **P0** | Option 3 quick test on `fix/` branch | `p5_tau_buy_option3.json` |
+| P0 | If Option 3 positive: Option 1 full state extension | `p5_tau_buy_option1.json` |
+| P0 | Channel decomposition under tau_buy | `p5_tau_buy_decomposition.md` |
+| P0 | If Options 1+3 both fail: write `path_D_REE_pivot.md` recommending fallback | handoff doc |
+
+## P1 (after path B resolves)
 
 | Priority | Action |
 |---|---|
-| P2 | **Asymmetric robustness**: `p(A→B) ≠ p(B→A)` and `mu_A ≠ mu_B`. |
-| P2 | **Mortgage activation**: `ltv_max ∈ {0.5, 0.8}`. Closes Round-2 (j). |
-| P2 | **Reversible relocation**: allow B→A→B... — currently one-time. |
-| P2 | **CEV across (t,w,z)**: not just midpoint. |
-| P2 | **Comparison table**: at common calibration to Liu (2021 JHE) MHS, KMW (2018) habit, YZ (2005), Cocco (2005). Mechanism distinction must be visible numerically. |
-| P3 | Equilibrium price effects discussion (defer to manuscript). |
-| P3 | Maintenance / agency frictions (P0 lift_xmax may force this). |
-| P3 | Empirical identification of hedge channel from observables. |
+| P1 | rho_AB sensitivity sweep (referee P1 still pending under fixed rule) |
+| P1 | Asymmetric robustness (`p(A→B) ≠ p(B→A)`, `mu_A ≠ mu_B`) |
+| P1 | Mortgage activation (`ltv_max ∈ {0.5, 0.8}`) |
+| P1 | CEV across (t,w,z) state space, not just midpoint |
 
-## Phase 0/1 status
+## DONE
 
 | Status | Action |
 |---|---|
-| DONE | Pivot memo, Bellman v3 design, main_question rewrite |
-| DONE | v3 solver skeleton (881 LOC, 6 Phase 1 items) — cloud agent first fire 2026-05-01 |
+| DONE | v3 solver skeleton (881 LOC, 6 Phase 1 items) — cloud agent first fire |
 | DONE | Smoke test PASS in 3.3s |
-| DONE | Reduced-grid baseline: CEV +5.93% (corner-loaded artifact) |
-| DONE | Full-grid E1_2L baseline (V=-1408.63, mean_x=0.556, less corner) |
-| IN-FLIGHT | Full-grid E2_2L baseline |
+| DONE | Reduced + full-grid baselines |
+| DONE | Channel decomposition (under OLD kappa rule) — hedge claim 87% |
+| DONE | Round 4 P1 falsification (rho_AB=0.95, p_relocate=0) — BOTH FAIL |
+| DONE | Model fix: kappa = rho - x_ell * delta_own (only occupied unit) |
+| DONE | Fixed-rule baselines (p_relocate ∈ {0, 0.06, 0.30}) — mean_xB=0 always |
+| DONE | Decisions_needed.md with paths B/C/D + recommendation |
 
 ## Cloud routine
 
 - ID: `trig_013fH7bjrudxtrb6hkhz4Nkj`
-- Cron: `0 */2 * * *` (every 2 hours, 24/7) — ASAP mode
-- Next fire: 2026-05-01 10:08 UTC (~19:08 KST today)
+- Cron: `0 */2 * * *` (every 2 hours, ASAP mode)
+- Next fire: ~10:08 UTC (~19:08 KST today)
 
-## Human gates (still open)
+## Human gates
 
-- (H1') Title/abstract approval (defer until Round 5)
-- (H2') Calibration anchor approval (PSID, NAR, Case-Shiller specifics)
-- (H3') Framing approval at writing kickoff
-- (H4') Submission decision
+- (H1') Title approval — defer
+- (H2') Calibration anchor approval — defer
+- (H3') Framing approval at writing kickoff — defer
+- (H4') Submission decision — defer
+- **NEW: path B/C/D decision DONE 2026-05-01: chose B**
 
-## Parking lot
+## Branch state
 
-- Information-asymmetry extension (companion paper)
-- Tax-wedge extension (companion paper)
-- Default option (deferred)
+- `main`: through `3004841` (full-grid + decomposition)
+- `fix/2026-05-01-housing-cost-only-occupied`: `7c2e4d6` — adds fixed
+  kappa rule + falsification evidence + decisions_needed.md
+- Cloud agent: continue on `fix/` or new `auto/` branch
+- No main commits until path B resolution
