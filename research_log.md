@@ -855,3 +855,64 @@ rental-income artifact, not a hedge.
 Next decision after (A) result: if hedge channel emerges at high
 p_relocate, mechanism is real but calibration-sensitive (REE-OK,
 RFS-questionable). If still 0, mechanism is dead and need (B) or (C).
+
+## 2026-05-01 — DECISIVE: Hedge mechanism dead at any p_relocate
+
+Tested high-mobility scenario (P_RELOCATE_WORKING=0.30, retired=0.10)
+under fixed kappa rule. Result:
+
+| p_relocate | CEV vs E1_2L | mean_xB at ellA |
+|---|---|---|
+| 0.00 | 3.989% | 0.000 |
+| 0.06 | 3.995% | 0.000 |
+| **0.30 (high mobility)** | **3.996%** | **0.000** |
+
+Even at 30 percent annual relocation (3-year average tenure —
+unrealistically mobile), mean_xB = 0 at ell=A. Cross-location hedge
+**does not activate at any plausible p_relocate** under the symmetric
+calibration.
+
+**Why**: at ell=A, x_A receives rent saving (delta_own=4%) AND capital
+gain (R_A). x_B receives ONLY capital gain (R_B). With symmetric returns
+R_A ~ R_B, the rent-saving advantage makes x_A strictly dominate x_B as
+a financial instrument. The future hedge benefit of pre-holding x_B
+cannot compensate for x_A's per-period rent saving — even at 30%
+mobility.
+
+**Conclusion**: v3 "Tokens decouple location from housing exposure"
+framing **as proposed delivers empirically zero hedge channel** under
+correct model spec. The +4.0% headline is entirely continuous-x
+rent-saving (Liu 2021 / KMW 2018 territory). Mechanism is dead at any
+p_relocate.
+
+**Mechanism-saving routes** (require additional model structure):
+
+(B) **tau_buy state extension**: real households pay 2-3% buying cost
+    on arrival. Pre-holding x_B (tokens of B before relocation) saves
+    this cost. State extension: track "did just relocate". Cloud agent
+    deferred this in initial implementation; now P0.
+
+(C) **Income-location correlation**: location-A specific income shocks
+    correlate with R_A; x_B at ell=A becomes hedge against
+    location-A-specific consumption shortfall. Requires shock-block
+    extension with corr(eps_loc_A, iota_A).
+
+(A) high p_relocate alone: TESTED — does not save mechanism.
+
+**Strategic update**:
+
+- Current evidence puts v3 in REE/Liu territory without (B) or (C).
+- (B) is the cleanest path: tau_buy with state extension. Cloud agent
+  estimated this as Phase 2 work; the falsification evidence makes it
+  P0 critical.
+- (C) is more speculative; income-housing correlation literature is
+  thin and might not support meaningful magnitude.
+
+**Queued for cloud agent next fire**: implement (B) tau_buy state
+extension, re-run E2_2L baseline + falsification tests under (B).
+
+**Honest assessment**: if (B) doesn't deliver meaningful hedge channel
+either, the paper's RFS-credible mechanism is exhausted within v3
+framework. REE/JHE submission with continuous-x channel is the
+realistic target.
+
