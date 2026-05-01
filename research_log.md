@@ -794,3 +794,54 @@ next fire (~10:08 UTC) can implement and queue runs.
 +4.23% total) and additive separability empirically confirmed, the
 mechanism distinction from Liu (2021) MHS / KMW (2018) habit / Cocco
 (2005) is *both structural AND quantitative*. RFS-credible.
+
+## 2026-05-01 — tau_buy activated in v3 solver (Round 4 P0)
+
+**Action picked**: Add `tau_buy` to `src/vfi_solver_v3.jl` — the last
+incomplete P0 item from the Round 4 MUST list. Previous fires completed
+channel decomposition (P0-1, DONE commit 3004841) and confirmed x upper
+bound is NOT NEEDED (P0-2, wealth-adaptive). tau_buy was stored in
+`ModelParams_v3` but not applied ("deferred to Phase 2").
+
+**Implementation decision**: applied tau_buy as a wealth deduction from
+`w_reloc` inside `continuation_value_v3()` for the E1_2L regime. This
+captures the anticipated re-entry buying cost at the new location without
+requiring a new "incumbent vs. new buyer" state variable.
+
+Approximation: assumes the E1_2L household re-enters homeownership after
+relocation (consistent with binary-tenure optimality in the baseline). E2_2L
+is unaffected — tokens are portable and incur no buying cost, which is the
+key mechanism asymmetry.
+
+**Files changed**:
+- `src/vfi_solver_v3.jl`:
+  - `ModelParams_v3.tau_buy` comment updated: "applied at E1_2L relocation"
+  - `continuation_value_v3()`: added `w_reloc -= p.tau_buy` for E1_2L
+  - Smoke-test extended: tau_buy spot-checks verify E1_2L EV is reduced by
+    tau_buy > 0 and E2_2L EV is unaffected (portable tokens)
+  - Metadata: `tau_buy_deferred` key renamed to `tau_buy` (now active)
+  - Print: removed "(deferred)" label from tau_buy log line
+- `scripts/p4_txcost_sweep.sh` (NEW): 6-run sweep script for server1
+  (3 scenarios × 2 regimes: tx_baseline, tx_roundtrip, tx_none)
+- `scripts/compute_cev_v3.jl` (NEW): CEV computation helper from JSON summaries
+- `docs/p4_full_txcost_plan.md` (NEW): run plan with prior results
+  and expected decomposition table (TBD cells for post-run fill-in)
+
+**Prior channel decomposition** (tau_sell=0.06, tau_buy=0 [deferred]):
+- TOTAL CEV(E2_2L vs E1_2L) = +4.231%
+- avoided-tx: +0.565% (13.4%); maintained-hedge: +3.645% (86.2%)
+
+**Expected directional effect** of activating tau_buy=0.025:
+- E1_2L welfare decreases further (relocation is now more costly)
+- TOTAL CEV(E2_2L vs E1_2L) INCREASES (E1_2L is worse)
+- avoided-tx channel INCREASES (larger tx burden to avoid)
+- maintained-hedge remains near 3.6-3.7%
+
+**Branch**: `auto/2026-05-01-tau-buy-activation`
+
+**Server1 run needed**: `bash scripts/p4_txcost_sweep.sh` followed by
+`julia scripts/compute_cev_v3.jl` pairs to fill p4_full_txcost.md.
+
+**Next queued** (next cloud fire):
+- Implement `scripts/p4_rhoAB_sweep.sh` and `scripts/p4_prelocate_sweep.sh`
+  (Round 4 P1 sensitivity sweeps; pure script work, no solver edits needed)

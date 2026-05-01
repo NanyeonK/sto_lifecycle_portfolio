@@ -13,9 +13,11 @@
 #   2. Stochastic relocation shock: Bernoulli(p_relocate(t)) each period
 #      p_relocate age-dependent: working-age ~6% (PSID mid-range), retired ~2%
 #   3. Transaction costs on relocation:
-#      E1_2L: tau_sell (~6% NAR) applied to x_ell * R_ell on forced sale
-#      E2_2L: tokens portable across moves — no forced sale, no selling cost
-#      tau_buy (~2.5%) deferred to Phase 2 (buying-cost state extension)
+#      E1_2L: tau_sell (~6% NAR) on x_ell * R_ell forced-sale; tau_buy (~2.5%)
+#      deducted from w_reloc as anticipated re-entry cost at new location.
+#      Approximation: assumes E1_2L household re-enters ownership after relocation
+#      (consistent with binary-tenure model; avoids a lagged-ownership state var).
+#      E2_2L: tokens portable — no forced sale, no tx costs.
 #   4. Location-correlated returns: R_A and R_B share aggregate factor eta_div;
 #      idiosyncratic components iota_A and iota_B are correlated by rho_AB
 #      (Case-Shiller MSA-pair anchor: baseline rho_AB = 0.50, range 0.30-0.70)
@@ -95,7 +97,7 @@ struct ModelParams_v3
     p_relocate_retired::Float64  # annual relocation prob, retired (~0.02)
     # v3: transaction costs
     tau_sell::Float64     # selling cost fraction of housing value (~0.06, NAR)
-    tau_buy::Float64      # buying cost fraction (~0.025); stored but deferred to Phase 2
+    tau_buy::Float64      # buying cost fraction (~0.025); applied at E1_2L relocation
     tau_token::Float64    # token transfer cost fraction (~0.01); stored, deferred to Phase 2
     # Mortgage
     ltv_max::Float64
@@ -453,6 +455,12 @@ function continuation_value_v3(
         w_reloc = next_wealth_v3(p, b, s, x_A, x_B, shock.hp[q], shock.rs[q],
                                   shock.ra[q], shock.rb[q],
                                   sf_A_reloc, sf_B_reloc, y_next)
+        # tau_buy: deduct anticipated re-entry buying cost at new location.
+        # Applied to E1_2L only; E2_2L tokens are portable with no buying cost.
+        # Approximation: assumes the household re-enters ownership at new location.
+        if regime == REGIME_E1_2L
+            w_reloc -= p.tau_buy
+        end
 
         # Value at next-period location: (n_w, n_z) slice for each ell
         v_stay  = interp_bilinear_v3(view(next_value_slice, :, :, ell),
@@ -685,7 +693,7 @@ function solve_v3(;
     result.metadata["p_relocate_working"]  = params.p_relocate_working
     result.metadata["p_relocate_retired"]  = params.p_relocate_retired
     result.metadata["tau_sell"]            = params.tau_sell
-    result.metadata["tau_buy_deferred"]    = params.tau_buy    # Phase 2
+    result.metadata["tau_buy"]             = params.tau_buy    # applied at E1_2L relocation
     result.metadata["tau_token_deferred"]  = params.tau_token  # Phase 2
 
     if cfg.save_path !== nothing
@@ -774,7 +782,7 @@ function smoke_test_v3()
     @printf("  p_relocate_working  = %.3f\n",  params.p_relocate_working)
     @printf("  p_relocate_retired  = %.3f\n",  params.p_relocate_retired)
     @printf("  tau_sell            = %.4f\n",  params.tau_sell)
-    @printf("  tau_buy             = %.4f  (deferred Phase 2)\n", params.tau_buy)
+    @printf("  tau_buy             = %.4f  (active: E1_2L reloc wealth deduction)\n", params.tau_buy)
     @printf("  sigma_div           = %.4f\n",  params.sigma_div)
     @printf("  sigma_iota          = %.4f\n",  params.sigma_iota)
     @printf("  decomp check: sqrt(%.6f^2 + %.6f^2) = %.6f  (sigma_h = %.6f)\n",
@@ -835,6 +843,46 @@ function smoke_test_v3()
     @assert p_relocate_v3(p, 42) == p.p_relocate_retired  # age 66
     println("  p_relocate_v3 spot-checks: PASS")
 
+    # tau_buy application: verify it lowers w_reloc for E1_2L but not E2_2L.
+    # We call continuation_value_v3 with a trivial next_value_slice (all zeros)
+    # and check that the E1_2L value with tau_buy > 0 differs from tau_buy = 0.
+    # Use a minimal 1-period model: T=2, terminal slice (index 2) = utility_crra(w).
+    let gs = default_grids_v3(small=true), cf = default_config_v3(small=true)
+        gd     = build_grids_v3(gs)
+        sh     = build_shock_block_v3(p, cf)
+        fp     = income_profile_v3(p)
+        T      = num_periods_v3(p) + 1
+        res_tb = initialize_result_v3(p, gd)
+        terminal_slice_v3!(res_tb, p, gd, T)
+        nxt    = view(res_tb.value, T, :, :, :)
+        w_test = 3.0;  z_test = 0.5;  t_test = 1
+        ev_e1   = continuation_value_v3(p, gd, sh, fp, nxt, t_test, z_test, LOC_A,
+                                         0.0, 0.2, 1.0, 0.0, REGIME_E1_2L)
+        # Build params with tau_buy = 0 for comparison
+        p_notb  = ModelParams_v3(p.gamma, p.beta, p.rf, p.mu_s, p.sigma_s,
+                                  p.mu_h, p.sigma_h, p.g_h, p.sigma_xi,
+                                  p.rho, p.m, p.sigma_u, p.sigma_eps,
+                                  p.lambda_ret, p.age0, p.retire_age, p.terminal_age,
+                                  p.sigma_div, p.sigma_iota, p.rho_AB,
+                                  p.p_relocate_working, p.p_relocate_retired,
+                                  p.tau_sell, 0.0, p.tau_token,
+                                  p.ltv_max, p.r_mort_premium)
+        sh_notb = build_shock_block_v3(p_notb, cf)
+        ev_notb = continuation_value_v3(p_notb, gd, sh_notb, fp, nxt, t_test, z_test, LOC_A,
+                                         0.0, 0.2, 1.0, 0.0, REGIME_E1_2L)
+        # With tau_buy > 0, expected value of relocating is lower → ev_e1 < ev_notb
+        @assert ev_e1 < ev_notb "tau_buy should reduce E1_2L continuation value"
+        # E2_2L should be unaffected by tau_buy (tokens portable)
+        ev_e2   = continuation_value_v3(p, gd, sh, fp, nxt, t_test, z_test, LOC_A,
+                                         0.0, 0.2, 0.5, 0.5, REGIME_E2_2L)
+        ev_e2nb = continuation_value_v3(p_notb, gd, sh_notb, fp, nxt, t_test, z_test, LOC_A,
+                                         0.0, 0.2, 0.5, 0.5, REGIME_E2_2L)
+        @assert abs(ev_e2 - ev_e2nb) < 1e-10 "tau_buy must not affect E2_2L (tokens portable)"
+        @printf("  tau_buy spot-check: E1_2L EV %.6f (w/ tau_buy) vs %.6f (no tau_buy)  diff=%.6f\n",
+                ev_e1, ev_notb, ev_e1 - ev_notb)
+        println("  tau_buy spot-checks: PASS")
+    end
+
     println("=== smoke_test_v3: PASS ===")
     return true
 end
@@ -858,7 +906,7 @@ function main_v3(args::Vector{String}=ARGS)
     @printf("  quadrature: %d nodes, %d points total\n", cfg.quadrature_nodes, cfg.quadrature_nodes^7)
     @printf("  mobility  : p_reloc_work=%.3f, p_reloc_ret=%.3f\n",
             params.p_relocate_working, params.p_relocate_retired)
-    @printf("  tx costs  : tau_sell=%.3f, tau_buy=%.3f (deferred), tau_token=%.3f (deferred)\n",
+    @printf("  tx costs  : tau_sell=%.3f, tau_buy=%.3f (E1_2L reloc), tau_token=%.3f (deferred)\n",
             params.tau_sell, params.tau_buy, params.tau_token)
     @printf("  returns   : rho_AB=%.2f, sigma_div=%.4f, sigma_iota=%.4f\n",
             params.rho_AB, params.sigma_div, params.sigma_iota)

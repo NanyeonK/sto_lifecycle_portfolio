@@ -10,11 +10,11 @@ RFS-quality submission. Ordered by impact + ease.
 
 | Priority | Action | Cloud agent? | Server1 run? | Done artifact |
 |---|---|---|---|---|
-| **P0** | **Channel decomposition**: implement counterfactual `E1_2L_NOTX` regime (tau_sell=0). Solve and compute `CEV(E2_2L vs E1_2L_NOTX)`. The residual CEV is the maintained-hedge channel; the difference vs `CEV(E2_2L vs E1_2L)` is the avoided-tx channel. **Most important Round 4 item.** | yes (code + counterfactual regime) | yes (run) | `output/diagnostics/p4_channel_decomposition.md` |
-| P0 | **Lift `x` upper bound**: re-parameterize x grid to `x_max ∈ {1.5, 2, 3}` (env var `X_MAX`). Re-solve E2_2L. If `mean_x` still pins at corner, add maintenance / property tax / agency cost on `x_{¬ell}` (curvature mechanism per Round 4 (h)+(p)). | yes (code) | yes (run) | `output/diagnostics/p4_xmax_sensitivity.md` |
-| P0 | **Add `tau_buy`**: lift to round-trip 8-12% per NAR + closing costs. Apply at relocation in E1_2L (sell at A + buy at B). Re-run baseline. | yes (code) | yes (run) | `output/diagnostics/p4_full_txcost.md` |
-| P1 | **`rho_AB` sensitivity**: sweep `{0, 0.25, 0.5, 0.75, 0.95}`. Hedge channel must collapse at `rho_AB → 1`. | yes (script) | yes (5 runs) | `output/diagnostics/p4_rhoAB_sweep.md` |
-| P1 | **`p_relocate` sensitivity**: sweep `{0, 0.02, 0.06, 0.12}`. Cross-location holding must collapse at `p_relocate=0`. | yes (script) | yes (4 runs) | `output/diagnostics/p4_prelocate_sweep.md` |
+| **P0** | **Channel decomposition**: implement counterfactual `E1_2L_NOTX` regime (tau_sell=0). Solve and compute `CEV(E2_2L vs E1_2L_NOTX)`. The residual CEV is the maintained-hedge channel; the difference vs `CEV(E2_2L vs E1_2L)` is the avoided-tx channel. **Most important Round 4 item.** | yes (code + counterfactual regime) | yes (run) | `output/diagnostics/p4_channel_decomposition.md` | **DONE** (commit 3004841) |
+| P0 | **Lift `x` upper bound**: re-parameterize x grid to `x_max ∈ {1.5, 2, 3}` (env var `X_MAX`). Re-solve E2_2L. If `mean_x` still pins at corner, add maintenance / property tax / agency cost on `x_{¬ell}` (curvature mechanism per Round 4 (h)+(p)). | yes (code) | yes (run) | `output/diagnostics/p4_xmax_sensitivity.md` | **NOT NEEDED** — x_max is wealth-adaptive in v3; full-grid mean_x=0.91 (interior). |
+| P0 | **Add `tau_buy`**: lift to round-trip 8-12% per NAR + closing costs. Apply at relocation in E1_2L (sell at A + buy at B). Re-run baseline. | yes (code) | yes (run) | `docs/p4_full_txcost_plan.md` | **CODE DONE** (branch auto/2026-05-01-tau-buy-activation). Sweep script `scripts/p4_txcost_sweep.sh` ready. **Runs pending on server1.** |
+| P1 | **`rho_AB` sensitivity**: sweep `{0, 0.25, 0.5, 0.75, 0.95}`. Hedge channel must collapse at `rho_AB → 1`. | yes (script) | yes (5 runs) | `output/diagnostics/p4_rhoAB_sweep.md` | **NEXT cloud fire** |
+| P1 | **`p_relocate` sensitivity**: sweep `{0, 0.02, 0.06, 0.12}`. Cross-location holding must collapse at `p_relocate=0`. | yes (script) | yes (4 runs) | `output/diagnostics/p4_prelocate_sweep.md` | **NEXT cloud fire** |
 
 ## ROUND 4 SHOULD list
 
