@@ -39,9 +39,10 @@ ENV/
 
 # Project
 output/logs/*
-output/diagnostics/*
 !output/logs/.gitkeep
+output/diagnostics/*
 !output/diagnostics/.gitkeep
+!output/diagnostics/*.md
 
 # Large model artifacts
 output/models/*.pkl

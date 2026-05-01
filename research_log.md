@@ -794,3 +794,77 @@ next fire (~10:08 UTC) can implement and queue runs.
 +4.23% total) and additive separability empirically confirmed, the
 mechanism distinction from Liu (2021) MHS / KMW (2018) habit / Cocco
 (2005) is *both structural AND quantitative*. RFS-credible.
+
+## 2026-05-01 — Round 4 sensitivity sweep scripts implemented (cloud fire)
+
+**Action picked**: implement server1-ready sensitivity sweep scripts for
+the three remaining Round 4 MUST/SHOULD items. This fire is cloud-only
+(script authoring); actual VFI runs are queued for server1.
+
+**Context**: the previous cloud fire (commit 3004841) completed the full-grid
+channel decomposition — CEV total +4.231%, hedge channel +3.645% (86.2%),
+avoided-tx +0.565% (13.4%). The Round 4 P0 items are now resolved at the
+code level; the three remaining items require scripted sensitivity sweeps
+before server1 runs.
+
+**Three scripts written** (all in `scripts/`, all `chmod +x`):
+
+### 1. `scripts/run_p4_full_txcost.sh` (Round 4 P0 — tau_buy)
+
+Implements the round-trip transaction cost comparison requested by Round 4
+referee item (h)+(p). **Approximation approach** (Phase 2 state extension
+deferred per prior agent): tau_buy = 2.5% is folded into tau_sell as a
+combined round-trip cost `TAU_SELL = 0.085` (6% NAR sell + 2.5% buy/closing).
+Applied to E1_2L at relocation events; E2_2L uses `TAU_SELL = 0.0` (tokens
+portable). Three regimes:
+- `E1_2L_fulltx`: TAU_SELL=0.085 (full round-trip)
+- `E2_2L_notx`: TAU_SELL=0.0 (token portability, no forced sale)
+- `E1_2L_notx`: TAU_SELL=0.0 (counterfactual zero tx, for channel decomp)
+
+Expected outcome: CEV_total higher than baseline 4.231% (E1_2L more costly
+under round-trip cost); hedge channel share expected stable (~86%).
+
+### 2. `scripts/run_p4_rhoAB_sweep.sh` (Round 4 P1 — rho_AB sensitivity)
+
+Sweeps `RHO_AB ∈ {0.00, 0.25, 0.50, 0.75, 0.95}` for both E1_2L and E2_2L.
+10 total runs; ~5 hours sequential or ~30 min with 10 parallel workers on
+server1. Key falsification test: `CEV(E2_2L vs E1_2L)` must collapse toward
+the avoided-tx floor (~0.565%) as `rho_AB → 0.95`. If it does not, the
+mechanism claim is undermined.
+
+### 3. `scripts/run_p4_prelocate_sweep.sh` (Round 4 P1 — p_relocate sensitivity)
+
+Sweeps `P_RELOCATE_WORKING ∈ {0.00, 0.02, 0.06, 0.12}` for both regimes.
+8 total runs; ~4 hours sequential. Key falsification test: `CEV(E2_2L vs
+E1_2L)` and `mean_xB` must collapse toward zero at `p_relocate = 0`. A small
+residual CEV at p=0 would quantify the indivisibility-relaxation component
+(Liu 2021 territory) that the paper explicitly distinguishes from the
+mobility-hedge mechanism.
+
+**Three diagnostic templates written** (placeholders for server1 results):
+- `output/diagnostics/p4_full_txcost.md`
+- `output/diagnostics/p4_rhoAB_sweep.md`
+- `output/diagnostics/p4_prelocate_sweep.md`
+
+Each template includes: design rationale, predicted patterns, CEV tables with
+[FILL] stubs, and a referee checklist.
+
+**next_actions.md updated**:
+- Round 4 P0: channel decomp → DONE; lift x upper bound → NOT NEEDED;
+  tau_buy script → SCRIPT DONE, SERVER1 RUN QUEUED
+- Round 4 P1: rhoAB script → SCRIPT DONE, SERVER1 RUN QUEUED;
+  p_relocate script → SCRIPT DONE, SERVER1 RUN QUEUED
+- Full-grid E2_2L baseline → DONE (V=-1193.49 from prior run)
+
+**Feature branch**: `auto/2026-05-01-sensitivity-sweeps`
+
+**Next queued (server1)**:
+1. Run `bash scripts/run_p4_full_txcost.sh` — 3 regimes × ~30 min = ~90 min
+2. Run `bash scripts/run_p4_rhoAB_sweep.sh` — 10 regimes × ~30 min = ~5 hr
+   (parallelize: run 10 tmux panes or use GNU parallel on server1)
+3. Run `bash scripts/run_p4_prelocate_sweep.sh` — 8 regimes × ~30 min = ~4 hr
+4. After runs: fill in [FILL] cells in the three diagnostic templates
+5. Next cloud fire: read filled-in diagnostics, compute final CEV tables,
+   produce `p4_channel_decomposition_v2.md` with full_txcost comparison,
+   and draft the Round 4 / SHOULD list items (asymmetric robustness script,
+   mortgage activation script).
