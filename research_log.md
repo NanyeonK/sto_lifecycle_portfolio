@@ -518,6 +518,74 @@ range. RFS still ambitious; multi-property tokens (alpha'') remains
 the only credible path to RFS, and would be a separate 12-18 month
 project.
 
+## 2026-05-01 — Phase 1 solver v3 skeleton implemented
+
+**Action picked**: implement `src/vfi_solver_v3.jl` — all six interconnected
+Phase 1 items completed in one cohesive file (they cannot be separated: the
+4D state requires the relocation shock; the shock block requires correlated
+returns; the regime IDs require the transaction-cost block).
+
+**Six Phase 1 items completed:**
+
+1. **4D state `(t, w, z, ell)`**: `ell ∈ {LOC_A=1, LOC_B=2}`. Value
+   function, policy functions, feasibility mask all 4D arrays. Interpolation
+   dispatches per-location via `view(next_value_slice, :, :, ell)`.
+
+2. **Stochastic relocation shock**: Bernoulli(`p_relocate(t)`) each period.
+   `p_relocate_v3()` returns `p_relocate_working` (default 0.06) for
+   working-age periods and `p_relocate_retired` (default 0.02) post-65.
+   Calibrated to PSID mid-range. Both parameters are env-var configurable.
+
+3. **Transaction-cost block**: `tau_sell` (~6%, NAR), `tau_buy` (~2.5%),
+   `tau_token` (~1%) all in `ModelParams_v3` and env-var configurable.
+   `tau_sell` applied at relocation in E1_2L: `sell_factor = (1 - tau_sell)`
+   on the current-location housing return. `tau_buy` and `tau_token` stored
+   but **deferred to Phase 2** (buying-cost application requires tracking
+   whether the household just relocated — a state extension; noted in code
+   comments; contribution estimate from Phase 1 is conservative / lower bound).
+
+4. **Regime IDs E0 / E1_2L / E2_2L**: replace v2 taxonomy entirely.
+   `housing_cost_v3()` implements the three cost rules:
+   - E0: `rho` (pure renter)
+   - E1_2L: binary kink at `x_ell ∈ {0,1}`; `x_{ell'} = 0` by admissibility
+   - E2_2L: smooth `rho - (x_A + x_B) * delta_own` — x_ell saves rent at
+     occupied location, x_{ell'} earns rental income (both reduce net cost
+     by delta_own per unit).
+
+5. **Location-correlated returns**: 7D GH quadrature
+   `(eta_s, eta_div, xi_iota_A, xi_iota_B, xi_house, u, eps)`.
+   Bivariate (iota_A, iota_B) via Cholesky:
+   `iota_A = sigma_iota * sqrt(2) * xi_A`;
+   `iota_B = rho_AB * iota_A + sqrt(1-rho_AB^2) * sigma_iota * sqrt(2) * xi_B`.
+   Default `rho_AB = 0.50` (Case-Shiller MSA-pair midpoint; range 0.3–0.7).
+   At n=3 nodes: 3^7 = 2187 quadrature points per state.
+
+6. **Smoke-test stub**: `smoke_test_v3()` function; run via
+   `julia src/vfi_solver_v3.jl --smoke-test`. Tests: sigma decomposition
+   invariant, shock-block size and weight-sum, 4D array shape, terminal
+   slice, housing-cost spot-checks, `p_relocate_v3` boundary checks.
+   VFI not run (cloud env lacks Julia; server1 run queued as next P1 action).
+
+**File created**: `src/vfi_solver_v3.jl` (~430 LOC). v2 solver preserved at
+`src/vfi_solver_v2.jl` for reference and CEV baseline comparison.
+
+**Design notes:**
+- Housing-cost rule for E2_2L (`rho - (x_A + x_B) * delta_own`) is symmetric
+  in ell: x_A saves rent when living at A and earns rental income when at B;
+  x_B vice versa. Net cost reduction is delta_own = 0.04 per unit held.
+- Mortgage (LTV) applied to the occupied-unit token (x_ell) only.
+- E1_2L: x_{ell'} = 0 enforced by the grid search (only two cases: rent x_ell=0
+  or own x_ell=1; nothing for other location).
+- Continuation value integrates discrete relocation Bernoulli inline with the
+  7D quadrature: `EV = Σ_q w_q * hp_scale * [(1-p_reloc)*V(ell,w_stay) + p_reloc*V(ell',w_reloc)]`.
+
+**Next queued actions** (all auto-allowed, server1 required):
+- Run `julia src/vfi_solver_v3.jl --smoke-test` on server1.
+- Run E1_2L and E2_2L small-grid baselines; check feasibility.
+- Compute `CEV(E2_2L vs E1_2L)` at baseline calibration.
+
+**Feature branch**: `auto/2026-05-01-v3-solver-skeleton`.
+
 ## 2026-05-01 — FULL PIVOT to mobility-hedge framing
 
 After Round-3 referee + delta + alpha'' empirical work concluded
