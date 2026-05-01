@@ -1,46 +1,81 @@
-# Next Actions
+# Next Actions (v3 — post mobility-hedge pivot)
 
 Project: sto_lifecycle_portfolio
-Updated: 2026-05-01
+Updated: 2026-05-01 (full pivot)
 
-Only list concrete next actions. Move completed or abandoned items into `research_log.md`.
+## Phase 0 — Design and pivot (this week)
 
-| Priority | Action | Auto allowed? | Human required? | Why now | Owner | Required context | Blocking dependency | Validation command/check | Done artifact | Rollback / recovery |
-|---|---|---|---|---|---|---|---|---|---|---|
-| DONE | (H1) Confirm repo name `sto_lifecycle_portfolio` and server1 allocation | — | — | confirmed 2026-05-01 chat ("진행해라 이대로 가라") | human | — | — | recorded in `decision_log.md` | confirmation row in `decision_log.md` | — |
-| DONE | (P0a) Read archived prior code at `~/project/token_paper/_archive/vfi_lifecycle_v1_20260314/`; extract notation, parameter set, calibration targets, convergence note | — | — | completed 2026-05-01; methods.md updated with archive-aligned notation | claude | archived design + code | H1 | reflected in `docs/methods.md` and `research_log.md` | `docs/methods.md` rewrite | — |
-| P0 | (P0b) `git init` and first commit of framework skeleton + state files + Bellman sketch | yes | no | provenance and reproducibility hygiene | claude | none | none | `.git/` exists; first commit recorded | first commit | `git rm -rf .git` if rejected |
-| P0 | (P0c) Set up server1 **Julia** environment matching archive dependencies (Project.toml + Manifest.toml from archive `code/`) | yes (with human signal) | no | archive solver is Julia not Python; env must match before P1 | claude | archive Julia files at `~/project/token_paper/_archive/vfi_lifecycle_v1_20260314/code/` | P0b | `julia --project=. -e 'using Pkg; Pkg.status()'` succeeds | env doc in `README.md` Environment section | rebuild env if pinning fails |
-| P1 | (P1a) Reproduce archive locked-baseline E1 run in Julia (`vfi_solver_locked_baseline.jl` adapted to repo `src/`) | yes | no | first auto-checkable precondition | claude/human | archive Julia solver, archive parameter set, archive convergence note | P0c | VFI converges; CEV(E1) magnitude matches archive within tolerance | `output/diagnostics/p1_e1_baseline.md` | reset env or re-pin if convergence fails |
-| P1 | (P1b) Diagnose archive Euler-accuracy issue (p95 ≈ -0.02 vs target < -2; p99 outliers to 1.3 at `N_W in {60,80,120}`); identify driving regions (corners, tenure boundary, low-wealth) | yes | no | flagged in archive `handoff/t5a1_convergence_note.md`; must be addressed before E2 | claude/human | archive solver diagnostics | P1a | Euler-accuracy region map produced | `output/diagnostics/p1b_euler_accuracy.md` | document remaining gaps if not fully resolvable; note as risk |
-| P1 | (P1c) Decide whether to refine the grid, change interpolation, or rewrite the Bellman operator to recover Euler accuracy. Document the decision | yes (with human signal) | yes (decision) | this affects E2 implementation choices | human/claude | P1b diagnostics | P1b | decision recorded | `decision_log.md` row | revisit if E2 implementation reveals new issues |
-| P1 | (P2) Implement E2 with continuous-`theta` cost rule `kappa_E2(theta) = (1 - theta) * rho + theta * m`; verify VFI convergence; verify interior `theta*` in non-trivial region | yes | no | contribution-existence precondition | claude/human | `docs/methods.md` Three Regimes section | P1c | numerical convergence; interior `theta*` log | `output/diagnostics/p2_e2_interior_theta.md` | tighten grid or relax cost rule if non-convergence |
-| P1 | (P3) Implement E2' falsification `kappa_E2'(theta) = rho` (`delta := 0`); verify recovery of REIT-access portfolio choice | yes | no | structural-distinction-from-REIT precondition | claude/human | E2 implementation | P2 | E2' policy reproduces an asset-only solution | `output/diagnostics/p3_falsification.md` | review coupling specification if recovery fails |
-| P1 | (P4) Compute `CEV(E2 vs E1)`, `CEV(E2' vs E1)`, and channel decomposition `delta_CEV` | yes | no | central-exhibit precondition | claude/human | P1, P2, P3 outputs | P3 | CEV magnitudes; decomposition value | `output/tables/p4_welfare_decomposition.tex` | rerun if decomposition is empty |
-| P1 | (H2) Approve `delta` baseline value after RealT and REIT net-yield review (archive implies `delta = 0.04`; confirm or adjust) | no | yes | sensitivity needs an explicit baseline | human | RealT public data; REIT effective dividend yield; archive baseline | P4 | human reply with `delta_baseline = X%` | `decision_log.md` row | rerun P4 with new value if changed |
-| P2 | (P5) Sensitivity grid `delta in [-0.02, +0.03]` (vary `m`, then vary `rho`) | yes | no | headline-conditional precondition | claude/human | E2, E2' implementations; H2 baseline | H2 | grid produced; comparative-statics figure | `output/figures/p5_cev_vs_delta.pdf` | extend grid if monotonicity fails |
-| P2 | Build `~/second_brain/wiki/projects/sto-lifecycle-portfolio.md` second_brain page | DONE | — | created 2026-05-01 | claude | repo state files | none | second_brain page exists | `wiki/projects/sto-lifecycle-portfolio.md` | — |
-| P2 | Review `/Users/nanyeon/AGENTS.md` server allocation policy and confirm server1 vs server2 fit | yes | no | server-first work rule; capacity check | claude/human | AGENTS.md | none | host decision recorded | `decision_log.md` row | move repo to server2 if capacity prefers it |
+| Priority | Action | Auto allowed? | Owner | Done artifact |
+|---|---|---|---|---|
+| DONE | Pivot memo | yes | claude | `question/pivots/2026-05-01_full_pivot_to_mobility_hedge.md` |
+| DONE | Bellman v3 design | yes | claude | `~/Library/.../wiki/research-ideas/tokenized-housing-mobility-hedge-bellman.md` |
+| DONE | Rewrite `main_question.md` | yes | claude | `question/main_question.md` v3 |
+| P0 | Scheduled agent setup for autonomous Phase 1 progression | yes | claude | `/schedule` config |
+| P0 | (H1') Confirm new title and abstract framing | no | human | reply |
+| P0 | (H2') Approve calibration anchors: PSID mobility, NAR transaction costs, Case-Shiller MSA correlations | no | human | reply with data sources |
+
+## Phase 1 — Solver v3 implementation (4-6 weeks, autonomous)
+
+| Priority | Action | Auto allowed? | Notes |
+|---|---|---|---|
+| P1 | Extend v2 solver to 2-location state: add `ell_t in {A, B}` | yes | Add 4-D state grid (t, w, z, ell) |
+| P1 | Add stochastic relocation shock with age-dependent `p_relocate(t)` | yes | PSID-anchored |
+| P1 | Add transaction-cost block: `tau_sell` (NAR ~6%), `tau_buy` (~2-3%), `tau_token` (~0.5-2%) | yes | env-var params |
+| P1 | Implement E0, E1_2L, E2_2L regimes | yes | Drop E1+, E2+, E2plusTOK, E2plusBOTH |
+| P1 | Add location-correlated returns: `R_A`, `R_B` with shared `eta_div` and idio `iota_A`, `iota_B` (corr `rho_AB`) | yes | Case-Shiller anchored |
+| P1 | Smoke test at small grids; verify NaN/Inf clean and feasibility | yes | Same as P1a in old plan |
+
+## Phase 2 — Calibration + initial results (4-6 weeks, autonomous)
+
+| Priority | Action | Auto allowed? | Notes |
+|---|---|---|---|
+| P2 | Empirical anchors document: PSID mobility, NAR costs, Case-Shiller correlations | yes | `docs/calibration_v3.md` |
+| P2 | Run baseline calibration: medium-mobility, medium-cost, medium-correlation | yes | One canonical run |
+| P2 | Compute `CEV(E2_2L vs E1_2L)` headline | yes | Decompose into avoided-tx and maintained-hedge channels |
+| P2 | Sensitivity: `(p_relocate, tau_sell, rho_AB)` 3-D grid | yes | ~9-27 runs |
+
+## Phase 3 — Referee + iteration (2-3 weeks)
+
+| Priority | Action | Auto allowed? | Notes |
+|---|---|---|---|
+| P3 | Round 4 sub-agent referee on new framing | yes | Spawn after Phase 2 results |
+| P3 | Triage and address findings | mixed | Auto for tractable; human for redirection |
+| P3 | Round 5 referee after iteration | yes | If applicable |
+
+## Phase 4 — Manuscript (4-6 weeks)
+
+| Priority | Action | Auto allowed? | Notes |
+|---|---|---|---|
+| P4 | (H3') Final framing approval | no | human at writing kickoff |
+| P4 | Writing kickoff per `02_workflows/writing_kickoff_deep_interview.md` | mixed | Auto-drafted, human-approved |
+| P4 | Paragraph cowrite per `02_workflows/paper_cowrite.md` | mixed | Standard framework |
+
+## Phase 5 — Submission
+
+| Priority | Action | Owner |
+|---|---|---|
+| P5 | Referee audit per `02_workflows/referee_audit.md` | claude/human |
+| P5 | (H4') Submission decision | human |
 
 ## Current Gate
 
-Gate: P0c (Julia env setup) -> P1 pipeline (P1a-c, P2, P3, P4) -> H2 -> P5.
+Gate: Phase 0 completion + scheduled agent active.
 
-Autonomy level: A1_PREPARE -> A2_ANALYZE once P0c completes.
-
-Required before moving on:
-- (P0b) git init.
-- (P0c) Julia env setup matching archive dependencies.
-
-Human decision needed:
-- (H2) `delta` baseline calibration value (defer to before P5; archive implies 0.04).
-- (H3) target journal cascade at writing kickoff.
-- (P1c) refine vs rewrite decision after Euler-accuracy diagnostics.
+Autonomy level: A2_ANALYZE (solver design + implementation can proceed
+autonomously; human gates at Phase 0 H1'/H2' confirmation, Phase 4
+H3', Phase 5 H4').
 
 ## Parking Lot
 
-- Borrowing / mortgage extension to E1 and E2 (deferred per Bellman sketch).
-- Single-house occupancy vs mobility (deferred per Bellman sketch).
-- Family-size dependent service flow `S_t` (deferred per Bellman sketch).
-- General-equilibrium robustness sketch as a closing section (separate from main contribution).
-- Empirical companion using RealT/Real-estate token data as descriptive support (later phase).
+- Information-asymmetry extension (deferred to companion paper)
+- Tax-wedge extension (deferred to companion paper)
+- Default option / mortgage limited-recourse (deferred)
+- Reversible relocation (robustness; first-cut is one-time)
+- N-location structure (robustness; first-cut is 2-location)
+
+## Retired (from v2)
+
+- 4-regime REIT-comparison structure
+- Multi-property x_other extension
+- Hedge channel via corr(iota, eps)
+- "Service-asset wedge" / "service-rights coupling" framing

@@ -26,11 +26,12 @@ Environment: **Julia** (archive solver language); to be configured during P0c by
 
 Autonomy level: A1_PREPARE
 
-Current gate: P0b (`git init`) and P0c (Julia env). After both, P1a (reproduce archive locked baseline E1).
+Current gate: P1c — choose plan A / C / B from p1b_grid_convergence.md. P0b, P0c, P1a, P1b all completed 2026-05-01.
 
 Gate status: OPEN
 
 Allowed next actions:
+- Run P1b Euler residual region map at N_W in {21, 40, 80} (one thread each); log residuals by state region.
 - `git init` plus baseline `.gitignore`; first commit of skeleton + state files + Bellman sketch.
 - Set up Julia environment on server1 mirroring archive dependencies.
 - Document the Julia env activation method in `README.md`.
@@ -53,8 +54,8 @@ Last validation result: not yet executed.
 
 Human decision needed:
 - (H1) confirmed 2026-05-01 — `sto_lifecycle_portfolio` on server1.
-- (H2) `delta` baseline value confirmation (archive implies 0.04). Defer to before P5.
-- (H3) target journal cascade (RFS / JF / MS) at writing kickoff.
+- (H2) DONE 2026-05-01 — `delta_baseline = 0.04` locked (literature follow). Sensitivity grid `[-2%, +3%]` retained.
+- (H3) target journal cascade locked 2026-05-01: RFS primary, RAPS backup.
 - (P1c) refine vs rewrite decision after Euler-accuracy diagnostic (P1b).
 
 Latest state probe: `handoff/project_status_probe.md`
@@ -82,7 +83,7 @@ What this project should not claim:
 
 ## Current Evidence Status
 
-Data status: parameter ranges from archive locked baseline (Yao-Zhang, Cocco, CGM 2005, KMW 2018); calibration data for `delta` cross-check pending H2.
+Data status: parameter ranges from archive locked baseline (Yao-Zhang, Cocco, CGM 2005, KMW 2018); calibration baseline locked at `delta = 0.04` (H2, 2026-05-01); sensitivity grid retained.
 Method status: Bellman sketch in `docs/methods.md` (archive-aligned); numerical implementation pending P0c-P1.
 Table status: none.
 Figure status: none.
