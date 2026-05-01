@@ -794,3 +794,92 @@ next fire (~10:08 UTC) can implement and queue runs.
 +4.23% total) and additive separability empirically confirmed, the
 mechanism distinction from Liu (2021) MHS / KMW (2018) habit / Cocco
 (2005) is *both structural AND quantitative*. RFS-credible.
+
+## 2026-05-01 — tau_buy implemented; sensitivity sweep scripts written
+
+**Action picked**: P0 "Add tau_buy" from ROUND 4 MUST list — highest-priority
+remaining auto-allowed action after verifying channel decomposition and full-grid
+baselines are DONE in previous fires.
+
+### tau_buy implementation in vfi_solver_v3.jl
+
+Modified `continuation_value_v3` to apply a buying-cost penalty at relocation
+for E1_2L owning households. The change is localized to 15 new lines in the
+`continuation_value_v3` function:
+
+```julia
+buy_penalty_reloc = if regime == REGIME_E1_2L
+    x_ell = ell == LOC_A ? x_A : x_B
+    x_ell >= 1.0 - 1e-6 ? p.tau_buy : 0.0
+else
+    0.0
+end
+```
+
+Applied inside the quadrature loop:
+```julia
+w_reloc = next_wealth_v3(...) - buy_penalty_reloc
+```
+
+**Design rationale**: In E1_2L, x_ell is binary (0 or 1). An owning household
+(x_ell = 1) who relocates is assumed to purchase one unit at the new location,
+incurring cost tau_buy in normalized wealth units. This is the Phase 1
+approximation; exact implementation (conditional on next-period ownership
+choice) requires a "just-relocated" state flag and is deferred to Phase 2.
+
+**Effect on CEV**: tau_buy=2.5% applies only to the E1_2L relocation path for
+owning households. E2_2L is unaffected (tokens are portable, no forced
+sale/rebuy). This adds a second wedge between E1_2L and E2_2L welfare:
+- Previous: E1_2L pays tau_sell=6% on sell proceeds at relocation
+- Now: E1_2L also pays tau_buy=2.5% on the purchase at new location
+- E2_2L: zero relocation cost in both cases
+- Net: full round-trip cost for E1_2L owners at relocation = 8.5%
+- This increases CEV(E2_2L vs E1_2L) — magnitude TBD from server1 run
+
+**Files modified**: `src/vfi_solver_v3.jl` (4 locations: continuation_value_v3,
+solve_v3 metadata, smoke_test_v3, main_v3 print).
+
+### Sensitivity sweep scripts written
+
+Three scripts written for server1 execution:
+
+1. `scripts/compute_cev.jl`: Julia helper that reads two JSON summary files and
+   computes `CEV(E2_2L vs E1_2L)` using the CRRA formula
+   `cev = (V_E2/V_E1)^(1/(1-gamma)) - 1`. Reports CEV, V values, and
+   mean_xA/mean_xB at the representative state. Called by all three sweep
+   scripts.
+
+2. `scripts/p4_full_txcost.sh`: Runs E1_2L (tau_sell=6%, tau_buy=2.5%),
+   E1_2L_NOTX (tau_sell=0%, tau_buy=0%), and E2_2L at the standard grid.
+   Calls compute_cev.jl three times: TOTAL, avoided-tx channel, maintained-hedge
+   channel. Produces the channel decomposition under full round-trip costs.
+
+3. `scripts/p4_rhoAB_sweep.sh`: Runs E1_2L and E2_2L at rho_AB ∈ {0, 0.25,
+   0.5, 0.75, 0.95}. Referee prediction: CEV collapses monotonically as
+   rho_AB → 1 (perfect correlation destroys diversification benefit).
+
+4. `scripts/p4_prelocate_sweep.sh`: Runs E1_2L and E2_2L at
+   P_RELOCATE_WORKING ∈ {0, 0.02, 0.06, 0.12}. Referee prediction: at
+   p_relocate=0, cross-location holdings in E2_2L collapse to zero (no
+   mobility risk → no hedge motive) and CEV → 0.
+
+**Grid settings** in all scripts: N_W=21, N_Z=7, ASSET_GRID_SIZE=9,
+X_GRID_SIZE=7, GH_NODES=3 (matches previous full-grid baseline runs).
+
+### next_actions.md updated
+
+- Marked Phase 0/1 status: all Phase 1 items DONE including full-grid E2_2L
+  baseline and channel decomposition (these were stale in previous version).
+- Marked tau_buy code DONE.
+- Marked sweep scripts DONE.
+- Added "Server1 run queue" section with execution order for three scripts.
+- Estimated total server1 compute: ~3-5 hours single thread.
+
+**Feature branch**: `auto/2026-05-01-taubuy-sensitivity-scripts`
+
+**Next queued actions** (server1, then cloud):
+1. Server1: `bash scripts/p4_full_txcost.sh` → recompute CEV with full round-trip costs
+2. Server1: `bash scripts/p4_rhoAB_sweep.sh` → 5 rho_AB values × 2 regimes = 10 runs
+3. Server1: `bash scripts/p4_prelocate_sweep.sh` → 4 p_reloc values × 2 regimes = 8 runs
+4. Cloud (next fire): read server1 output JSONs, write diagnostic .md summaries,
+   queue Round 5 referee simulation against updated evidence

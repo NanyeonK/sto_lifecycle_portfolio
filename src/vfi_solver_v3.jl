@@ -440,19 +440,34 @@ function continuation_value_v3(
         end
     end
 
+    # tau_buy: buying cost at new location for E1_2L owning households.
+    # A household who owned (x_ell = 1) at the current location is assumed to
+    # purchase one unit at the new location upon relocation, incurring cost
+    # tau_buy in normalized wealth units (fraction of unit price).
+    # Approximation: conditional on next-period ownership choice (exact
+    # implementation requires a "just-relocated" state flag — deferred to Phase 2).
+    # E2_2L / E0: tokens are portable / no housing asset — no buying cost.
+    buy_penalty_reloc = if regime == REGIME_E1_2L
+        x_ell = ell == LOC_A ? x_A : x_B
+        x_ell >= 1.0 - 1e-6 ? p.tau_buy : 0.0
+    else
+        0.0
+    end
+
     ev = 0.0
     @inbounds for q in eachindex(shock.weights)
         z_next, y_next = next_income_state_v3(p, f_profile, t, z,
                                                shock.hp[q], shock.u[q], shock.eps[q])
         hp_scale = exp((1.0 - p.gamma) * log(shock.hp[q]))
 
-        # Wealth: same portfolio, different sell factor for relocation case
+        # Wealth: same portfolio, different sell factor for relocation case.
+        # tau_buy deducted from relocation path only (buying cost at new location).
         w_stay  = next_wealth_v3(p, b, s, x_A, x_B, shock.hp[q], shock.rs[q],
                                   shock.ra[q], shock.rb[q],
                                   sf_A_stay, sf_B_stay, y_next)
         w_reloc = next_wealth_v3(p, b, s, x_A, x_B, shock.hp[q], shock.rs[q],
                                   shock.ra[q], shock.rb[q],
-                                  sf_A_reloc, sf_B_reloc, y_next)
+                                  sf_A_reloc, sf_B_reloc, y_next) - buy_penalty_reloc
 
         # Value at next-period location: (n_w, n_z) slice for each ell
         v_stay  = interp_bilinear_v3(view(next_value_slice, :, :, ell),
@@ -685,7 +700,7 @@ function solve_v3(;
     result.metadata["p_relocate_working"]  = params.p_relocate_working
     result.metadata["p_relocate_retired"]  = params.p_relocate_retired
     result.metadata["tau_sell"]            = params.tau_sell
-    result.metadata["tau_buy_deferred"]    = params.tau_buy    # Phase 2
+    result.metadata["tau_buy"]             = params.tau_buy    # active (Phase 1 approx for E1_2L owners)
     result.metadata["tau_token_deferred"]  = params.tau_token  # Phase 2
 
     if cfg.save_path !== nothing
@@ -774,7 +789,7 @@ function smoke_test_v3()
     @printf("  p_relocate_working  = %.3f\n",  params.p_relocate_working)
     @printf("  p_relocate_retired  = %.3f\n",  params.p_relocate_retired)
     @printf("  tau_sell            = %.4f\n",  params.tau_sell)
-    @printf("  tau_buy             = %.4f  (deferred Phase 2)\n", params.tau_buy)
+    @printf("  tau_buy             = %.4f  (active Phase 1 approx; E1_2L owners only)\n", params.tau_buy)
     @printf("  sigma_div           = %.4f\n",  params.sigma_div)
     @printf("  sigma_iota          = %.4f\n",  params.sigma_iota)
     @printf("  decomp check: sqrt(%.6f^2 + %.6f^2) = %.6f  (sigma_h = %.6f)\n",
@@ -858,7 +873,7 @@ function main_v3(args::Vector{String}=ARGS)
     @printf("  quadrature: %d nodes, %d points total\n", cfg.quadrature_nodes, cfg.quadrature_nodes^7)
     @printf("  mobility  : p_reloc_work=%.3f, p_reloc_ret=%.3f\n",
             params.p_relocate_working, params.p_relocate_retired)
-    @printf("  tx costs  : tau_sell=%.3f, tau_buy=%.3f (deferred), tau_token=%.3f (deferred)\n",
+    @printf("  tx costs  : tau_sell=%.3f, tau_buy=%.3f (active approx), tau_token=%.3f (deferred)\n",
             params.tau_sell, params.tau_buy, params.tau_token)
     @printf("  returns   : rho_AB=%.2f, sigma_div=%.4f, sigma_iota=%.4f\n",
             params.rho_AB, params.sigma_div, params.sigma_iota)
