@@ -13,9 +13,11 @@
 #   2. Stochastic relocation shock: Bernoulli(p_relocate(t)) each period
 #      p_relocate age-dependent: working-age ~6% (PSID mid-range), retired ~2%
 #   3. Transaction costs on relocation:
-#      E1_2L: tau_sell (~6% NAR) applied to x_ell * R_ell on forced sale
-#      E2_2L: tokens portable across moves — no forced sale, no selling cost
-#      tau_buy (~2.5%) deferred to Phase 2 (buying-cost state extension)
+#      E1_2L: tau_sell (~6% NAR) + tau_buy (~2.5%) applied at relocation.
+#             Round-trip total ~8.5% (NAR sell + closing buy costs).
+#             Applied as combined sf_reloc = 1 - tau_sell - tau_buy on
+#             the sold unit's return, approximating the full move cost.
+#      E2_2L: tokens portable across moves — no forced sale, no round-trip cost.
 #   4. Location-correlated returns: R_A and R_B share aggregate factor eta_div;
 #      idiosyncratic components iota_A and iota_B are correlated by rho_AB
 #      (Case-Shiller MSA-pair anchor: baseline rho_AB = 0.50, range 0.30-0.70)
@@ -95,7 +97,7 @@ struct ModelParams_v3
     p_relocate_retired::Float64  # annual relocation prob, retired (~0.02)
     # v3: transaction costs
     tau_sell::Float64     # selling cost fraction of housing value (~0.06, NAR)
-    tau_buy::Float64      # buying cost fraction (~0.025); stored but deferred to Phase 2
+    tau_buy::Float64      # buying cost fraction (~0.025); applied at relocation in E1_2L
     tau_token::Float64    # token transfer cost fraction (~0.01); stored, deferred to Phase 2
     # Mortgage
     ltv_max::Float64
@@ -433,10 +435,13 @@ function continuation_value_v3(
     sf_A_stay   = 1.0;  sf_B_stay   = 1.0    # no relocation
     sf_A_reloc  = 1.0;  sf_B_reloc  = 1.0    # default (E0, E2_2L: tokens portable)
     if regime == REGIME_E1_2L
+        # Round-trip cost: tau_sell (sell old location) + tau_buy (buy at new location).
+        # Approximated by deducting both from the sold unit's gross return at relocation.
+        round_trip = p.tau_sell + p.tau_buy
         if ell == LOC_A
-            sf_A_reloc = 1.0 - p.tau_sell    # selling A-unit when moving to B
+            sf_A_reloc = 1.0 - round_trip    # sell A, buy at B
         else
-            sf_B_reloc = 1.0 - p.tau_sell    # selling B-unit when moving to A
+            sf_B_reloc = 1.0 - round_trip    # sell B, buy at A
         end
     end
 
@@ -685,7 +690,8 @@ function solve_v3(;
     result.metadata["p_relocate_working"]  = params.p_relocate_working
     result.metadata["p_relocate_retired"]  = params.p_relocate_retired
     result.metadata["tau_sell"]            = params.tau_sell
-    result.metadata["tau_buy_deferred"]    = params.tau_buy    # Phase 2
+    result.metadata["tau_buy"]             = params.tau_buy
+    result.metadata["tau_round_trip"]      = params.tau_sell + params.tau_buy
     result.metadata["tau_token_deferred"]  = params.tau_token  # Phase 2
 
     if cfg.save_path !== nothing
@@ -774,7 +780,8 @@ function smoke_test_v3()
     @printf("  p_relocate_working  = %.3f\n",  params.p_relocate_working)
     @printf("  p_relocate_retired  = %.3f\n",  params.p_relocate_retired)
     @printf("  tau_sell            = %.4f\n",  params.tau_sell)
-    @printf("  tau_buy             = %.4f  (deferred Phase 2)\n", params.tau_buy)
+    @printf("  tau_buy             = %.4f  (active: applied at relocation in E1_2L)\n", params.tau_buy)
+    @printf("  round_trip          = %.4f  (tau_sell + tau_buy)\n", params.tau_sell + params.tau_buy)
     @printf("  sigma_div           = %.4f\n",  params.sigma_div)
     @printf("  sigma_iota          = %.4f\n",  params.sigma_iota)
     @printf("  decomp check: sqrt(%.6f^2 + %.6f^2) = %.6f  (sigma_h = %.6f)\n",
@@ -835,6 +842,14 @@ function smoke_test_v3()
     @assert p_relocate_v3(p, 42) == p.p_relocate_retired  # age 66
     println("  p_relocate_v3 spot-checks: PASS")
 
+    # tau_buy activation check
+    @assert p.tau_buy > 0.0 "tau_buy is zero — round-trip underestimated"
+    @assert p.tau_sell > 0.0 "tau_sell is zero"
+    round_trip = p.tau_sell + p.tau_buy
+    @assert round_trip >= 0.08 && round_trip <= 0.15 "round_trip $round_trip outside 8-15% plausible range"
+    @printf("  tau_buy activation: tau_sell=%.4f + tau_buy=%.4f = round_trip=%.4f  PASS\n",
+            p.tau_sell, p.tau_buy, round_trip)
+
     println("=== smoke_test_v3: PASS ===")
     return true
 end
@@ -858,8 +873,8 @@ function main_v3(args::Vector{String}=ARGS)
     @printf("  quadrature: %d nodes, %d points total\n", cfg.quadrature_nodes, cfg.quadrature_nodes^7)
     @printf("  mobility  : p_reloc_work=%.3f, p_reloc_ret=%.3f\n",
             params.p_relocate_working, params.p_relocate_retired)
-    @printf("  tx costs  : tau_sell=%.3f, tau_buy=%.3f (deferred), tau_token=%.3f (deferred)\n",
-            params.tau_sell, params.tau_buy, params.tau_token)
+    @printf("  tx costs  : tau_sell=%.3f, tau_buy=%.3f, round_trip=%.3f, tau_token=%.3f (deferred)\n",
+            params.tau_sell, params.tau_buy, params.tau_sell + params.tau_buy, params.tau_token)
     @printf("  returns   : rho_AB=%.2f, sigma_div=%.4f, sigma_iota=%.4f\n",
             params.rho_AB, params.sigma_div, params.sigma_iota)
     flush(stdout)

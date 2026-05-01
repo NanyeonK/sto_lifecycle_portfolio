@@ -794,3 +794,80 @@ next fire (~10:08 UTC) can implement and queue runs.
 +4.23% total) and additive separability empirically confirmed, the
 mechanism distinction from Liu (2021) MHS / KMW (2018) habit / Cocco
 (2005) is *both structural AND quantitative*. RFS-credible.
+
+## 2026-05-01 — Cloud fire 2: tau_buy activated + sweep scripts written
+
+**Action picked**: Round 4 P0 — activate `tau_buy` in `vfi_solver_v3.jl`
+(highest-priority auto-allowed code action remaining after channel
+decomposition DONE and x-upper-bound NOT NEEDED). Also wrote Round 4 P1
+sensitivity sweep scripts (cloud-agent code work; server1 runs queued).
+
+**tau_buy implementation** (`src/vfi_solver_v3.jl`):
+
+`tau_buy` was stored in `ModelParams_v3` since the v3 skeleton but
+marked "deferred to Phase 2 (state extension required)." The clean
+approximation within the current architecture applies BOTH `tau_sell`
+and `tau_buy` at relocation events in E1_2L:
+
+```julia
+round_trip = p.tau_sell + p.tau_buy
+sf_A_reloc = 1.0 - round_trip   # sell A + buy at B
+```
+
+Default: `tau_sell=0.06 + tau_buy=0.025 = 0.085` (8.5% round-trip).
+This matches NAR sell (~6%) + closing/buy costs (~2.5%) and satisfies
+Round 4 requirement "round-trip 8-12% per NAR + closing costs."
+
+Rationale: when relocating from A to B in E1_2L, the household (i) sells
+the A-unit at cost `tau_sell` and (ii) must buy a new unit at B at cost
+`tau_buy`. Both costs reduce wealth available at the new location. Since
+the solver does not track previous tenure as a state variable, the
+combined cost is applied to the sold unit's return — a standard
+approximation used when a "just relocated" flag is not tracked in state.
+
+E2_2L: sell factor remains 1.0 (tokens portable; no forced sale; no
+buying cost at new location since cross-location holdings are retained).
+
+**Changes to `src/vfi_solver_v3.jl`**:
+- `continuation_value_v3`: `round_trip = p.tau_sell + p.tau_buy`;
+  `sf_{A,B}_reloc = 1 - round_trip` in E1_2L.
+- `ModelParams_v3` field comment: "stored but deferred" → "applied at relocation in E1_2L."
+- Metadata: `tau_buy_deferred` key → `tau_buy` + `tau_round_trip`.
+- Main print: shows `round_trip` alongside `tau_sell` and `tau_buy`.
+- Smoke test: added `tau_buy` activation assertion (round-trip in 8–15%
+  plausible range).
+
+**Expected impact on CEV**: adding `tau_buy` increases the penalty of
+relocation in E1_2L (from 6% to 8.5% round-trip), which should increase
+`CEV(E2_2L vs E1_2L)` relative to the previous baseline (+4.231%).
+The maintained-hedge channel grows because E1_2L is now more costly to
+maintain across moves. Quantitative update requires server1 re-run.
+
+**Sweep scripts written** (server1-queued):
+
+1. `scripts/sweep_rhoAB.sh`: sweeps `rho_AB ∈ {0, 0.25, 0.5, 0.75, 0.95}`
+   for both E1_2L and E2_2L. Writes per-run JSON summaries and assembles
+   `output/diagnostics/p4_rhoAB_sweep.md`. Includes CEV interpretation
+   note (hedge channel must collapse at rho_AB→1).
+
+2. `scripts/sweep_prelocate.sh`: sweeps `p_relocate_working ∈ {0, 0.02, 0.06, 0.12}`
+   for both E1_2L and E2_2L. Writes per-run JSON summaries and assembles
+   `output/diagnostics/p4_prelocate_sweep.md`. Includes mechanism
+   prediction note (CEV must → 0 at p_relocate=0; xB_gt0 must collapse).
+
+Both scripts use env-var overrides, single-thread Julia, and depend only
+on `vfi_solver_v3.jl` (no new solver file needed). Python3 used only for
+JSON parsing in the summary table; fallback "N/A" on failure.
+
+**Feature branch**: `auto/2026-05-01-tau-buy-sweep-scripts`
+
+**Next queued for server1** (human to run):
+1. Re-run E1_2L + E2_2L baseline with updated tau_buy (default 0.025).
+2. `bash scripts/sweep_rhoAB.sh` (5 x 2 = 10 runs, ~1-2h wall).
+3. `bash scripts/sweep_prelocate.sh` (4 x 2 = 8 runs, ~1-2h wall).
+
+**Next cloud agent fire**: ROUND 4 SHOULD items —
+- Asymmetric robustness script (`p_A→B ≠ p_B→A`, `mu_A ≠ mu_B`).
+- CEV across (t, w, z) state space (not just midpoint) — add percentile
+  reporting to `summary_v3`.
+- Comparison table scaffold (Liu/YZ/Cocco/KMW calibration reference).
