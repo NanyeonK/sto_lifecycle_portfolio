@@ -695,3 +695,42 @@ reduced grids.
 
 The cloud-routine ↔ server1 ↔ session hybrid loop is working as
 designed. v3 path looks RFS-credible.
+
+## 2026-05-01 — Round 4 referee + full-grid E1_2L baseline
+
+**Sub-agent Referee 2 round 4** evaluated the v3 pivot and first
+numerical evidence (smoke + reduced-grid CEV +5.93%). Verdict:
+**MAJOR REVISION with credit for the pivot**. Path to RFS exists
+conditional on a MUST checklist:
+
+1. Full-grid run (now in flight — E1_2L done, E2_2L running)
+2. Lift `x ∈ [0,1]` upper bound — re-solve with `x_max ∈ {1.5, 2, 3}`
+3. **Channel decomposition** (avoided-tx vs maintained-hedge):
+   counterfactual E1_2L' with `tau_sell=0`. The single most
+   important addition.
+4. Sensitivity over `rho_AB ∈ {0, 0.25, 0.5, 0.75, 0.95}` —
+   at `rho_AB → 1` hedge channel must collapse
+5. Sensitivity over `p_relocate ∈ {0, 0.02, 0.06, 0.12}` —
+   at `p_relocate=0` cross-location holding must collapse
+6. Add `tau_buy` alongside `tau_sell` (round-trip 8-12% per NAR
+   + closing costs)
+
+SHOULD: asymmetric robustness, mortgage activation
+(`ltv_max > 0`), reversible relocation, CEV across (t,w,z) state
+space, comparison table to Liu/YZ/Cocco/KMW.
+
+**Full-grid E1_2L result** (default grids `ASSET=9, RENTER=OWNER_X=7,
+D=5`):
+- V_t1_midpoint_ellA = -1408.63 (vs reduced -1590.77, +11% V)
+- mean_xA at ellA = 0.556 (vs reduced 0.444; **less corner-loaded**)
+- xA>0 count = 70 (vs 56)
+- Symmetry preserved (ellA ≈ ellB)
+
+The reduced-grid `mean_x = 0.997` was a grid artifact.
+Round-4 (p) "corner-solution pathology" partially resolved by full
+grid. E2_2L full-grid in flight; CEV recomputation pending.
+
+**ASAP acceleration**: cloud routine cron updated from
+`0 0 * * 1-5` (weekday 09:00 KST) to `0 */2 * * *` (every 2 hours
+24/7) per human "as soon as possible" instruction. Next fire ~10:08
+UTC.
