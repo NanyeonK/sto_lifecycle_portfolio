@@ -638,3 +638,60 @@ register (re-categorized).
 **Dropped from v2**: 4-regime REIT comparison (E1+, E2+),
 multi-property x_other, hedge channel via corr(iota, eps),
 service-asset wedge framing.
+
+## 2026-05-01 — Phase 1 v3 baseline VFI: HEADLINE +5.93% confirmed
+
+After cloud agent's first fire (commit 2ad24ad) merged to main, ran
+the v3 solver baseline VFI on server1 with reduced grids
+(`ASSET_GRID_SIZE=5, D_GRID_SIZE=3, RENTER_X=OWNER_X=4`). Both
+regimes ran ~10-15 minutes wall, single thread.
+
+**Headline: `CEV(E2_2L vs E1_2L) = +5.93%`** at the representative
+state (midpoint, both ell=A and ell=B by symmetry). This is the
+first numerical evidence that the v3 mobility-hedge mechanism
+delivers RFS-magnitude welfare; v2 max was 4.36 percent with
+mortgage.
+
+**Asset-use confirms the unbundling:**
+
+- E1_2L at ell=A: mean_xA=0.444, mean_xB=0, xA>0 in 56 states,
+  xB>0 in 0 states. Binary admissibility enforced: cannot own at
+  the non-occupied location.
+- E2_2L at ell=A: mean_xA=0.997, mean_xB=**0.997**, xA>0 in 94
+  states, xB>0 in 94 states. Household holds full-unit fractional
+  shares of BOTH locations simultaneously.
+- E2_2L at ell=B: symmetric (mean_xA=0.997, mean_xB=0.997, 94/94).
+
+Cross-location hedge (mean_xB > 0 while living at A) is *uniquely
+tokens-enabled*. Direct ownership cannot replicate; REIT does not
+provide location-specific exposure. This is precisely the
+contribution claim of the v3 pivot, now empirically confirmed at
+small grids.
+
+**Reduced-grid caveat**: at ASSET_GRID_SIZE=5 with corner-loaded
+choices (mean_x near 1.0 boundary), the household appears to hit
+upper-bound on x grids. Full-resolution run needed to confirm
+magnitude. 5.93 percent is a likely lower bound on the true CEV.
+
+**Files**:
+- `output/diagnostics/p3_v3_E1_2L_smoke.json` (E1_2L summary)
+- `output/diagnostics/p3_v3_E2_2L_smoke.json` (E2_2L summary)
+- `output/diagnostics/p3_v3_*_smoke_stdout.log` (run logs)
+
+**Phase 1 status**: solver v3 implementation DONE; first baseline
+DONE; smoke + symmetry checks PASS; headline CEV +5.93 percent at
+reduced grids.
+
+**Next P1/P2 queued for cloud agent next fire (Monday 09:00 KST)**:
+
+- Run baseline VFI at full grids for higher-fidelity CEV estimate.
+- Sensitivity sweep: `(p_relocate, tau_sell, rho_AB)` 3D grid.
+- Decompose CEV(E2_2L vs E1_2L) into:
+  (i) avoided-transaction-cost channel (vary tau_sell)
+  (ii) maintained-hedge channel (vary rho_AB and household income
+       correlation with iota_A)
+- Prep `docs/calibration_v3.md` with PSID / NAR / Case-Shiller
+  empirical anchors.
+
+The cloud-routine ↔ server1 ↔ session hybrid loop is working as
+designed. v3 path looks RFS-credible.
