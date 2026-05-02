@@ -991,3 +991,79 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-05-02 — v4 solver (Option 1 full state extension) implemented
+
+**Action picked**: P0 step 2-4 — create `src/vfi_solver_v4.jl` with
+6D state `(t, w, z, ell, x_A_prev, x_B_prev)` and per-period
+`tx_cost` on deltas, per `handoff/tau_buy_option1_spec.md`.
+
+This is the critical implementation that might resurrect the hedge
+channel: by tracking prior holdings as state, households can
+incrementally pre-accumulate `x_B` at ell=A at marginal cost
+`tau_buy * delta_B`, which is cheaper than paying `tau_buy` on a
+lump-sum purchase at relocation. The expected hedge premium per unit
+held: `p_relocate * tau_buy ≈ 0.0015` per year, which over a
+20-year working horizon is material.
+
+**Changes from v3:**
+
+1. **6D state**: `value`, `c_policy`, `b_policy`, `s_policy`,
+   `xA_policy`, `xB_policy`, `feasible` all 6D arrays sized
+   `(T, N_W, N_Z, 2, N_X_PREV, N_X_PREV)`.
+
+2. **`x_prev` grid**: `N_X_PREV=3` default `{0.0, 0.5, 1.0}`,
+   env-var configurable. `X_PREV_MAX=1.0` default.
+
+3. **`tx_cost_v4()`**: charges `tau_buy * max(delta,0)` on positive
+   increments (new purchases) and `tau_token * max(-delta,0)` on
+   negative increments (sales/transfers) for BOTH x_A and x_B each
+   period. Budget equation:
+   `c + kappa(x_ell_new) + X_total + tx_cost = w`.
+
+4. **`continuation_value_v4()`**: uses `interp_next_v4()` which
+   nearest-neighbours on `(x_A_prev, x_B_prev)` dimensions and
+   bilinear-interpolates over `(w, z)`. On relocation in E1_2L,
+   `x_A_next_reloc = x_B_next_reloc = 0` (forced sale resets
+   holdings to zero). In E2_2L tokens are portable so
+   `x_A_next_reloc = x_A_new`, `x_B_next_reloc = x_B_new`.
+
+5. **Housing cost rule**: carried forward the FIXED rule from
+   `fix/2026-05-01-housing-cost-only-occupied` — only occupied-
+   location token reduces rent; non-occupied is purely financial.
+
+6. **`smoke_test_v4()`** (callable via `--smoke-test`): checks
+   sigma decomposition, grids, 6D array allocation, terminal slice,
+   `tx_cost_v4` spot-checks (no-rebalance=0, buy-A, buy-B, sell-A,
+   mixed), housing cost spot-checks, shock block size and weight sum.
+   VFI is NOT run in the smoke test (cloud env lacks Julia).
+
+7. **Reduced base grids**: N_W=15 (down from 21), N_Z=5 (down from 7).
+   Net compute factor vs v3 baseline: ~4.6x per regime.
+   Expected wall time on server1: ~2-3 hours per regime.
+
+**Files created:**
+- `src/vfi_solver_v4.jl` (~580 LOC)
+- `scripts/run_option1_e1.sh` (E1_2L baseline runner)
+- `scripts/run_option1_e2.sh` (E2_2L Option 1 runner)
+
+**Branch**: `auto/2026-05-02-option1-state-extension`
+
+**Steps DONE in P0 table**: 1, 2, 3, 4.
+
+**Next actions for user on server1 (steps 5-6):**
+
+```bash
+# Step 5: smoke test
+julia src/vfi_solver_v4.jl --smoke-test 2>&1 | tee output/diagnostics/p6_option1_smoke.md
+
+# Step 6a: E1_2L baseline (~2-3h)
+bash scripts/run_option1_e1.sh
+
+# Step 6b: E2_2L baseline (~2-3h)
+bash scripts/run_option1_e2.sh
+```
+
+After step 6: compare V-midpoints from `p6_option1_e1.json` and
+`p6_option1_e2.json` to compute CEV(E2_2L_v4 vs E1_2L_v4) and
+check H1 (mean_xB > 0 at ellA). If H1+H2+H3 hold → RFS-credible.
+
