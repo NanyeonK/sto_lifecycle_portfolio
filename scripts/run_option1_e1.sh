@@ -1,41 +1,37 @@
 #!/usr/bin/env bash
-# run_option1_e1.sh — E1_2L baseline at v4 Option 1 settings
-# Usage: bash scripts/run_option1_e1.sh
+# run_option1_e1.sh — Run E1_2L baseline with v4 6D state (Option 1 tau_buy)
 #
-# Coarse grid (N_X_PREV=3) recommended for first confirmation run.
-# Expect ~2-3 hours wall on server1 single thread.
+# Usage: bash scripts/run_option1_e1.sh
+# Output: output/diagnostics/p6_option1_e1.json  +  p6_option1_e1_stdout.log
+#
+# Grid: N_W=15, N_Z=5, N_X_PREV=3  (spec-prescribed coarse grid for first run)
+# Regime: E1_2L — binary own at current location; forced sale + tau_sell at relocation;
+#         tau_buy charged on (0→1) purchase entry each period.
 
 set -euo pipefail
 
-OUTDIR="output/diagnostics"
-mkdir -p "$OUTDIR"
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+mkdir -p "$REPO_ROOT/output/diagnostics"
 
-REGIME=E1_2L
-SUMMARY_JSON="$OUTDIR/p6_option1_e1.json"
-STDOUT_LOG="$OUTDIR/p6_option1_e1_stdout.log"
+LOG="$REPO_ROOT/output/diagnostics/p6_option1_e1_stdout.log"
+JSON="$REPO_ROOT/output/diagnostics/p6_option1_e1.json"
 
-echo "=== v4 Option 1 E1_2L baseline ==="
-echo "  REGIME         = $REGIME"
-echo "  N_X_PREV       = ${N_X_PREV:-3}"
-echo "  N_W            = ${N_W:-15}"
-echo "  N_Z            = ${N_Z:-5}"
-echo "  TAU_SELL       = ${TAU_SELL:-0.06}"
-echo "  TAU_BUY        = ${TAU_BUY:-0.025}"
-echo "  TAU_TOKEN      = ${TAU_TOKEN:-0.005}"
-echo "  Output JSON    = $SUMMARY_JSON"
-echo ""
+echo "=== v4 E1_2L Option 1 run ==="
+echo "  log  -> $LOG"
+echo "  json -> $JSON"
 
-REGIME=$REGIME \
-  N_W=${N_W:-15} \
-  N_Z=${N_Z:-5} \
-  N_X_PREV=${N_X_PREV:-3} \
-  X_PREV_MAX=${X_PREV_MAX:-1.0} \
-  TAU_SELL=${TAU_SELL:-0.06} \
-  TAU_BUY=${TAU_BUY:-0.025} \
-  TAU_TOKEN=${TAU_TOKEN:-0.005} \
-  APPLY_TAU_BUY=0 \
-  SUMMARY_JSON_PATH="$SUMMARY_JSON" \
-  julia src/vfi_solver_v4.jl 2>&1 | tee "$STDOUT_LOG"
+REGIME=E1_2L \
+N_W=15 N_Z=5 \
+N_X_PREV=3 X_PREV_MAX=2.0 \
+ASSET_GRID_SIZE=7 X_GRID_SIZE=4 GH_NODES=3 \
+GAMMA=5.0 BETA=0.96 RF=1.02 EQUITY_PREMIUM=0.04 \
+SIGMA_H=0.115 SIGMA_DIV=0.10 G_H=0.016 \
+RHO=0.05 M=0.01 \
+TAU_SELL=0.06 TAU_BUY=0.025 TAU_TOKEN=0.01 \
+P_RELOCATE_WORKING=0.06 P_RELOCATE_RETIRED=0.02 \
+RHO_AB=0.50 \
+LTV_MAX=0.0 \
+SUMMARY_JSON_PATH="$JSON" \
+julia "$REPO_ROOT/src/vfi_solver_v4.jl" 2>&1 | tee "$LOG"
 
-echo ""
-echo "Done. Summary at: $SUMMARY_JSON"
+echo "=== E1_2L done. Summary at $JSON ==="
