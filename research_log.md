@@ -1075,3 +1075,43 @@ The mechanism is properly captured by the state because:
 4. Compute `CEV(E2_2L_v4 vs E1_2L_v4)` and check `mean_xB > 0` at ell=A
 5. If H1+H2+H3 hold: proceed to Phase 2 (calibration, sensitivity, writing)
 
+## 2026-05-02 — P1 sweep scripts updated for v4 (cloud agent fire 3)
+
+**Action picked**: update sensitivity sweep scripts to target `vfi_solver_v4.jl`.
+All three sweep scripts (`sweep_rhoAB.sh`, `sweep_prelocate.sh`, `sweep_txcost.sh`)
+previously used `vfi_solver_v3.jl` and would have produced wrong results (v3 hedge
+mechanism is dead; v4 is the proper test of H1). Updated to v4 in this fire.
+
+**Changes made**:
+
+1. `scripts/sweep_rhoAB.sh` — updated to v4, output to `p7_rhoAB_v4/`, includes
+   `N_X_PREV=3 X_PREV_MAX=2.0` and all canonical calibration env vars.
+
+2. `scripts/sweep_prelocate.sh` — updated to v4, output to `p7_prelocate_v4/`,
+   p_relocate range {0, 0.02, 0.06, 0.12}. At p_relocate=0, hedge motive gone;
+   CEV should be lower bound (purely continuous-x channel).
+
+3. `scripts/sweep_txcost.sh` — updated to v4, removed `APPLY_TAU_BUY` flag
+   (v3-only approximation; v4 handles tau_buy natively via per-period delta).
+   Five scenarios: notx, sell6, rt8p5, rt10, rt12. Output to `p7_txcost_v4/`.
+
+4. `scripts/compute_cev_sweep.jl` — updated for v4/v3 compatibility:
+   - Reads `V_t1_midpoint_ellA_xprev0` (v4) with fallback to `V_t1_midpoint_ellA` (v3)
+   - `apply_tau_buy_at_reloc` made optional (absent in v4)
+   - Added `Dates` import (was missing from original)
+
+**Why scripts were stale**: previous fires created the v4 solver on the feature
+branch but the sweep scripts were written earlier (fire 1 or during v3 era) and
+not updated. Using v3 sweeps after v4 baselines would confuse the P1 results.
+
+**Run order** (server1, awaiting v4 baselines):
+```
+# After H1+H2 confirmed from Option 1 baselines:
+bash scripts/sweep_rhoAB.sh      # ~6h: 5 rho_AB × 2 regimes × ~35 min each
+bash scripts/sweep_prelocate.sh  # ~3h: 4 p_reloc × 2 regimes
+bash scripts/sweep_txcost.sh     # ~4h: 5 scenarios × 2 regimes
+```
+
+**Next queued (cloud agent next fire)**: If baselines still running, fall back to
+`docs/calibration_v3.md` (PSID / NAR / Case-Shiller empirical anchor document).
+

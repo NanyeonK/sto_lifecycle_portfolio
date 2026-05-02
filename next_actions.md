@@ -1,7 +1,7 @@
 # Next Actions (Path B Option 1 in flight, ASAP-tempered to 6h cron)
 
 Project: sto_lifecycle_portfolio
-Updated: 2026-05-02 (cloud agent fire 2)
+Updated: 2026-05-02 (cloud agent fire 3)
 
 ## ⭐ P0 — Option 1 full state extension (USER CHOSE B, OPTION 1)
 
@@ -50,14 +50,15 @@ If any fails: fall back to Path D (REE/JHE) at +4.26%.
 
 ## P1 (after Option 1 resolves)
 
-| Priority | Action |
-|---|---|
-| P1 | Sensitivity sweep: rho_AB ∈ {0, 0.25, 0.5, 0.75, 0.95} on best v4 |
-| P1 | Sensitivity: p_relocate ∈ {0, 0.06, 0.12, 0.30} on best v4 |
-| P1 | Asymmetric robustness (mu_A != mu_B, p_AB != p_BA) |
-| P1 | Mortgage activation (ltv_max ∈ {0.5, 0.8}) |
-| P1 | Liu/YZ/Cocco/KMW comparison table |
-| P2 | If Option 1 successful: writing kickoff |
+| Priority | Action | Script | Status |
+|---|---|---|---|
+| P1 | Sensitivity sweep: rho_AB ∈ {0, 0.25, 0.5, 0.75, 0.95} | `scripts/sweep_rhoAB.sh` (v4, DONE) | awaiting baselines |
+| P1 | Sensitivity: p_relocate ∈ {0, 0.02, 0.06, 0.12} | `scripts/sweep_prelocate.sh` (v4, DONE) | awaiting baselines |
+| P1 | Transaction-cost sweep: tau_buy ∈ {0, 2.5%, 4%, 6%} | `scripts/sweep_txcost.sh` (v4, DONE) | awaiting baselines |
+| P1 | Asymmetric robustness (mu_A != mu_B, p_AB != p_BA) | — | queued |
+| P1 | Mortgage activation (ltv_max ∈ {0.5, 0.8}) | — | queued |
+| P1 | Liu/YZ/Cocco/KMW comparison table | — | queued |
+| P2 | If Option 1 successful: writing kickoff | — | blocked H3' |
 
 ## Cleanup queue (non-critical)
 
