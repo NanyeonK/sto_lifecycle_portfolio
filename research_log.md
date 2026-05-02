@@ -991,3 +991,87 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-05-02 — v4 solver (Option 1 full state extension) implemented
+
+**Action picked**: P0 Step 2 — create `src/vfi_solver_v4.jl` implementing
+the full 6D state extension specified in `handoff/tau_buy_option1_spec.md`.
+This is the highest-priority auto-allowed action per `next_actions.md`.
+
+**Branch**: `auto/2026-05-02-option1-state-extension`
+
+**What was built** (`src/vfi_solver_v4.jl`, 954 LOC):
+
+1. **6D state** `(t, w, z, ell, x_A_prev, x_B_prev)`:
+   - `x_A_prev` and `x_B_prev` are explicit state dimensions indexed by
+     `x_prev_grid` (default: 3 points, `{0.0, 1.0, 2.0}` at `X_PREV_MAX=2.0`).
+   - Value and policy arrays are 6D: `(T, N_W, N_Z, 2, N_xprev, N_xprev)`.
+   - Memory: ~10 MB at default coarse grid (N_W=15, N_Z=5, N_X_PREV=3).
+
+2. **Per-period transaction cost** (`tx_cost_v4`):
+   - `delta_A = x_A_new - x_A_prev`;  `delta_B = x_B_new - x_B_prev`
+   - `tx_cost = tau_buy * (max(dA,0) + max(dB,0)) + tau_token * (max(-dA,0) + max(-dB,0))`
+   - Charged in budget constraint before (c, b, s) allocation.
+   - `tau_sell` is NOT part of `tx_cost`; it enters only the E1_2L forced
+     relocation sell-factor in the wealth transition (same as v3).
+
+3. **4D multilinear interpolation** (`interp_v4`):
+   - Continuation value now interpolates over `(w, z, x_A_prev, x_B_prev)`.
+   - 4 bilinear(w,z) evaluations at the corners of the (xA_prev, xB_prev)
+     bracket, combined with bilinear weights in x_prev dimensions.
+   - Clamping handled by `bracket()` helper for out-of-grid x choices.
+
+4. **x_prev state update rules** (in `continuation_value_v4`):
+   - E2_2L (stay or reloc): `x_prev_next = (x_A_new, x_B_new)` — tokens portable.
+   - E1_2L stay:            `x_prev_next = (x_A_new, 0.0)` — x_{ell'}=0 by admissibility.
+   - E1_2L reloc:           `x_prev_next = (0.0, 0.0)` — forced sale, fresh start.
+   - **This is the mechanism**: E2_2L pre-holder of x_B arrives at ell=B with
+     x_B_prev > 0, pays tau_buy only on the positive delta (x_B_desired - x_B_prev).
+     E1_2L forced-buyer always pays tau_buy * 1 on a full (0 → 1) jump at arrival.
+
+5. **Smoke test stub** (`smoke_test_v4`, via `--smoke-test`):
+   - 6D array allocation + dimension checks
+   - `tx_cost_v4` spot-checks: (i) zero delta → 0 cost, (ii) buy increment →
+     `tau_buy * delta`, (iii) voluntary sell → `tau_token * delta`,
+     (iv) simultaneous buy A + sell B → correct mixed formula
+   - `interp_v4` constant-function test: interpolant equals constant everywhere
+   - E1_2L relocation x_prev state update logic check
+   - Terminal slice NaN/feasibility check
+   - Sigma decomposition invariant, p_relocate boundary checks
+
+6. **Run scripts** created:
+   - `scripts/run_option1_e1.sh` — E1_2L_v4 baseline (server1 run)
+   - `scripts/run_option1_e2.sh` — E2_2L_v4 baseline (server1 run)
+   Both use: `N_W=15 N_Z=5 N_X_PREV=3 X_PREV_MAX=2.0 ASSET_GRID_SIZE=7 X_GRID_SIZE=4`
+
+**Design choices vs spec:**
+- `X_PREV_MAX=2.0` (spec said 1.5): raised to 2.0 to fully cover the v3
+  equilibrium mean_x ≈ 1.748 found in full-grid runs. Grid = {0.0, 1.0, 2.0}
+  with N_X_PREV=3 includes 0 and 1 as exact grid points (important for E1_2L).
+- `apply_tau_buy_at_reloc` removed from ModelParams_v4 (was an Option 3
+  approximation flag in v3; now tau_buy is native via state).
+- Budget constraint for E2_2L: `res = w - kappa - X_total - tx_cost` where
+  `X_total = x_A + x_B`. Max X upper bound computed conservatively ignoring tx_cost
+  (valid: tx > 0 only tightens the budget, which the inner loop handles correctly).
+
+**Why hedge channel should now activate:**
+
+Under v4 E2_2L, holding x_B > 0 while at ell=A has a payoff:
+- Period cost: tau_buy * x_B_new (if increasing from 0) — paid once at purchase
+- Period benefit on relocation: saves tau_buy * min(x_B_held, x_B_desired_at_B)
+  because x_B_prev > 0 at ell=B reduces the required delta.
+- Expected one-period hedge premium ≈ p_relocate * tau_buy * x_B ≈ 0.06 * 0.025 = 0.15%
+  per unit x_B held. Discounted over multiple periods: ~1-2% lifetime CEV.
+
+The mechanism is properly captured by the state because:
+- The household at ell=A KNOWS x_B_prev will be x_B_chosen at t+1 (portable)
+- The continuation value at (ell=B, x_B_prev=0.5) > (ell=B, x_B_prev=0) by
+  exactly the interpolation across the x_B_prev grid
+- So the Bellman at ell=A correctly assigns future value to pre-holding x_B
+
+**Next steps (server1, USER)**:
+1. `julia src/vfi_solver_v4.jl --smoke-test` → verify PASS
+2. `bash scripts/run_option1_e1.sh` → E1_2L_v4 baseline (~2-3 h estimated)
+3. `bash scripts/run_option1_e2.sh` → E2_2L_v4 baseline (~2-3 h estimated)
+4. Compute `CEV(E2_2L_v4 vs E1_2L_v4)` and check `mean_xB > 0` at ell=A
+5. If H1+H2+H3 hold: proceed to Phase 2 (calibration, sensitivity, writing)
+
