@@ -1189,3 +1189,60 @@ claims that a referee would challenge, creating a defense-first paper trail.
 - (cloud agent next fire, if still waiting for baselines): sensitivity-grid
   plan document (`docs/sensitivity_grid_v4.md`) or methods.md v3 update
 
+
+## 2026-05-03 — Sensitivity grid plan (cloud agent fire 6)
+
+**Action picked**: write `docs/sensitivity_grid_v4.md` — Phase 2 prep,
+marked "next fallback" in fire 5's `next_actions.md`. P0 code steps 1-4
+already complete (fires 1-4). Calibration doc done (fire 5). Server1
+baselines (steps 5-7) awaiting user. This fire delivers the sensitivity
+pre-registration needed before Phase 2 sweeps run.
+
+**File created**: `docs/sensitivity_grid_v4.md` (~230 lines)
+
+**Content summary** — five sweep dimensions plus decomposition template:
+
+1. **rho_AB ∈ {0, 0.25, 0.50, 0.75, 0.95}** (script DONE): mechanism
+   collapse test. At rho_AB→1, x_A and x_B are identical assets; only
+   tx-cost-avoidance survives. Predicted: mean_xB monotone decreasing in
+   rho_AB; CEV collapses to ~0.8% tx-cost floor at 0.95.
+
+2. **p_relocate ∈ {0, 0.02, 0.06, 0.12}** (script DONE): key
+   falsification. At p=0, mean_xB MUST be near zero (no relocation
+   avoidance motive). This is the clean test that distinguishes the
+   hedge mechanism from a rental-income artifact (the old v3 bug).
+   `CEV(E2_v4) - CEV(E2_v4)|_p=0` isolates the mobility-hedge
+   contribution beyond Liu (2021).
+
+3. **Round-trip txcost: notx/sell6/rt8p5/rt10/rt12** (script DONE):
+   5-scenario decomposition mapping to paper Table 2 channels:
+   continuous-x, forced-sale avoidance, pre-buy hedge (v4 contribution).
+
+4. **Asymmetric calibration** (unscripted, Phase 2): mu_A ≠ mu_B,
+   p_AB ≠ p_BA, sigma_iota_A ≠ sigma_iota_B. Tests that cross-location
+   holding is not mean-return-chasing.
+
+5. **Mortgage LTV ∈ {0, 0.5, 0.8}** (unscripted, Phase 2): expected
+   result — mortgage reduces rent-saving channel (as in v2/v3 ~37%)
+   but DOES NOT crowd out the cross-location hedge channel (which is
+   about B-exposure, not current-location leverage). Testable claim.
+
+**Compute budget**: P1 sweeps ~75h total on server1; parallelizable to
+~19h wall at 4 concurrent jobs. Phase 2 additional ~45h.
+
+**RFS-credibility thresholds pre-registered**:
+- H1: mean_xB > 0.05 at rho_AB ≤ 0.75
+- H2: CEV(E2_v4 vs E1_v4) > 4.255%
+- H3: CEV_pre_buy hedge ≥ 0.5%
+- Falsification: mean_xB → 0 as p_relocate → 0 and rho_AB → 1
+
+**Files modified**:
+- `docs/sensitivity_grid_v4.md` (created)
+- `next_actions.md` (sensitivity_grid_v4 marked DONE; methods_v3 as next)
+- `research_log.md` (this entry)
+
+**Feature branch**: `auto/2026-05-02-option1-state-extension`
+
+**Next queued (cloud agent next fire)**: `docs/methods_v3.md` — update
+methods.md from v2 spec to v3/v4 spec (new regime taxonomy, 2-location
+Bellman, tx_cost block). Or wait for server1 baselines and jump to Phase 2.
