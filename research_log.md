@@ -991,3 +991,80 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-05-03 — v4 solver implemented: Path B Option 1 full state extension
+
+**Action picked**: implement `src/vfi_solver_v4.jl` — Path B Option 1,
+the P0 action specified in `handoff/tau_buy_option1_spec.md`.
+
+**Rationale**: Option 3 (v3 + synthetic tau_buy at relocation) was
+confirmed dead for the cross-location hedge channel: mean_xB stays 0 at
+all tested p_relocate values because x_A strictly dominates x_B when
+only x_ell saves rent. Option 1 is the correct implementation: track
+x_prev as a state variable so that pre-holding x_B at ell=A reduces the
+FUTURE delta (and therefore future tau_buy) when relocating to B.
+
+**Files created**:
+- `src/vfi_solver_v4.jl` (~530 LOC)
+- `scripts/run_option1_e1.sh` (E1_2L baseline run command)
+- `scripts/run_option1_e2.sh` (E2_2L baseline run command)
+
+**Key design decisions**:
+
+1. **6D state**: `(t, w, z, ell, x_A_prev, x_B_prev)`. Value / policy
+   arrays are 6D `(T, N_W, N_Z, 2, N_xA_prev, N_xB_prev)`.
+   At default grids (N_W=15, N_Z=5, N_X_PREV=3): ~77k state points,
+   ~4 MB total array memory.
+
+2. **tx_cost on deltas** (correct Option 1 spec):
+   ```
+   tx_cost = tau_buy  * (max(Δx_A,0) + max(Δx_B,0))
+           + tau_token * (max(-Δx_A,0) + max(-Δx_B,0))
+   ```
+   Charged every period on the change in holdings. Pre-holding x_B from
+   period t incrementally pays tau_buy * dx; on relocation the delta to
+   target allocation is smaller by x_B_prev, so tau_buy is saved
+   proportionally.
+
+3. **4D interpolation** for continuation value: since `x_new` (choice)
+   = `x_prev` at t+1 (deterministic), the next-period value function is
+   interpolated over `(w_next, z_next, x_A_new, x_B_new)`. Implemented
+   as a 16-term tensor-product linear interpolation (`interp_4d_v4`).
+
+4. **FIXED kappa rule** (from v3 model fix):
+   `kappa = rho - x_ell_local * (rho - m)` — only occupied unit saves
+   rent; non-occupied token is pure financial asset.
+
+5. **E1_2L tx_cost**: binary holdings. Buying (0→1) costs tau_buy per
+   unit; selling (1→0) costs tau_token per unit (token transfer).
+   Forced relocation sell is still via sell_factor = (1 - tau_sell) in
+   wealth transition (same as v3).
+
+6. **Coarse x_prev grid**: N_X_PREV=3, X_PREV_MAX=1.5 → {0, 0.75, 1.5}.
+   Env-var configurable. Net compute vs. v3 full-grid: ~4.6x.
+
+7. **Smoke test** (`--smoke-test` flag): checks 6D allocation (~4 MB),
+   terminal slice, tx_cost spot-checks (buy/sell/hold/mixed), 4D
+   interpolation at grid node and midpoint, E2_2L budget feasibility,
+   shock-block weight sum. VFI NOT run (cloud env; server1 required).
+
+8. **v3 helpers reused** via `include(joinpath(@__DIR__, "vfi_solver_v3.jl"))`:
+   `ModelParams_v3`, `build_shock_block_v3`, `income_profile_v3`,
+   `next_income_state_v3`, `next_wealth_v3`, `utility_crra`,
+   `p_relocate_v3`, `candidate_grid`, `regime_from_env_v3`, etc.
+
+**Feature branch**: `auto/2026-05-02-option1-state-extension`
+
+**Next steps (server1, user)**:
+1. `julia src/vfi_solver_v4.jl --smoke-test` — verify struct checks pass
+2. `bash scripts/run_option1_e1.sh` — E1_2L baseline (~2.5h)
+3. `bash scripts/run_option1_e2.sh` — E2_2L baseline (~2.5h)
+4. Compute `CEV(E2_2L_v4 vs E1_2L_v4)` and check H1 (mean_xB > 0 at ellA)
+
+**Hypothesis H1 mechanism recap**: at ell=A in E2_2L, x_A saves rent
+(delta_own per unit) AND holds capital gain. x_B saves rent only at ell=B
+(when relocated), but pre-holding x_B incrementally at ell=A DOES reduce
+future tau_buy at arrival — the per-period expected savings is
+`p_relocate * tau_buy` per unit held. This is 0.06 * 0.025 = 0.0015
+(0.15%) per period per unit, about 6% over a 40-year working life with
+discounting. Whether this is large enough to motivate positive x_B at
+ell=A depends on whether this beats the rent-saving advantage of x_A.
