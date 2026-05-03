@@ -1,7 +1,7 @@
 # Next Actions (Path B Option 1 in flight, ASAP-tempered to 6h cron)
 
 Project: sto_lifecycle_portfolio
-Updated: 2026-05-02 (cloud agent fire 3)
+Updated: 2026-05-03 (cloud agent fire 5)
 
 ## ⭐ P0 — Option 1 full state extension (USER CHOSE B, OPTION 1)
 
@@ -47,6 +47,14 @@ If any fails: fall back to Path D (REE/JHE) at +4.26%.
 | DONE | Merged fix + Option 3 into main (commit 186da13) |
 | DONE | E1_2L with tau_buy active: CEV(E2_2L vs E1_2L_full) = +4.255% |
 | DONE | Final Path B Option 3 verdict: continuous-x 3.4% + tx-cost 0.8% = 4.26% |
+
+## Phase 2 prep (cloud agent can do while server1 baselines pending)
+
+| Priority | Action | Status |
+|---|---|---|
+| P1-prep | `docs/calibration_v3.md` — PSID/NAR/Case-Shiller anchors | **DONE** 2026-05-03 |
+| P1-prep | `docs/sensitivity_grid_v4.md` — grid plan + expected patterns | next fallback |
+| P1-prep | `docs/methods_v3.md` — update methods.md from v2 to v3/v4 spec | queued |
 
 ## P1 (after Option 1 resolves)
 

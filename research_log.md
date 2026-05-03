@@ -1124,3 +1124,68 @@ reviewed, merged, and confirmed the work. Key correctness property confirmed:
 E1_2L relocation resets x_prev → (0,0); E2_2L tokens are portable (x_prev
 carried over unchanged). Branch `auto/2026-05-02-option1-state-extension` is
 merged and current. Pending: server1 smoke test + baselines (USER steps 5-7).
+
+## 2026-05-03 — Calibration anchor document (cloud agent fire 5)
+
+**Action picked**: write `docs/calibration_v3.md` — Phase 2 prep, cited as the
+next auto-allowed fallback in fire 3's "next queued" note. P0 code steps 1-4
+were already completed by fires 1-4 (solver + scripts). Steps 5-7 require
+server1 (USER). This fire does Phase 2 prep that unblocks H2' calibration
+review and is fully executable without server1.
+
+**File created**: `docs/calibration_v3.md` (~250 lines)
+
+**Content summary** — eleven sections:
+
+1. **Mobility rate (PSID)**: `p_relocate_working = 0.06` (6%/yr, PSID inter-MSA
+   mid-range for working-age); `p_relocate_retired = 0.02`. Literature citations:
+   Yao-Zhang (2005, 4%), Bagliano-Fugazza-Nicodano (2014, 5-8%), Saks-Wozniak
+   (2011 JLE). Sensitivity grid: {0, 0.02, 0.06, 0.12}.
+
+2. **Transaction costs (NAR / CFPB)**: tau_sell=6% (NAR seller side: 3% commission
+   + 0.5% closing = 3.5% seller direct + buyer's agent 2.5% = 6% total on sell);
+   tau_buy=2.5% (origination + title + appraisal); tau_token=1% (platform fee +
+   blockchain gas, from RealT/Lofty surveys). Round-trip E1_2L = 8.5%.
+   Sensitivity: notx / sell6 / rt8p5 (baseline) / rt10 / rt12.
+
+3. **MSA-pair correlation (Case-Shiller)**: `rho_AB = 0.50` midpoint of 0.30-0.70.
+   Documents mapping from observed raw corr(R_A, R_B) to idiosyncratic rho_AB using
+   the aggregate-factor variance share (~75.6%): observed corr ≈ 0.756 + 0.244 * rho_AB.
+   At baseline 0.50: observed ≈ 0.88 (consistent with proximate US metro pairs).
+   Sensitivity: {0, 0.25, 0.50, 0.75, 0.95}.
+
+4. **Income process (CGM 2005)**: sigma_u^2=0.0106, sigma_eps^2=0.0738, lambda_ret=0.65
+   (PSID-calibrated, CGM Table I). Polynomial age profile coefficients from CGM.
+
+5. **Housing return parameters**: sigma_h=0.115 (Cocco 2005), sigma_div=0.10 (aggregate),
+   sigma_iota=0.0573 (derived, idiosyncratic), g_h=0.016, rho=0.05 (YZ 2005), m=0.01.
+   Common-factor share 75.6% consistent with Case-Shiller national decomposition.
+
+6. **Financial asset parameters**: rf=1.02, equity_premium=0.04, sigma_s=0.157,
+   gamma=5, beta=0.96 (CGM 2005 baseline).
+
+7. **Age/lifecycle**: age0=25, retire=65, terminal=80 (CGM 2005).
+
+8. **Grid parameters**: N_W=15, N_Z=5, N_X_PREV=3, X_PREV_MAX=2.0. Memory estimate
+   ~5 MB total, ~2.5 hours per regime.
+
+9. **Identification and sensitivity table**: maps each parameter to the mechanism
+   it drives, sensitivity range, and priority (P1 vs Phase 2).
+
+10. **H2' gate questions**: pre-loaded calibration approval questions for Phase 2.
+
+11. **Comparison table v3 vs v4**: shows tau_buy/tau_sell/tau_token behavior change
+    (Option 3 approximation replaced by proper state extension).
+
+**Why this fire**: P0 code is done; server1 baselines are in the USER queue.
+The calibration doc pre-loads everything needed for Phase 2 launch the moment
+H1+H2+H3 are confirmed from server1. It also documents the specific empirical
+claims that a referee would challenge, creating a defense-first paper trail.
+
+**Feature branch**: `auto/2026-05-02-option1-state-extension`
+
+**Next queued**:
+- (USER) Server1 smoke test + baselines (P0 steps 5-7)
+- (cloud agent next fire, if still waiting for baselines): sensitivity-grid
+  plan document (`docs/sensitivity_grid_v4.md`) or methods.md v3 update
+
