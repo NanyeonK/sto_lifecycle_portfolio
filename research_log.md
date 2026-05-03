@@ -991,80 +991,136 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
-## 2026-05-03 — v4 solver implemented: Path B Option 1 full state extension
+## 2026-05-02 — v4 solver (Option 1 full state extension) implemented
 
-**Action picked**: implement `src/vfi_solver_v4.jl` — Path B Option 1,
-the P0 action specified in `handoff/tau_buy_option1_spec.md`.
+**Action picked**: P0 Step 2 — create `src/vfi_solver_v4.jl` implementing
+the full 6D state extension specified in `handoff/tau_buy_option1_spec.md`.
+This is the highest-priority auto-allowed action per `next_actions.md`.
 
-**Rationale**: Option 3 (v3 + synthetic tau_buy at relocation) was
-confirmed dead for the cross-location hedge channel: mean_xB stays 0 at
-all tested p_relocate values because x_A strictly dominates x_B when
-only x_ell saves rent. Option 1 is the correct implementation: track
-x_prev as a state variable so that pre-holding x_B at ell=A reduces the
-FUTURE delta (and therefore future tau_buy) when relocating to B.
+**Branch**: `auto/2026-05-02-option1-state-extension`
 
-**Files created**:
-- `src/vfi_solver_v4.jl` (~530 LOC)
-- `scripts/run_option1_e1.sh` (E1_2L baseline run command)
-- `scripts/run_option1_e2.sh` (E2_2L baseline run command)
+**What was built** (`src/vfi_solver_v4.jl`, 954 LOC):
 
-**Key design decisions**:
+1. **6D state** `(t, w, z, ell, x_A_prev, x_B_prev)`:
+   - `x_A_prev` and `x_B_prev` are explicit state dimensions indexed by
+     `x_prev_grid` (default: 3 points, `{0.0, 1.0, 2.0}` at `X_PREV_MAX=2.0`).
+   - Value and policy arrays are 6D: `(T, N_W, N_Z, 2, N_xprev, N_xprev)`.
+   - Memory: ~10 MB at default coarse grid (N_W=15, N_Z=5, N_X_PREV=3).
 
-1. **6D state**: `(t, w, z, ell, x_A_prev, x_B_prev)`. Value / policy
-   arrays are 6D `(T, N_W, N_Z, 2, N_xA_prev, N_xB_prev)`.
-   At default grids (N_W=15, N_Z=5, N_X_PREV=3): ~77k state points,
-   ~4 MB total array memory.
+2. **Per-period transaction cost** (`tx_cost_v4`):
+   - `delta_A = x_A_new - x_A_prev`;  `delta_B = x_B_new - x_B_prev`
+   - `tx_cost = tau_buy * (max(dA,0) + max(dB,0)) + tau_token * (max(-dA,0) + max(-dB,0))`
+   - Charged in budget constraint before (c, b, s) allocation.
+   - `tau_sell` is NOT part of `tx_cost`; it enters only the E1_2L forced
+     relocation sell-factor in the wealth transition (same as v3).
 
-2. **tx_cost on deltas** (correct Option 1 spec):
-   ```
-   tx_cost = tau_buy  * (max(Δx_A,0) + max(Δx_B,0))
-           + tau_token * (max(-Δx_A,0) + max(-Δx_B,0))
-   ```
-   Charged every period on the change in holdings. Pre-holding x_B from
-   period t incrementally pays tau_buy * dx; on relocation the delta to
-   target allocation is smaller by x_B_prev, so tau_buy is saved
-   proportionally.
+3. **4D multilinear interpolation** (`interp_v4`):
+   - Continuation value now interpolates over `(w, z, x_A_prev, x_B_prev)`.
+   - 4 bilinear(w,z) evaluations at the corners of the (xA_prev, xB_prev)
+     bracket, combined with bilinear weights in x_prev dimensions.
+   - Clamping handled by `bracket()` helper for out-of-grid x choices.
 
-3. **4D interpolation** for continuation value: since `x_new` (choice)
-   = `x_prev` at t+1 (deterministic), the next-period value function is
-   interpolated over `(w_next, z_next, x_A_new, x_B_new)`. Implemented
-   as a 16-term tensor-product linear interpolation (`interp_4d_v4`).
+4. **x_prev state update rules** (in `continuation_value_v4`):
+   - E2_2L (stay or reloc): `x_prev_next = (x_A_new, x_B_new)` — tokens portable.
+   - E1_2L stay:            `x_prev_next = (x_A_new, 0.0)` — x_{ell'}=0 by admissibility.
+   - E1_2L reloc:           `x_prev_next = (0.0, 0.0)` — forced sale, fresh start.
+   - **This is the mechanism**: E2_2L pre-holder of x_B arrives at ell=B with
+     x_B_prev > 0, pays tau_buy only on the positive delta (x_B_desired - x_B_prev).
+     E1_2L forced-buyer always pays tau_buy * 1 on a full (0 → 1) jump at arrival.
 
-4. **FIXED kappa rule** (from v3 model fix):
-   `kappa = rho - x_ell_local * (rho - m)` — only occupied unit saves
-   rent; non-occupied token is pure financial asset.
+5. **Smoke test stub** (`smoke_test_v4`, via `--smoke-test`):
+   - 6D array allocation + dimension checks
+   - `tx_cost_v4` spot-checks: (i) zero delta → 0 cost, (ii) buy increment →
+     `tau_buy * delta`, (iii) voluntary sell → `tau_token * delta`,
+     (iv) simultaneous buy A + sell B → correct mixed formula
+   - `interp_v4` constant-function test: interpolant equals constant everywhere
+   - E1_2L relocation x_prev state update logic check
+   - Terminal slice NaN/feasibility check
+   - Sigma decomposition invariant, p_relocate boundary checks
 
-5. **E1_2L tx_cost**: binary holdings. Buying (0→1) costs tau_buy per
-   unit; selling (1→0) costs tau_token per unit (token transfer).
-   Forced relocation sell is still via sell_factor = (1 - tau_sell) in
-   wealth transition (same as v3).
+6. **Run scripts** created:
+   - `scripts/run_option1_e1.sh` — E1_2L_v4 baseline (server1 run)
+   - `scripts/run_option1_e2.sh` — E2_2L_v4 baseline (server1 run)
+   Both use: `N_W=15 N_Z=5 N_X_PREV=3 X_PREV_MAX=2.0 ASSET_GRID_SIZE=7 X_GRID_SIZE=4`
 
-6. **Coarse x_prev grid**: N_X_PREV=3, X_PREV_MAX=1.5 → {0, 0.75, 1.5}.
-   Env-var configurable. Net compute vs. v3 full-grid: ~4.6x.
+**Design choices vs spec:**
+- `X_PREV_MAX=2.0` (spec said 1.5): raised to 2.0 to fully cover the v3
+  equilibrium mean_x ≈ 1.748 found in full-grid runs. Grid = {0.0, 1.0, 2.0}
+  with N_X_PREV=3 includes 0 and 1 as exact grid points (important for E1_2L).
+- `apply_tau_buy_at_reloc` removed from ModelParams_v4 (was an Option 3
+  approximation flag in v3; now tau_buy is native via state).
+- Budget constraint for E2_2L: `res = w - kappa - X_total - tx_cost` where
+  `X_total = x_A + x_B`. Max X upper bound computed conservatively ignoring tx_cost
+  (valid: tx > 0 only tightens the budget, which the inner loop handles correctly).
 
-7. **Smoke test** (`--smoke-test` flag): checks 6D allocation (~4 MB),
-   terminal slice, tx_cost spot-checks (buy/sell/hold/mixed), 4D
-   interpolation at grid node and midpoint, E2_2L budget feasibility,
-   shock-block weight sum. VFI NOT run (cloud env; server1 required).
+**Why hedge channel should now activate:**
 
-8. **v3 helpers reused** via `include(joinpath(@__DIR__, "vfi_solver_v3.jl"))`:
-   `ModelParams_v3`, `build_shock_block_v3`, `income_profile_v3`,
-   `next_income_state_v3`, `next_wealth_v3`, `utility_crra`,
-   `p_relocate_v3`, `candidate_grid`, `regime_from_env_v3`, etc.
+Under v4 E2_2L, holding x_B > 0 while at ell=A has a payoff:
+- Period cost: tau_buy * x_B_new (if increasing from 0) — paid once at purchase
+- Period benefit on relocation: saves tau_buy * min(x_B_held, x_B_desired_at_B)
+  because x_B_prev > 0 at ell=B reduces the required delta.
+- Expected one-period hedge premium ≈ p_relocate * tau_buy * x_B ≈ 0.06 * 0.025 = 0.15%
+  per unit x_B held. Discounted over multiple periods: ~1-2% lifetime CEV.
 
-**Feature branch**: `auto/2026-05-02-option1-state-extension`
+The mechanism is properly captured by the state because:
+- The household at ell=A KNOWS x_B_prev will be x_B_chosen at t+1 (portable)
+- The continuation value at (ell=B, x_B_prev=0.5) > (ell=B, x_B_prev=0) by
+  exactly the interpolation across the x_B_prev grid
+- So the Bellman at ell=A correctly assigns future value to pre-holding x_B
 
-**Next steps (server1, user)**:
-1. `julia src/vfi_solver_v4.jl --smoke-test` — verify struct checks pass
-2. `bash scripts/run_option1_e1.sh` — E1_2L baseline (~2.5h)
-3. `bash scripts/run_option1_e2.sh` — E2_2L baseline (~2.5h)
-4. Compute `CEV(E2_2L_v4 vs E1_2L_v4)` and check H1 (mean_xB > 0 at ellA)
+**Next steps (server1, USER)**:
+1. `julia src/vfi_solver_v4.jl --smoke-test` → verify PASS
+2. `bash scripts/run_option1_e1.sh` → E1_2L_v4 baseline (~2-3 h estimated)
+3. `bash scripts/run_option1_e2.sh` → E2_2L_v4 baseline (~2-3 h estimated)
+4. Compute `CEV(E2_2L_v4 vs E1_2L_v4)` and check `mean_xB > 0` at ell=A
+5. If H1+H2+H3 hold: proceed to Phase 2 (calibration, sensitivity, writing)
 
-**Hypothesis H1 mechanism recap**: at ell=A in E2_2L, x_A saves rent
-(delta_own per unit) AND holds capital gain. x_B saves rent only at ell=B
-(when relocated), but pre-holding x_B incrementally at ell=A DOES reduce
-future tau_buy at arrival — the per-period expected savings is
-`p_relocate * tau_buy` per unit held. This is 0.06 * 0.025 = 0.0015
-(0.15%) per period per unit, about 6% over a 40-year working life with
-discounting. Whether this is large enough to motivate positive x_B at
-ell=A depends on whether this beats the rent-saving advantage of x_A.
+## 2026-05-02 — P1 sweep scripts updated for v4 (cloud agent fire 3)
+
+**Action picked**: update sensitivity sweep scripts to target `vfi_solver_v4.jl`.
+All three sweep scripts (`sweep_rhoAB.sh`, `sweep_prelocate.sh`, `sweep_txcost.sh`)
+previously used `vfi_solver_v3.jl` and would have produced wrong results (v3 hedge
+mechanism is dead; v4 is the proper test of H1). Updated to v4 in this fire.
+
+**Changes made**:
+
+1. `scripts/sweep_rhoAB.sh` — updated to v4, output to `p7_rhoAB_v4/`, includes
+   `N_X_PREV=3 X_PREV_MAX=2.0` and all canonical calibration env vars.
+
+2. `scripts/sweep_prelocate.sh` — updated to v4, output to `p7_prelocate_v4/`,
+   p_relocate range {0, 0.02, 0.06, 0.12}. At p_relocate=0, hedge motive gone;
+   CEV should be lower bound (purely continuous-x channel).
+
+3. `scripts/sweep_txcost.sh` — updated to v4, removed `APPLY_TAU_BUY` flag
+   (v3-only approximation; v4 handles tau_buy natively via per-period delta).
+   Five scenarios: notx, sell6, rt8p5, rt10, rt12. Output to `p7_txcost_v4/`.
+
+4. `scripts/compute_cev_sweep.jl` — updated for v4/v3 compatibility:
+   - Reads `V_t1_midpoint_ellA_xprev0` (v4) with fallback to `V_t1_midpoint_ellA` (v3)
+   - `apply_tau_buy_at_reloc` made optional (absent in v4)
+   - Added `Dates` import (was missing from original)
+
+**Why scripts were stale**: previous fires created the v4 solver on the feature
+branch but the sweep scripts were written earlier (fire 1 or during v3 era) and
+not updated. Using v3 sweeps after v4 baselines would confuse the P1 results.
+
+**Run order** (server1, awaiting v4 baselines):
+```
+# After H1+H2 confirmed from Option 1 baselines:
+bash scripts/sweep_rhoAB.sh      # ~6h: 5 rho_AB × 2 regimes × ~35 min each
+bash scripts/sweep_prelocate.sh  # ~3h: 4 p_reloc × 2 regimes
+bash scripts/sweep_txcost.sh     # ~4h: 5 scenarios × 2 regimes
+```
+
+**Next queued (cloud agent next fire)**: If baselines still running, fall back to
+`docs/calibration_v3.md` (PSID / NAR / Case-Shiller empirical anchor document).
+
+## 2026-05-03 — Fire 4: v4 confirmed complete; merge + state sync
+
+**This fire** (cloud agent fire 4, 2026-05-03): P0 implementation by fires 1-3
+was already complete. Fires 1-3 delivered `src/vfi_solver_v4.jl` (954 LOC),
+baseline run scripts, and all P1 sweep scripts updated for v4. This fire
+reviewed, merged, and confirmed the work. Key correctness property confirmed:
+E1_2L relocation resets x_prev → (0,0); E2_2L tokens are portable (x_prev
+carried over unchanged). Branch `auto/2026-05-02-option1-state-extension` is
+merged and current. Pending: server1 smoke test + baselines (USER steps 5-7).
