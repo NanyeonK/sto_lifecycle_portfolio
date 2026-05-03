@@ -991,3 +991,67 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-05-03 — v4 solver: 6D state extension (Option 1) implemented
+
+**Action picked**: P0 Step 2 — create `src/vfi_solver_v4.jl` with full
+6D state `(t, w, z, ell, x_A_prev, x_B_prev)` + per-period tau_buy on
+positive x deltas. This is the highest-priority auto-allowed action per
+`next_actions.md` and `handoff/tau_buy_option1_spec.md`.
+
+**What the v4 solver adds over v3**:
+
+1. **6D state array**: `(T, N_W, N_Z, 2, N_X_PREV, N_X_PREV)`.
+   Default small grids: T=57, N_W=15, N_Z=5, N_ell=2, N_X_PREV=3.
+   Memory: ~0.5 MB per policy array (6 arrays + feasibility mask ≈ 3.5 MB total).
+
+2. **Per-period transaction cost** on x changes:
+   ```
+   tx_cost = tau_buy  * (max(delta_A, 0) + max(delta_B, 0))
+           + tau_token * (max(-delta_A, 0) + max(-delta_B, 0))   [E2_2L only]
+   ```
+   Charged on both x_A and x_B separately, every period. This replaces the
+   Option 3 approximation (tau_buy only at relocation event).
+
+3. **Regime-specific sell logic**:
+   - E1_2L: tau_buy on purchases (tx_cost); tau_sell via sell_factor at
+     relocation (no tau_token — sell_factor handles it).
+   - E2_2L: tau_buy on positive deltas; tau_token on negative deltas
+     (token transfer cost); sell_factor = 1.0 always (tokens portable).
+
+4. **Quadrilinear interpolation** in continuation value: bilinear in
+   (w, z) × bilinear in (x_A_next, x_B_next) over the x_prev grid. The
+   chosen (x_A_new, x_B_new) become next period's (x_A_prev, x_B_prev)
+   state — value lookup is quadrilinear over all four dimensions.
+
+5. **Smoke test**: `julia src/vfi_solver_v4.jl --smoke-test`. Checks:
+   6D array shape/memory, terminal slice health, tx_cost formula (5 cases),
+   housing_cost fixed-kappa rule, shock block weight-sum, x_prev grid
+   initial condition.
+
+6. **Run scripts**:
+   - `scripts/run_option1_e1.sh` — E1_2L baseline at v4 settings
+   - `scripts/run_option1_e2.sh` — E2_2L baseline at v4 settings
+
+**Mechanism logic** (why this resurrects the hedge channel):
+Under v4 E2_2L, a household at ell=A who anticipates relocation to B can
+pre-build x_B incrementally (paying tau_buy * delta_B each period). At
+relocation the delta is small → low tx_cost. Under E1_2L the household
+must pay tau_buy * 1.0 at relocation (forced full purchase at new
+location). Expected hedge premium per unit x_B held: ~p_reloc * tau_buy
+≈ 0.06 × 0.025 = 0.0015 per period per unit.
+
+**Files created/modified**:
+- `src/vfi_solver_v4.jl` (917 LOC, new)
+- `scripts/run_option1_e1.sh` (new)
+- `scripts/run_option1_e2.sh` (new)
+- `next_actions.md` (steps 1-2 marked DONE)
+- `research_log.md` (this entry)
+
+**Branch**: `auto/2026-05-03-option1-state-extension`
+
+**Next queued (user runs on server1)**:
+- Step 3: `julia src/vfi_solver_v4.jl --smoke-test` to confirm 6D
+  allocation, tx_cost checks, terminal health.
+- Steps 5-6: Run E1_2L and E2_2L baselines; check H1 (mean_xB > 0 at ellA),
+  H2 (CEV > 4.255%), H3 (hedge channel ≈ 0.5-1.5%).
+
