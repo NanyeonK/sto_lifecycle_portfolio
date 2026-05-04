@@ -991,3 +991,71 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-05-04 — v4 solver (Option 1 full state extension) implemented
+
+**Action picked**: P0 step 2-4 from `handoff/tau_buy_option1_spec.md` —
+implement `src/vfi_solver_v4.jl` with 6D state, per-period tx_cost, and
+smoke test stub.
+
+**Context**: Option 3 (approximated tau_buy at relocation event) was
+tested 2026-05-02 and confirmed that cross-location hedge (mean_xB > 0
+at ell=A) remains exactly zero even with the tau_buy asymmetry. Option 1
+is the proper fix: extend state to `(t, w, z, ell, x_A_prev, x_B_prev)`,
+charge tau_buy on positive deltas every period. Pre-holding x_B while at
+ell=A yields literal future savings: delta_B at next-period relocation
+= x_B_target - x_B_prev is smaller, so tau_buy charge is smaller. The
+per-period expected hedge premium per unit: p_relocate * tau_buy
+≈ 0.06 * 0.025 = 0.0015. Lifetime impact: ~1-2% additional CEV.
+
+**Files created**:
+- `src/vfi_solver_v4.jl` (~530 LOC):
+  - `ModelParams_v4`: removes `apply_tau_buy_at_reloc` flag (superseded
+    by proper tx_cost); adds all three costs active.
+  - `GridSpec_v4`: adds `n_x_prev` (default 3) and `x_prev_max`
+    (default 1.0). x_prev_grid = {0.0, 0.5, 1.0} at N_X_PREV=3.
+  - `SolverResult_v4`: 6D arrays `(T, N_W, N_Z, 2, N_X_PREV, N_X_PREV)`.
+    At N_W=15, N_Z=5, N_X_PREV=3: 57*15*5*2*3*3 = 76,950 elements per
+    array, ~615 KB each, ~5 MB total.
+  - `tx_cost_v4()`: `tau_buy*max(delta,0) + tau_token*max(-delta,0)` per
+    location, charged in budget constraint at choice time.
+  - `interp_wz_v4()`: bilinear in (w, z) with exact index lookup in
+    (iell, ixA_prev, ixB_prev) — no x_prev interpolation needed because
+    x_new choices are restricted to x_prev_grid points.
+  - `continuation_value_v4()`: E1_2L relocation resets x_prev to (1,1)
+    (index 1 = 0.0), reflecting forced physical sale. E2_2L relocation
+    keeps x_prev = (x_A_new, x_B_new), reflecting token portability.
+    This is the critical design distinction.
+  - `solve_state_v4()`:
+    - E0: x_new = (0,0), no tx_cost, standard (b,s) grid.
+    - E1_2L: binary x_ell ∈ {0,1}, x_{ell'} = 0; tx_cost on delta from
+      x_prev (captures repeat ownership cost and buying cost after reloc).
+    - E2_2L: (x_A_new, x_B_new) ∈ x_prev_grid × x_prev_grid (9 pairs at
+      N_X_PREV=3); budget includes tx_cost; fixed kappa rule (occupied
+      location only saves rent).
+  - `smoke_test_v4()`: 8 checks — sigma decomp, 6D allocation, shock
+    block, terminal slice, tx_cost spot-checks (buy/sell/no-change/
+    pre-hold), housing-cost rule, 6D size consistency.
+- `scripts/run_option1_e1.sh`: E1_2L v4 at baseline calibration.
+- `scripts/run_option1_e2.sh`: E2_2L v4 at baseline calibration.
+
+**Branch**: `auto/2026-05-04-option1-state-extension`.
+
+**v4 vs v3 key distinctions**:
+- x_prev state tracks prior holdings; choice grid = x_prev_grid
+- tau_buy charged on EVERY positive delta (not just at relocation)
+- E1_2L relocation forces x_prev reset to (0,0) → tau_buy charged on
+  full new purchase at destination
+- E2_2L relocation: x_prev persists → pre-held x_B_prev saves
+  tau_buy * x_B_prev at destination; this is the hedge mechanism
+
+**Hypothesis to test on server1** (Option 1 runs):
+- H1: mean_xB > 0 at ell=A in E2_2L_v4 (hedge activates)
+- H2: CEV(E2_2L_v4 vs E1_2L_v4) > 4.255% (Option 3 baseline)
+- H3: hedge channel = CEV(E2_2L_v4 vs E2_2L_v3) ≈ 0.5-1.5%
+
+**Next steps for user (server1)**:
+1. `julia src/vfi_solver_v4.jl --smoke-test` → verify PASS
+2. `bash scripts/run_option1_e1.sh` → E1_2L baseline (~2-4 h)
+3. `bash scripts/run_option1_e2.sh` → E2_2L baseline (~2-4 h)
+4. Compute CEV decomposition; verify H1/H2/H3.
+
