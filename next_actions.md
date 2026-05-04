@@ -1,7 +1,7 @@
 # Next Actions (Path B Option 1 in flight, ASAP-tempered to 6h cron)
 
 Project: sto_lifecycle_portfolio
-Updated: 2026-05-04 (cloud agent fire 7)
+Updated: 2026-05-04 (cloud agent fire 8)
 
 ## ⭐ P0 — Option 1 full state extension (USER CHOSE B, OPTION 1)
 
@@ -60,7 +60,8 @@ If any fails: fall back to Path D (REE/JHE) at +4.26%.
 
 | Priority | Action | Status |
 |---|---|---|
-| P1-prep | `docs/welfare_decomp_v4.md` — CEV formula, channel decomp plan, comparison table spec | next fallback |
+| P1-prep | `docs/welfare_decomp_v4.md` — CEV formula, channel decomp plan, comparison table spec | **DONE** 2026-05-04 |
+| P1-prep | `paper/outline_v4.md` — section headings + contribution paragraph anchored to welfare_decomp_v4 | next fallback |
 
 ## P1 (after Option 1 resolves)
 

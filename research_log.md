@@ -1322,3 +1322,47 @@ reading the solver code.
 CEV formula spec, channel decomposition plan, and comparison table to
 Liu (2021) / Cocco (2005) / KMW (2018). Or jump to Phase 2 if server1
 baselines H1+H2+H3 confirmed before the next fire.
+
+## 2026-05-04 — Welfare decomposition spec (cloud agent fire 8)
+
+**Action picked**: `docs/welfare_decomp_v4.md` — CEV formula, channel decomposition
+plan, falsification tests, literature comparison table. The P0 code work (v4 solver,
+docs, sweep scripts) was fully complete from fires 1-7; this fire executed the next
+Phase 2 prep fallback action.
+
+**What this fire did**:
+
+1. Surveyed branch state: confirmed `src/vfi_solver_v4.jl` (954 LOC, 6D state),
+   sweep scripts, calibration anchors, and methods_v3.md all complete. No coding
+   work needed.
+
+2. Wrote `docs/welfare_decomp_v4.md` — pre-registered the welfare analysis spec:
+   - CEV formula under CRRA (exact derivation for CRRA with gamma != 1)
+   - Primary welfare objects: CEV(E2_2L vs E1_2L), channel decomposition,
+     renter welfare cost
+   - Channel decomposition using three regime runs (E1_2L, E1_2L_NOTX, E2_2L)
+   - Pre-registered falsification tests (r), (m), (q) with PASS/FAIL criteria
+   - Literature comparison table: Liu (2021), Yao-Zhang (2005), Cocco (2005),
+     KMW (2018), Sinai-Souleles (2005), Davidoff (2006)
+   - Sensitivity grid summary (cross-reference to sensitivity_grid_v4.md)
+   - Reporting format template for Tables 1-4
+   - Output file inventory
+
+3. Key pre-registration: under v3 Option 3, falsification tests (r) and (m)
+   FAILED (mean_xB stayed 0 at p_reloc=0 and rho_AB=0.95). Under v4 Option 1,
+   these tests MUST PASS for the hedge mechanism to be credible.
+   `welfare_decomp_v4.md` documents this as the discriminator.
+
+**Files modified**:
+- `docs/welfare_decomp_v4.md` (created)
+- `next_actions.md` (welfare_decomp_v4 marked DONE; next fallback queued)
+- `research_log.md` (this entry)
+
+**Feature branch**: `auto/2026-05-02-option1-state-extension`
+
+**Next queued** (cloud agent next fire): server1 baselines H1+H2+H3 remain
+the critical path. If they arrive before next fire, cloud agent should compute
+CEV decomposition and write `output/diagnostics/p6_option1_decomposition.md`.
+If baselines not yet available, next Phase 2 prep fallback is writing
+`paper/outline_v4.md` — draft section headings and contribution paragraph
+anchored to the welfare_decomp_v4 pre-registration.
