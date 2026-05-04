@@ -1246,3 +1246,79 @@ pre-registration needed before Phase 2 sweeps run.
 **Next queued (cloud agent next fire)**: `docs/methods_v3.md` — update
 methods.md from v2 spec to v3/v4 spec (new regime taxonomy, 2-location
 Bellman, tx_cost block). Or wait for server1 baselines and jump to Phase 2.
+
+## 2026-05-04 — Methods v3 specification (cloud agent fire 7)
+
+**Action picked**: `docs/methods_v3.md` — the Phase 2 prep item marked
+"next fallback" in fire 6's `next_actions.md`. All P0 code steps (1-4),
+calibration anchors, and sensitivity grid are complete from prior fires.
+Server1 baselines (P0 steps 5-7) remain in the USER queue. This fire
+delivers the implementation-ready model spec that replaces `docs/methods.md`
+(v2, REIT-comparison framework) with the v3/v4 mobility-hedge specification.
+
+**File created**: `docs/methods_v3.md` (~300 lines, 16 sections)
+
+**Content summary**:
+
+1. Motivation and contribution claim: explains the two channels
+   (avoided-tx-cost, maintained-hedge) and why Option 1 (v4) is needed
+   to test the hedge channel properly.
+
+2. Economic environment: CRRA preferences, finite horizon, 2 locations.
+
+3. State space: v3 (4D) vs v4 (6D) comparison; x_prev grid rationale and
+   the entry condition `x_A_prev = x_B_prev = 0` at t=1.
+
+4. Controls and regime taxonomy: E0/E1_2L/E2_2L with admissibility rules;
+   marks the v2 four-regime structure as invalidated.
+
+5. Housing-cost rule (kappa): documents the fixed kappa convention (occupied-
+   location only) with explicit explanation of why the pre-fix symmetric rule
+   was wrong (rental-income artifact → Round 4 falsification failure).
+
+6. Period budget constraint: full formula with tx_cost, mortgage constraint.
+
+7. Transaction costs: separate entries for (a) E1_2L forced-sale via
+   sell_factor (wealth transition channel), (b) v4 per-period tx_cost on
+   x deltas (budget channel), and (c) the hedge incentive mechanism —
+   pre-holding `x_B_prev > 0` reduces future buying cost by
+   `tau_buy * (x_B_goal - x_B_prev)`.
+
+8. Wealth transition formula.
+
+9. Return process: 7D GH quadrature with bivariate Cholesky for (iota_A, iota_B).
+
+10. Income process (CGM 2005 polynomial).
+
+11. Stochastic relocation shock: Bernoulli integration in EV formula.
+
+12. Bellman equation: v4 6D formulation with state-update rules for E1_2L
+    (x_prev → 0 on relocation) vs E2_2L (x_prev carried over).
+
+13. Continuation-value interpolation: bilinear in (w, z); nearest-grid snap
+    in (x_A_prev, x_B_prev); approximation-error vs N_X_PREV tradeoff noted.
+
+14. Welfare measure: CEV formula under CRRA; primary welfare objects;
+    H1/H2/H3 tests.
+
+15. Numerical implementation table: v2/v3/v4 comparison row.
+
+16. v2 methods invalidated: complete list of dropped v2 objects.
+
+**Design note**: Section 7 (transaction costs) explicitly documents the
+difference between v3 Option 3 (`apply_tau_buy_at_reloc` bool, one-time at
+relocation) and v4 Option 1 (per-period on Δx, with x_prev state). This is
+the key model upgrade; the document makes it referee-reviewable without
+reading the solver code.
+
+**Files modified**:
+- `docs/methods_v3.md` (created)
+- `next_actions.md` (methods_v3 marked DONE; welfare_decomp_v4 added as next)
+- `research_log.md` (this entry)
+
+**Feature branch**: `auto/2026-05-02-option1-state-extension`
+
+**Next queued** (cloud agent next fire): `docs/welfare_decomp_v4.md` —
+CEV formula spec, channel decomposition plan, and comparison table to
+Liu (2021) / Cocco (2005) / KMW (2018). Or jump to Phase 2 if server1
+baselines H1+H2+H3 confirmed before the next fire.

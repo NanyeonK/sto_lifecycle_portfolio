@@ -1,7 +1,7 @@
 # Next Actions (Path B Option 1 in flight, ASAP-tempered to 6h cron)
 
 Project: sto_lifecycle_portfolio
-Updated: 2026-05-03 (cloud agent fire 6)
+Updated: 2026-05-04 (cloud agent fire 7)
 
 ## ⭐ P0 — Option 1 full state extension (USER CHOSE B, OPTION 1)
 
@@ -54,7 +54,13 @@ If any fails: fall back to Path D (REE/JHE) at +4.26%.
 |---|---|---|
 | P1-prep | `docs/calibration_v3.md` — PSID/NAR/Case-Shiller anchors | **DONE** 2026-05-03 |
 | P1-prep | `docs/sensitivity_grid_v4.md` — grid plan + expected patterns | **DONE** 2026-05-03 |
-| P1-prep | `docs/methods_v3.md` — update methods.md from v2 to v3/v4 spec | next fallback |
+| P1-prep | `docs/methods_v3.md` — update methods.md from v2 to v3/v4 spec | **DONE** 2026-05-04 |
+
+## Phase 2 prep — continued (cloud agent can do while baselines pending)
+
+| Priority | Action | Status |
+|---|---|---|
+| P1-prep | `docs/welfare_decomp_v4.md` — CEV formula, channel decomp plan, comparison table spec | next fallback |
 
 ## P1 (after Option 1 resolves)
 
