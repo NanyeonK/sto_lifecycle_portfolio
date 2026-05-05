@@ -570,3 +570,83 @@ register (re-categorized).
 **Dropped from v2**: 4-regime REIT comparison (E1+, E2+),
 multi-property x_other, hedge channel via corr(iota, eps),
 service-asset wedge framing.
+
+## 2026-05-05 — v4 solver implemented: 6D state with per-period tau_buy on deltas
+
+**Action picked**: implement `src/vfi_solver_v4.jl` (P0, auto-allowed, highest
+priority item in next_actions.md). This is the proper Option 1 state extension
+that the user approved 2026-05-02: tracking `(x_A_prev, x_B_prev)` as state
+variables so that `tau_buy` is charged each period on INCREASES in x holdings,
+creating a genuine pre-buy hedge option value.
+
+**Context from prior fires** (per research_log in orphaned commit 8cbe2ca):
+Path B Option 3 (tau_buy approximation at relocation only) was tested and found
+to leave the cross-location hedge channel dead (mean_xB = 0 at all p_relocate).
+The +4.26% headline CEV was 80% continuous-x rent-saving (Liu 2021 territory)
+and 20% transaction-cost avoidance. Option 1 (proper state extension) is the
+remaining mechanism-saving route: it gives households the genuine option to
+pre-hold x_B while at ell=A, saving tau_buy at eventual relocation to B.
+
+**v4 solver design** (`src/vfi_solver_v4.jl`, 973 LOC):
+
+1. **6D state** `(t, w, z, ell, x_A_prev, x_B_prev)`:
+   - Value function and all policy arrays are 6D.
+   - Default coarse grids: N_W=15, N_Z=5, N_X_PREV=3, X_PREV_MAX=2.0.
+   - x_prev grid = {0.0, 1.0, 2.0} — hits 1.0 exactly (E1_2L binary states).
+   - State factor vs v3: 15*5*9/(21*7*1) ≈ 4.6x; ~2-3 hours/regime on server1.
+
+2. **Per-period tx_cost on deltas** (v4 proper spec):
+   - `delta_A = x_A_new - x_A_prev;  delta_B = x_B_new - x_B_prev`
+   - E1_2L: `tx_cost = tau_buy * (max(delta_A,0) + max(delta_B,0))`
+     (sales use tau_sell via sell_factor in wealth transition)
+   - E2_2L: `tx_cost = tau_buy * (max(dA,0) + max(dB,0)) + tau_token * (max(-dA,0) + max(-dB,0))`
+   - Budget: `c + kappa(x_ell_new) + b + s + x_A_new + x_B_new + tx_cost = w`
+
+3. **4D interpolation** for continuation value:
+   - `V[t+1, w_next, z_next, ell_next, x_A_new, x_B_new]` requires interpolation
+     in (w, z, x_A_prev, x_B_prev) at the next-period value function.
+   - `interp_4d_v4()`: bilinear in (w,z) × bilinear in (x_A_prev, x_B_prev).
+   - Bracket computation `find_bracket_v4()` runs once per state (not per
+     quadrature point): x_A_new, x_B_new fixed within the inner quadrature loop.
+
+4. **E1_2L accounting** at relocation (ell=A → B):
+   - tau_sell captured in `sell_factor_A = 1 - tau_sell` (wealth transition).
+   - Next-period state: `(x_A_prev=1, x_B_prev=0)` at LOC_B.
+   - At t+1, choosing x_A_new=0 gives delta_A=-1; tx_cost_E1=0 (no extra charge).
+   - The tau_buy for buying at B: `delta_B = x_B_new - 0 = x_B_new`; tc = tau_buy * x_B_new.
+   - Accounting is internally consistent: proceeds already in w via sell_factor.
+
+5. **Regime taxonomy**: E0 / E1_2L / E2_2L (same as v3; no legacy regime IDs).
+
+6. **Smoke test stub** `smoke_test_v4()` (no VFI):
+   - sigma decomposition invariant
+   - 6D array allocation and shape
+   - shock block size and weight-sum
+   - tx_cost_v4 spot-checks (E1_2L buy/sell, E2_2L mixed deltas)
+   - housing_cost_v4 spot-checks
+   - find_bracket_v4 boundary and clamp checks
+   - terminal_slice consistency (no NaN, all feasible)
+   - zero-delta → zero tx_cost
+   - hedge option value per unit x_B pre-held (informational)
+
+**Hedge option value analysis** (informational, embedded in smoke test):
+   `opt_val = p_reloc * tau_buy - (1 - p_reloc) * (tau_buy - tau_token)`
+   At baseline: `0.06 * 0.025 - 0.94 * 0.015 = -0.0126/period` — negative.
+   This means pure expected-value pre-buying is not profitable at baseline,
+   but CRRA utility + option asymmetry + future-location capital gain may still
+   activate the channel at some states. Numerical result will determine.
+
+**Run scripts** added:
+- `scripts/run_option1_smoke.sh` — smoke test (seconds)
+- `scripts/run_option1_e1.sh` — E1_2L baseline (~2-3h server1)
+- `scripts/run_option1_e2.sh` — E2_2L baseline (~2-3h server1)
+
+**Feature branch**: `auto/2026-05-02-option1-state-extension`.
+**Files created/modified**: `src/vfi_solver_v4.jl`, `src/vfi_solver_v3.jl`
+(extracted from orphaned commit for reference), `scripts/run_option1_*.sh`,
+`research_log.md`, `next_actions.md`.
+
+**Next queued** (all require server1):
+- P0 step 5: run smoke test `bash scripts/run_option1_smoke.sh`
+- P0 step 6: run E1_2L + E2_2L baselines; check mean_xB > 0
+- P0 step 7: compute CEV decomposition + test H1/H2/H3
