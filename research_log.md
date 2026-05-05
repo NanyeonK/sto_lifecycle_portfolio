@@ -570,3 +570,76 @@ register (re-categorized).
 **Dropped from v2**: 4-regime REIT comparison (E1+, E2+),
 multi-property x_other, hedge channel via corr(iota, eps),
 service-asset wedge framing.
+
+## 2026-05-05 — Phase 1: v3 solver skeleton complete
+
+Implemented `src/vfi_solver_v3.jl` (796 LOC) — the full Phase 1 solver
+skeleton for the mobility-hedge framing. All five Phase 1 solver items
+from `next_actions.md` are implemented:
+
+**1. 2-location state `ell_t ∈ {A, B}`.**
+State space is now 4-D: `(t, w, z, ell)`. `SolverResultV3` holds 4-D
+arrays `(t, n_w, n_z, n_ell)`. The VFI loop iterates over both locations at
+each period. Two `next_value` slices (A and B) are passed to the
+continuation-value function.
+
+**2. Stochastic relocation shock `p_relocate(t)`.**
+`p_relocate_v3(p, t)` returns `p.p_rel_work` (default 0.06, PSID-anchored
+5-7% per year) for working age `t ≤ retire_age`, and `p.p_rel_ret`
+(default 0.02) post-retirement. Continuation value is a mixture:
+```
+EV = (1-p_rel) * E[V(t+1, w', z', ell)] + p_rel * E[V(t+1, w'', z', ell')]
+```
+where `ell' = other location` and `w''` differs from `w'` by transaction
+costs under E1_2L (forced sale at tau_sell).
+
+**3. Transaction-cost block.**
+Parameters `tau_sell` (default 0.06, NAR), `tau_buy` (default 0.025,
+NAR), `tau_token` (default 0.01, stub). All are env-var configurable.
+`tau_sell` is applied in `next_wealth_move_E1_2L`: upon relocation under
+E1_2L, the current-location token `x_ell` is liquidated at
+`x_ell * R_ell * (1 - tau_sell)`, reducing next-period wealth. `tau_buy`
+is a parameter only (deferred: tracking previous holdings requires an
+additional state). `tau_token` is a parameter only (same reason).
+
+**4. Regimes E0, E1_2L, E2_2L.**
+
+| Regime | `x_A`, `x_B` | Housing cost | Relocation |
+|---|---|---|---|
+| E0 | 0, 0 | `rho_rent` | no wealth effect |
+| E1_2L | `{0,1}` at current ell only | binary kink | forced sale at `tau_sell` |
+| E2_2L | `[0,1]` each, independent | smooth `rho - x_ell*(rho-m)` | tokens retained |
+
+Key insight: in E2_2L, `kappa` depends only on `x_ell` (current-location
+tokens). `x_non_ell` is a pure financial asset providing no housing service
+at the current location — this is the mechanism that allows location-A
+exposure to be maintained while residing at B.
+
+**5. Location-correlated returns R_A, R_B.**
+7-D Gauss-Hermite quadrature (same architecture as v2 7-D block). Dimensions:
+eta_s, eta_div, raw_A, raw_B, xi, u, eps. Cholesky decomposition for
+`rho_AB`:
+```
+iota_A = sigma_iota_A * raw_A
+iota_B = sigma_iota_B * (rho_AB * raw_A + sqrt(1-rho_AB^2) * raw_B)
+```
+`rho_AB = 0.5` default (Case-Shiller MSA-pair anchor 0.3-0.7).
+`sigma_div = 0.07` default; `sigma_iota_A ≈ 0.091` (symmetric with
+sigma_iota_B). Both R_A and R_B share the aggregate factor `eta_div`
+while bearing independent idiosyncratic shocks.
+
+**Smoke test stub**: `scripts/smoke_test_v3.sh` — shell script with exact
+commands to run on server1 at small grids (N_W=11, N_Z=5, X_GRID_SIZE=4,
+GH_NODES=3). Expected wall time < 3 min total. Do not run in cloud env
+(Julia not installed here).
+
+**What is NOT yet done (intentional deferrals):**
+- `tau_buy` and `tau_token` applied in budget: deferred to Phase 2
+  (requires tracking previous holdings in state, or approximation design)
+- `docs/methods.md` v3 update: Phase 2 action
+- Calibration anchors document (`docs/calibration_v3.md`): Phase 2
+- Actual smoke test run: server1 only
+
+**Next action**: smoke test on server1, then Phase 2 calibration doc.
+Human gates H1'/H2' (title framing, calibration anchor approval) are still
+pending; they do not block Phase 1 completion or the smoke test.

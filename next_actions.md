@@ -18,12 +18,12 @@ Updated: 2026-05-01 (full pivot)
 
 | Priority | Action | Auto allowed? | Notes |
 |---|---|---|---|
-| P1 | Extend v2 solver to 2-location state: add `ell_t in {A, B}` | yes | Add 4-D state grid (t, w, z, ell) |
-| P1 | Add stochastic relocation shock with age-dependent `p_relocate(t)` | yes | PSID-anchored |
-| P1 | Add transaction-cost block: `tau_sell` (NAR ~6%), `tau_buy` (~2-3%), `tau_token` (~0.5-2%) | yes | env-var params |
-| P1 | Implement E0, E1_2L, E2_2L regimes | yes | Drop E1+, E2+, E2plusTOK, E2plusBOTH |
-| P1 | Add location-correlated returns: `R_A`, `R_B` with shared `eta_div` and idio `iota_A`, `iota_B` (corr `rho_AB`) | yes | Case-Shiller anchored |
-| P1 | Smoke test at small grids; verify NaN/Inf clean and feasibility | yes | Same as P1a in old plan |
+| DONE | Extend v2 solver to 2-location state: add `ell_t in {A, B}` | yes | `src/vfi_solver_v3.jl` — 4-D state (t,w,z,ell); 2026-05-05 |
+| DONE | Add stochastic relocation shock with age-dependent `p_relocate(t)` | yes | `p_relocate_v3(p,t)`: p_rel_work=0.06 working, p_rel_ret=0.02 retirement; 2026-05-05 |
+| DONE | Add transaction-cost block: `tau_sell` (NAR ~6%), `tau_buy` (~2-3%), `tau_token` (~0.5-2%) | yes | All env-var params; tau_sell applied at E1_2L relocation in continuation; 2026-05-05 |
+| DONE | Implement E0, E1_2L, E2_2L regimes | yes | Regime IDs, housing-cost rules, admissibility guards; 2026-05-05 |
+| DONE | Add location-correlated returns: `R_A`, `R_B` with shared `eta_div` and idio `iota_A`, `iota_B` (corr `rho_AB`) | yes | 7-D GH quadrature; Cholesky decomp for rho_AB; Case-Shiller anchor env var RHO_AB=0.5; 2026-05-05 |
+| P1 | Smoke test at small grids; verify NaN/Inf clean and feasibility | yes | Script at `scripts/smoke_test_v3.sh`; run on server1 (Julia not in cloud env) |
 
 ## Phase 2 — Calibration + initial results (4-6 weeks, autonomous)
 
