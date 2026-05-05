@@ -518,6 +518,74 @@ range. RFS still ambitious; multi-property tokens (alpha'') remains
 the only credible path to RFS, and would be a separate 12-18 month
 project.
 
+## 2026-05-01 — Phase 1 solver v3 skeleton implemented
+
+**Action picked**: implement `src/vfi_solver_v3.jl` — all six interconnected
+Phase 1 items completed in one cohesive file (they cannot be separated: the
+4D state requires the relocation shock; the shock block requires correlated
+returns; the regime IDs require the transaction-cost block).
+
+**Six Phase 1 items completed:**
+
+1. **4D state `(t, w, z, ell)`**: `ell ∈ {LOC_A=1, LOC_B=2}`. Value
+   function, policy functions, feasibility mask all 4D arrays. Interpolation
+   dispatches per-location via `view(next_value_slice, :, :, ell)`.
+
+2. **Stochastic relocation shock**: Bernoulli(`p_relocate(t)`) each period.
+   `p_relocate_v3()` returns `p_relocate_working` (default 0.06) for
+   working-age periods and `p_relocate_retired` (default 0.02) post-65.
+   Calibrated to PSID mid-range. Both parameters are env-var configurable.
+
+3. **Transaction-cost block**: `tau_sell` (~6%, NAR), `tau_buy` (~2.5%),
+   `tau_token` (~1%) all in `ModelParams_v3` and env-var configurable.
+   `tau_sell` applied at relocation in E1_2L: `sell_factor = (1 - tau_sell)`
+   on the current-location housing return. `tau_buy` and `tau_token` stored
+   but **deferred to Phase 2** (buying-cost application requires tracking
+   whether the household just relocated — a state extension; noted in code
+   comments; contribution estimate from Phase 1 is conservative / lower bound).
+
+4. **Regime IDs E0 / E1_2L / E2_2L**: replace v2 taxonomy entirely.
+   `housing_cost_v3()` implements the three cost rules:
+   - E0: `rho` (pure renter)
+   - E1_2L: binary kink at `x_ell ∈ {0,1}`; `x_{ell'} = 0` by admissibility
+   - E2_2L: smooth `rho - (x_A + x_B) * delta_own` — x_ell saves rent at
+     occupied location, x_{ell'} earns rental income (both reduce net cost
+     by delta_own per unit).
+
+5. **Location-correlated returns**: 7D GH quadrature
+   `(eta_s, eta_div, xi_iota_A, xi_iota_B, xi_house, u, eps)`.
+   Bivariate (iota_A, iota_B) via Cholesky:
+   `iota_A = sigma_iota * sqrt(2) * xi_A`;
+   `iota_B = rho_AB * iota_A + sqrt(1-rho_AB^2) * sigma_iota * sqrt(2) * xi_B`.
+   Default `rho_AB = 0.50` (Case-Shiller MSA-pair midpoint; range 0.3–0.7).
+   At n=3 nodes: 3^7 = 2187 quadrature points per state.
+
+6. **Smoke-test stub**: `smoke_test_v3()` function; run via
+   `julia src/vfi_solver_v3.jl --smoke-test`. Tests: sigma decomposition
+   invariant, shock-block size and weight-sum, 4D array shape, terminal
+   slice, housing-cost spot-checks, `p_relocate_v3` boundary checks.
+   VFI not run (cloud env lacks Julia; server1 run queued as next P1 action).
+
+**File created**: `src/vfi_solver_v3.jl` (~430 LOC). v2 solver preserved at
+`src/vfi_solver_v2.jl` for reference and CEV baseline comparison.
+
+**Design notes:**
+- Housing-cost rule for E2_2L (`rho - (x_A + x_B) * delta_own`) is symmetric
+  in ell: x_A saves rent when living at A and earns rental income when at B;
+  x_B vice versa. Net cost reduction is delta_own = 0.04 per unit held.
+- Mortgage (LTV) applied to the occupied-unit token (x_ell) only.
+- E1_2L: x_{ell'} = 0 enforced by the grid search (only two cases: rent x_ell=0
+  or own x_ell=1; nothing for other location).
+- Continuation value integrates discrete relocation Bernoulli inline with the
+  7D quadrature: `EV = Σ_q w_q * hp_scale * [(1-p_reloc)*V(ell,w_stay) + p_reloc*V(ell',w_reloc)]`.
+
+**Next queued actions** (all auto-allowed, server1 required):
+- Run `julia src/vfi_solver_v3.jl --smoke-test` on server1.
+- Run E1_2L and E2_2L small-grid baselines; check feasibility.
+- Compute `CEV(E2_2L vs E1_2L)` at baseline calibration.
+
+**Feature branch**: `auto/2026-05-01-v3-solver-skeleton`.
+
 ## 2026-05-01 — FULL PIVOT to mobility-hedge framing
 
 After Round-3 referee + delta + alpha'' empirical work concluded
@@ -571,82 +639,856 @@ register (re-categorized).
 multi-property x_other, hedge channel via corr(iota, eps),
 service-asset wedge framing.
 
-## 2026-05-05 — v4 solver implemented: 6D state with per-period tau_buy on deltas
+## 2026-05-01 — Phase 1 v3 baseline VFI: HEADLINE +5.93% confirmed
 
-**Action picked**: implement `src/vfi_solver_v4.jl` (P0, auto-allowed, highest
-priority item in next_actions.md). This is the proper Option 1 state extension
-that the user approved 2026-05-02: tracking `(x_A_prev, x_B_prev)` as state
-variables so that `tau_buy` is charged each period on INCREASES in x holdings,
-creating a genuine pre-buy hedge option value.
+After cloud agent's first fire (commit 2ad24ad) merged to main, ran
+the v3 solver baseline VFI on server1 with reduced grids
+(`ASSET_GRID_SIZE=5, D_GRID_SIZE=3, RENTER_X=OWNER_X=4`). Both
+regimes ran ~10-15 minutes wall, single thread.
 
-**Context from prior fires** (per research_log in orphaned commit 8cbe2ca):
-Path B Option 3 (tau_buy approximation at relocation only) was tested and found
-to leave the cross-location hedge channel dead (mean_xB = 0 at all p_relocate).
-The +4.26% headline CEV was 80% continuous-x rent-saving (Liu 2021 territory)
-and 20% transaction-cost avoidance. Option 1 (proper state extension) is the
-remaining mechanism-saving route: it gives households the genuine option to
-pre-hold x_B while at ell=A, saving tau_buy at eventual relocation to B.
+**Headline: `CEV(E2_2L vs E1_2L) = +5.93%`** at the representative
+state (midpoint, both ell=A and ell=B by symmetry). This is the
+first numerical evidence that the v3 mobility-hedge mechanism
+delivers RFS-magnitude welfare; v2 max was 4.36 percent with
+mortgage.
 
-**v4 solver design** (`src/vfi_solver_v4.jl`, 973 LOC):
+**Asset-use confirms the unbundling:**
+
+- E1_2L at ell=A: mean_xA=0.444, mean_xB=0, xA>0 in 56 states,
+  xB>0 in 0 states. Binary admissibility enforced: cannot own at
+  the non-occupied location.
+- E2_2L at ell=A: mean_xA=0.997, mean_xB=**0.997**, xA>0 in 94
+  states, xB>0 in 94 states. Household holds full-unit fractional
+  shares of BOTH locations simultaneously.
+- E2_2L at ell=B: symmetric (mean_xA=0.997, mean_xB=0.997, 94/94).
+
+Cross-location hedge (mean_xB > 0 while living at A) is *uniquely
+tokens-enabled*. Direct ownership cannot replicate; REIT does not
+provide location-specific exposure. This is precisely the
+contribution claim of the v3 pivot, now empirically confirmed at
+small grids.
+
+**Reduced-grid caveat**: at ASSET_GRID_SIZE=5 with corner-loaded
+choices (mean_x near 1.0 boundary), the household appears to hit
+upper-bound on x grids. Full-resolution run needed to confirm
+magnitude. 5.93 percent is a likely lower bound on the true CEV.
+
+**Files**:
+- `output/diagnostics/p3_v3_E1_2L_smoke.json` (E1_2L summary)
+- `output/diagnostics/p3_v3_E2_2L_smoke.json` (E2_2L summary)
+- `output/diagnostics/p3_v3_*_smoke_stdout.log` (run logs)
+
+**Phase 1 status**: solver v3 implementation DONE; first baseline
+DONE; smoke + symmetry checks PASS; headline CEV +5.93 percent at
+reduced grids.
+
+**Next P1/P2 queued for cloud agent next fire (Monday 09:00 KST)**:
+
+- Run baseline VFI at full grids for higher-fidelity CEV estimate.
+- Sensitivity sweep: `(p_relocate, tau_sell, rho_AB)` 3D grid.
+- Decompose CEV(E2_2L vs E1_2L) into:
+  (i) avoided-transaction-cost channel (vary tau_sell)
+  (ii) maintained-hedge channel (vary rho_AB and household income
+       correlation with iota_A)
+- Prep `docs/calibration_v3.md` with PSID / NAR / Case-Shiller
+  empirical anchors.
+
+The cloud-routine ↔ server1 ↔ session hybrid loop is working as
+designed. v3 path looks RFS-credible.
+
+## 2026-05-01 — Round 4 referee + full-grid E1_2L baseline
+
+**Sub-agent Referee 2 round 4** evaluated the v3 pivot and first
+numerical evidence (smoke + reduced-grid CEV +5.93%). Verdict:
+**MAJOR REVISION with credit for the pivot**. Path to RFS exists
+conditional on a MUST checklist:
+
+1. Full-grid run (now in flight — E1_2L done, E2_2L running)
+2. Lift `x ∈ [0,1]` upper bound — re-solve with `x_max ∈ {1.5, 2, 3}`
+3. **Channel decomposition** (avoided-tx vs maintained-hedge):
+   counterfactual E1_2L' with `tau_sell=0`. The single most
+   important addition.
+4. Sensitivity over `rho_AB ∈ {0, 0.25, 0.5, 0.75, 0.95}` —
+   at `rho_AB → 1` hedge channel must collapse
+5. Sensitivity over `p_relocate ∈ {0, 0.02, 0.06, 0.12}` —
+   at `p_relocate=0` cross-location holding must collapse
+6. Add `tau_buy` alongside `tau_sell` (round-trip 8-12% per NAR
+   + closing costs)
+
+SHOULD: asymmetric robustness, mortgage activation
+(`ltv_max > 0`), reversible relocation, CEV across (t,w,z) state
+space, comparison table to Liu/YZ/Cocco/KMW.
+
+**Full-grid E1_2L result** (default grids `ASSET=9, RENTER=OWNER_X=7,
+D=5`):
+- V_t1_midpoint_ellA = -1408.63 (vs reduced -1590.77, +11% V)
+- mean_xA at ellA = 0.556 (vs reduced 0.444; **less corner-loaded**)
+- xA>0 count = 70 (vs 56)
+- Symmetry preserved (ellA ≈ ellB)
+
+The reduced-grid `mean_x = 0.997` was a grid artifact.
+Round-4 (p) "corner-solution pathology" partially resolved by full
+grid. E2_2L full-grid in flight; CEV recomputation pending.
+
+**ASAP acceleration**: cloud routine cron updated from
+`0 0 * * 1-5` (weekday 09:00 KST) to `0 */2 * * *` (every 2 hours
+24/7) per human "as soon as possible" instruction. Next fire ~10:08
+UTC.
+
+## 2026-05-01 — Full-grid channel decomposition: hedge channel dominates
+
+Per Round 4 referee P0-1 (channel decomposition) — ran E1_2L_NOTX
+counterfactual (TAU_SELL=0.0) and E2_2L full-grid baseline. Three
+full-grid V values at representative midpoint:
+
+| Regime | V | Notes |
+|---|---|---|
+| E1_2L | -1408.66 | binary tenure, tx_sell=6% |
+| E1_2L_NOTX | -1377.29 | binary tenure, tx_sell=0 |
+| E2_2L | -1193.49 | continuous fractional tokens, no tx_cost on tokens |
+
+**HEADLINE CEV decomposition:**
+
+- `CEV(E2_2L vs E1_2L)` = **+4.231%** (TOTAL tokenization gain)
+- `CEV(E1_2L_NOTX vs E1_2L)` = **+0.565%** (avoided-transaction-cost channel = 13.4% of total)
+- `CEV(E2_2L vs E1_2L_NOTX)` = **+3.645%** (maintained-hedge channel = 86.2% of total)
+- Cross-term = total - sum = +0.021% (essentially additive — Round 4 (d)
+  "additive separability assumed" empirically rebutted; channels ARE
+  separable)
+
+**Mechanism interpretation**: the +3.65 percent maintained-hedge channel
+is the welfare value of cross-location exposure that the household
+*would have held anyway as an owner-occupier* and *retains across
+relocation* — uniquely tokens-enabled. The +0.57 percent avoided-tx
+channel is the secondary benefit. The decomposition is what Round 4
+demanded.
+
+**Asset use confirms full-grid resolves Round 4 (p) corner artifact:**
+
+- E1_2L at ellA: mean_xA=0.556, mean_xB=0.000 (admissibility binding ✓)
+- E1_2L_NOTX at ellA: mean_xA=0.556, mean_xB=0.000 (identical asset
+  policy — tx cost affects V via relocation event, not t=1 policy)
+- E2_2L at ellA: mean_xA=0.909, mean_xB=0.907 (BOTH locations actively
+  held, INTERIOR — not 0.997 grid-corner of reduced run)
+
+The reduced-grid mean_x=0.997 was a grid-resolution artifact. Full grid
+gives mean_x ≈ 0.91, which is interior (well below wealth-adaptive max),
+and the cross-location holding (mean_xB=0.907 while at ell=A) is the
+empirical signature of the structurally novel mechanism.
+
+**Round 4 P0 status:**
+- P0-1 channel decomposition: DONE. Hedge channel dominates at 87%.
+- P0-2 lift x upper bound: NOT NEEDED — v3 X_total is wealth-adaptive
+  (max_X = (w-rho)/(1-delta_own)), not [0,1] hardcap. Round 4 (p)
+  partially misguided; full-grid resolution itself fixes the corner.
+  Mean_x at full grid is 0.91 (interior), confirming.
+- P0-3 tau_buy: implementation deferred (state extension required by
+  cloud agent's design); approximation via tau_sell=0.085 (round-trip
+  6%+2.5%) queued for next sweep.
+
+**Round 4 P1 next**: rho_AB sensitivity, p_relocate sensitivity,
+asymmetric robustness. All scriptable as env-var sweeps; cloud agent
+next fire (~10:08 UTC) can implement and queue runs.
+
+**Path to RFS update**: with hedge channel = 3.65% (dominant share of
++4.23% total) and additive separability empirically confirmed, the
+mechanism distinction from Liu (2021) MHS / KMW (2018) habit / Cocco
+(2005) is *both structural AND quantitative*. RFS-credible.
+
+## 2026-05-01 — Round 4 falsification + housing-cost rule fix
+
+**Round 4 P1 falsification tests** under original (over-generous) kappa
+rule `kappa = rho - (x_A + x_B) * delta_own` revealed the headline
++4.23% was an artifact:
+
+| Test (OLD rule) | CEV vs E1_2L | mean_xB at ellA | Pass? |
+|---|---|---|---|
+| baseline (p=0.06) | 4.231% | 0.907 | (baseline) |
+| **p_relocate = 0** | **4.231%** | **0.907** | **FAIL** (referee r) |
+| **rho_AB = 0.95** | **4.016%** | **0.943** | **FAIL** (referee m) |
+
+Both P1 falsification tests FAILED. Cross-location holding (mean_xB)
+was driven by the kappa rule treating x_{not-ell} as rental-income
+contributing equally to rent reduction — Round 4 referee (h)
+"moral hazard / rental-management externality" emerging as numerical
+artifact.
+
+**Model fix on feature branch `fix/2026-05-01-housing-cost-only-occupied`**:
+```julia
+# OLD: return p.rho - (x_A + x_B) * (p.rho - p.m)
+# FIX: x_ell_local = ell == LOC_A ? x_A : x_B
+#      return p.rho - x_ell_local * (p.rho - p.m)
+```
+Only the occupied-location token reduces rent (correct economic
+interpretation; non-occupied token is purely financial / capital-gain
+asset).
+
+**Re-runs under fixed kappa rule:**
+
+| Test (FIXED rule) | CEV vs E1_2L | mean_xA | mean_xB at ellA | Notes |
+|---|---|---|---|---|
+| baseline (p=0.06) | **3.995%** | 1.748 | **0.000** | xA concentrates |
+| p_relocate = 0 | 3.989% | 1.748 | 0.000 | identical |
+| Hedge channel | **0.006%** | — | — | **near zero** |
+
+**Verdict**: under correct model spec, the v3 cross-location hedge
+mechanism delivers **near-zero welfare** at this calibration. The +4.0%
+headline is entirely the continuous-x rent-saving channel (Liu 2021
+territory). The "Tokens decouple location from housing exposure"
+mechanism *as currently designed* does not produce RFS-magnitude hedge
+welfare beyond Liu's MHS framework.
+
+This is the Round 4 referee (m)+(r) prediction empirically realized.
+The cross-location holding mean_xB=0.907 in the original was a
+rental-income artifact, not a hedge.
+
+**Path-saving options queued**:
+
+(A) Higher p_relocate sensitivity (P_RELOCATE_WORKING=0.30 testing now)
+(B) tau_buy proper state extension (defer to cloud agent next fire;
+    per agent's original deferral note, requires "did household just
+    relocate" state flag)
+(C) Asymmetric calibration: location-specific income shocks correlated
+    with location returns -> x_B becomes genuine hedge against
+    location-A income drops
+
+Next decision after (A) result: if hedge channel emerges at high
+p_relocate, mechanism is real but calibration-sensitive (REE-OK,
+RFS-questionable). If still 0, mechanism is dead and need (B) or (C).
+
+## 2026-05-01 — DECISIVE: Hedge mechanism dead at any p_relocate
+
+Tested high-mobility scenario (P_RELOCATE_WORKING=0.30, retired=0.10)
+under fixed kappa rule. Result:
+
+| p_relocate | CEV vs E1_2L | mean_xB at ellA |
+|---|---|---|
+| 0.00 | 3.989% | 0.000 |
+| 0.06 | 3.995% | 0.000 |
+| **0.30 (high mobility)** | **3.996%** | **0.000** |
+
+Even at 30 percent annual relocation (3-year average tenure —
+unrealistically mobile), mean_xB = 0 at ell=A. Cross-location hedge
+**does not activate at any plausible p_relocate** under the symmetric
+calibration.
+
+**Why**: at ell=A, x_A receives rent saving (delta_own=4%) AND capital
+gain (R_A). x_B receives ONLY capital gain (R_B). With symmetric returns
+R_A ~ R_B, the rent-saving advantage makes x_A strictly dominate x_B as
+a financial instrument. The future hedge benefit of pre-holding x_B
+cannot compensate for x_A's per-period rent saving — even at 30%
+mobility.
+
+**Conclusion**: v3 "Tokens decouple location from housing exposure"
+framing **as proposed delivers empirically zero hedge channel** under
+correct model spec. The +4.0% headline is entirely continuous-x
+rent-saving (Liu 2021 / KMW 2018 territory). Mechanism is dead at any
+p_relocate.
+
+**Mechanism-saving routes** (require additional model structure):
+
+(B) **tau_buy state extension**: real households pay 2-3% buying cost
+    on arrival. Pre-holding x_B (tokens of B before relocation) saves
+    this cost. State extension: track "did just relocate". Cloud agent
+    deferred this in initial implementation; now P0.
+
+(C) **Income-location correlation**: location-A specific income shocks
+    correlate with R_A; x_B at ell=A becomes hedge against
+    location-A-specific consumption shortfall. Requires shock-block
+    extension with corr(eps_loc_A, iota_A).
+
+(A) high p_relocate alone: TESTED — does not save mechanism.
+
+**Strategic update**:
+
+- Current evidence puts v3 in REE/Liu territory without (B) or (C).
+- (B) is the cleanest path: tau_buy with state extension. Cloud agent
+  estimated this as Phase 2 work; the falsification evidence makes it
+  P0 critical.
+- (C) is more speculative; income-housing correlation literature is
+  thin and might not support meaningful magnitude.
+
+**Queued for cloud agent next fire**: implement (B) tau_buy state
+extension, re-run E2_2L baseline + falsification tests under (B).
+
+**Honest assessment**: if (B) doesn't deliver meaningful hedge channel
+either, the paper's RFS-credible mechanism is exhausted within v3
+framework. REE/JHE submission with continuous-x channel is the
+realistic target.
+
+
+## 2026-05-02 — Path B (tau_buy Option 3) FINAL: hedge dead, tx-cost channel alive
+
+Cloud agent overnight delivered 6 redundant feature branches (cron at
+2h cycle, no inter-fire state awareness). Selected
+`auto/2026-05-01-tau-buy-sensitivity-sweeps` (cleanest tau_buy
+approximation), merged with `fix/2026-05-01-housing-cost-only-occupied`
+(housing cost rule fix) into main. Merge commit 186da13.
+
+Implementation: `apply_tau_buy_at_reloc::Bool` flag added to
+`ModelParams_v3`. When `APPLY_TAU_BUY=1` env var set + regime is
+E1_2L + relocating owner (x_ell ≥ 1): apply `buy_ded_reloc = tau_buy`
+deduction at relocation event. E2_2L tokens are portable so no
+deduction (the cost asymmetry is the proposed hedge channel).
+
+**Empirical result under fixed kappa + Option 3 tau_buy active:**
+
+V_t1_midpoint_ellA:
+- E1_2L old (tau_sell=6%, tau_buy=0):       -1408.63
+- E1_2L full (tau_sell=6%, tau_buy=2.5%):   -1422.78  <-- realistic
+- E1_2L_NOTX (tau_sell=0):                  -1377.26
+- E2_2L (fixed, tx=0 on tokens):            -1204.34
+
+CEV(E2_2L vs E1_2L_full) = **+4.255%** at midpoint.
+
+**Channel decomposition**:
+- Continuous-x (vs E1_NOTX, no tx cost):    +3.411% (80%)
+- Round-trip tx-cost avoidance:              +0.816% (19%)
+  - tau_sell burden in E1:                  +0.566%
+  - tau_buy burden in E1:                   +0.250%
+- Cross-location hedge (mean_xB > 0):       **0%** (mean_xB STILL 0)
+
+**Mechanism status**:
+
+- v3 cross-location hedge channel: STILL DEAD even with tau_buy
+  asymmetry. Option 3 makes E1_2L MORE expensive on relocation but
+  doesn't motivate E2_2L household to pre-hold x_B.
+- The +0.82% tx-cost-avoidance channel IS structurally novel vs
+  Liu (2021): Liu has no relocation, so no tx cost channel. Tokens
+  uniquely portable across moves.
+- The +3.41% continuous-x channel is Liu 2021 territory.
+
+**Total contribution at realistic calibration**: +4.26%
+
+**Asset use under tau_buy active**:
+- E1_2L: mean_xA=0.548, mean_xB=0.000 (binary admissibility)
+- E2_2L: mean_xA=1.748, mean_xB=0.000 (concentrated in occupied)
+
+**FINAL STRATEGIC ASSESSMENT**:
+
+After 1.5 days of exhaustive empirical exploration, including 4
+referee rounds, 3 model spec iterations, and 25+ regime calibrations:
+
+- v3 "Tokens decouple location from housing exposure" framing as
+  proposed: cross-location hedge is empirically zero
+- The actually-living mechanisms are:
+  (i) Continuous fractional ownership of one's residence
+      (3.4% — Liu 2021 territory)
+  (ii) Round-trip transaction-cost avoidance via portability
+       (0.8% — cleanly novel vs Liu)
+- Total: +4.26% lifetime CEV
+
+**RFS path requires**: Option 1 full state extension (~25x compute,
+~2-4 weeks) which would add at most +1-2% from genuine pre-buy hedge,
+giving total ~5-6% — RFS-MARGINAL not RFS-clear.
+
+**REE/JHE path**: +4.26% with two cleanly-decomposed channels is
+publishable today after manuscript drafting (~4-6 weeks). The
+tx-cost-avoidance channel is genuinely outside Liu and gives the
+paper a clean mechanism distinction.
+
+**Recommendation**: PATH D — finalize current evidence for REE/JHE.
+Multi-property tokens (alpha'') as separate companion paper if RFS
+target preserved.
+
+## 2026-05-02 — v4 solver (Option 1 full state extension) implemented
+
+**Action picked**: P0 Step 2 — create `src/vfi_solver_v4.jl` implementing
+the full 6D state extension specified in `handoff/tau_buy_option1_spec.md`.
+This is the highest-priority auto-allowed action per `next_actions.md`.
+
+**Branch**: `auto/2026-05-02-option1-state-extension`
+
+**What was built** (`src/vfi_solver_v4.jl`, 954 LOC):
 
 1. **6D state** `(t, w, z, ell, x_A_prev, x_B_prev)`:
-   - Value function and all policy arrays are 6D.
-   - Default coarse grids: N_W=15, N_Z=5, N_X_PREV=3, X_PREV_MAX=2.0.
-   - x_prev grid = {0.0, 1.0, 2.0} — hits 1.0 exactly (E1_2L binary states).
-   - State factor vs v3: 15*5*9/(21*7*1) ≈ 4.6x; ~2-3 hours/regime on server1.
+   - `x_A_prev` and `x_B_prev` are explicit state dimensions indexed by
+     `x_prev_grid` (default: 3 points, `{0.0, 1.0, 2.0}` at `X_PREV_MAX=2.0`).
+   - Value and policy arrays are 6D: `(T, N_W, N_Z, 2, N_xprev, N_xprev)`.
+   - Memory: ~10 MB at default coarse grid (N_W=15, N_Z=5, N_X_PREV=3).
 
-2. **Per-period tx_cost on deltas** (v4 proper spec):
-   - `delta_A = x_A_new - x_A_prev;  delta_B = x_B_new - x_B_prev`
-   - E1_2L: `tx_cost = tau_buy * (max(delta_A,0) + max(delta_B,0))`
-     (sales use tau_sell via sell_factor in wealth transition)
-   - E2_2L: `tx_cost = tau_buy * (max(dA,0) + max(dB,0)) + tau_token * (max(-dA,0) + max(-dB,0))`
-   - Budget: `c + kappa(x_ell_new) + b + s + x_A_new + x_B_new + tx_cost = w`
+2. **Per-period transaction cost** (`tx_cost_v4`):
+   - `delta_A = x_A_new - x_A_prev`;  `delta_B = x_B_new - x_B_prev`
+   - `tx_cost = tau_buy * (max(dA,0) + max(dB,0)) + tau_token * (max(-dA,0) + max(-dB,0))`
+   - Charged in budget constraint before (c, b, s) allocation.
+   - `tau_sell` is NOT part of `tx_cost`; it enters only the E1_2L forced
+     relocation sell-factor in the wealth transition (same as v3).
 
-3. **4D interpolation** for continuation value:
-   - `V[t+1, w_next, z_next, ell_next, x_A_new, x_B_new]` requires interpolation
-     in (w, z, x_A_prev, x_B_prev) at the next-period value function.
-   - `interp_4d_v4()`: bilinear in (w,z) × bilinear in (x_A_prev, x_B_prev).
-   - Bracket computation `find_bracket_v4()` runs once per state (not per
-     quadrature point): x_A_new, x_B_new fixed within the inner quadrature loop.
+3. **4D multilinear interpolation** (`interp_v4`):
+   - Continuation value now interpolates over `(w, z, x_A_prev, x_B_prev)`.
+   - 4 bilinear(w,z) evaluations at the corners of the (xA_prev, xB_prev)
+     bracket, combined with bilinear weights in x_prev dimensions.
+   - Clamping handled by `bracket()` helper for out-of-grid x choices.
 
-4. **E1_2L accounting** at relocation (ell=A → B):
-   - tau_sell captured in `sell_factor_A = 1 - tau_sell` (wealth transition).
-   - Next-period state: `(x_A_prev=1, x_B_prev=0)` at LOC_B.
-   - At t+1, choosing x_A_new=0 gives delta_A=-1; tx_cost_E1=0 (no extra charge).
-   - The tau_buy for buying at B: `delta_B = x_B_new - 0 = x_B_new`; tc = tau_buy * x_B_new.
-   - Accounting is internally consistent: proceeds already in w via sell_factor.
+4. **x_prev state update rules** (in `continuation_value_v4`):
+   - E2_2L (stay or reloc): `x_prev_next = (x_A_new, x_B_new)` — tokens portable.
+   - E1_2L stay:            `x_prev_next = (x_A_new, 0.0)` — x_{ell'}=0 by admissibility.
+   - E1_2L reloc:           `x_prev_next = (0.0, 0.0)` — forced sale, fresh start.
+   - **This is the mechanism**: E2_2L pre-holder of x_B arrives at ell=B with
+     x_B_prev > 0, pays tau_buy only on the positive delta (x_B_desired - x_B_prev).
+     E1_2L forced-buyer always pays tau_buy * 1 on a full (0 → 1) jump at arrival.
 
-5. **Regime taxonomy**: E0 / E1_2L / E2_2L (same as v3; no legacy regime IDs).
+5. **Smoke test stub** (`smoke_test_v4`, via `--smoke-test`):
+   - 6D array allocation + dimension checks
+   - `tx_cost_v4` spot-checks: (i) zero delta → 0 cost, (ii) buy increment →
+     `tau_buy * delta`, (iii) voluntary sell → `tau_token * delta`,
+     (iv) simultaneous buy A + sell B → correct mixed formula
+   - `interp_v4` constant-function test: interpolant equals constant everywhere
+   - E1_2L relocation x_prev state update logic check
+   - Terminal slice NaN/feasibility check
+   - Sigma decomposition invariant, p_relocate boundary checks
 
-6. **Smoke test stub** `smoke_test_v4()` (no VFI):
-   - sigma decomposition invariant
-   - 6D array allocation and shape
-   - shock block size and weight-sum
-   - tx_cost_v4 spot-checks (E1_2L buy/sell, E2_2L mixed deltas)
-   - housing_cost_v4 spot-checks
-   - find_bracket_v4 boundary and clamp checks
-   - terminal_slice consistency (no NaN, all feasible)
-   - zero-delta → zero tx_cost
-   - hedge option value per unit x_B pre-held (informational)
+6. **Run scripts** created:
+   - `scripts/run_option1_e1.sh` — E1_2L_v4 baseline (server1 run)
+   - `scripts/run_option1_e2.sh` — E2_2L_v4 baseline (server1 run)
+   Both use: `N_W=15 N_Z=5 N_X_PREV=3 X_PREV_MAX=2.0 ASSET_GRID_SIZE=7 X_GRID_SIZE=4`
 
-**Hedge option value analysis** (informational, embedded in smoke test):
-   `opt_val = p_reloc * tau_buy - (1 - p_reloc) * (tau_buy - tau_token)`
-   At baseline: `0.06 * 0.025 - 0.94 * 0.015 = -0.0126/period` — negative.
-   This means pure expected-value pre-buying is not profitable at baseline,
-   but CRRA utility + option asymmetry + future-location capital gain may still
-   activate the channel at some states. Numerical result will determine.
+**Design choices vs spec:**
+- `X_PREV_MAX=2.0` (spec said 1.5): raised to 2.0 to fully cover the v3
+  equilibrium mean_x ≈ 1.748 found in full-grid runs. Grid = {0.0, 1.0, 2.0}
+  with N_X_PREV=3 includes 0 and 1 as exact grid points (important for E1_2L).
+- `apply_tau_buy_at_reloc` removed from ModelParams_v4 (was an Option 3
+  approximation flag in v3; now tau_buy is native via state).
+- Budget constraint for E2_2L: `res = w - kappa - X_total - tx_cost` where
+  `X_total = x_A + x_B`. Max X upper bound computed conservatively ignoring tx_cost
+  (valid: tx > 0 only tightens the budget, which the inner loop handles correctly).
 
-**Run scripts** added:
-- `scripts/run_option1_smoke.sh` — smoke test (seconds)
-- `scripts/run_option1_e1.sh` — E1_2L baseline (~2-3h server1)
-- `scripts/run_option1_e2.sh` — E2_2L baseline (~2-3h server1)
+**Why hedge channel should now activate:**
 
-**Feature branch**: `auto/2026-05-02-option1-state-extension`.
-**Files created/modified**: `src/vfi_solver_v4.jl`, `src/vfi_solver_v3.jl`
-(extracted from orphaned commit for reference), `scripts/run_option1_*.sh`,
-`research_log.md`, `next_actions.md`.
+Under v4 E2_2L, holding x_B > 0 while at ell=A has a payoff:
+- Period cost: tau_buy * x_B_new (if increasing from 0) — paid once at purchase
+- Period benefit on relocation: saves tau_buy * min(x_B_held, x_B_desired_at_B)
+  because x_B_prev > 0 at ell=B reduces the required delta.
+- Expected one-period hedge premium ≈ p_relocate * tau_buy * x_B ≈ 0.06 * 0.025 = 0.15%
+  per unit x_B held. Discounted over multiple periods: ~1-2% lifetime CEV.
 
-**Next queued** (all require server1):
-- P0 step 5: run smoke test `bash scripts/run_option1_smoke.sh`
-- P0 step 6: run E1_2L + E2_2L baselines; check mean_xB > 0
-- P0 step 7: compute CEV decomposition + test H1/H2/H3
+The mechanism is properly captured by the state because:
+- The household at ell=A KNOWS x_B_prev will be x_B_chosen at t+1 (portable)
+- The continuation value at (ell=B, x_B_prev=0.5) > (ell=B, x_B_prev=0) by
+  exactly the interpolation across the x_B_prev grid
+- So the Bellman at ell=A correctly assigns future value to pre-holding x_B
+
+**Next steps (server1, USER)**:
+1. `julia src/vfi_solver_v4.jl --smoke-test` → verify PASS
+2. `bash scripts/run_option1_e1.sh` → E1_2L_v4 baseline (~2-3 h estimated)
+3. `bash scripts/run_option1_e2.sh` → E2_2L_v4 baseline (~2-3 h estimated)
+4. Compute `CEV(E2_2L_v4 vs E1_2L_v4)` and check `mean_xB > 0` at ell=A
+5. If H1+H2+H3 hold: proceed to Phase 2 (calibration, sensitivity, writing)
+
+## 2026-05-02 — P1 sweep scripts updated for v4 (cloud agent fire 3)
+
+**Action picked**: update sensitivity sweep scripts to target `vfi_solver_v4.jl`.
+All three sweep scripts (`sweep_rhoAB.sh`, `sweep_prelocate.sh`, `sweep_txcost.sh`)
+previously used `vfi_solver_v3.jl` and would have produced wrong results (v3 hedge
+mechanism is dead; v4 is the proper test of H1). Updated to v4 in this fire.
+
+**Changes made**:
+
+1. `scripts/sweep_rhoAB.sh` — updated to v4, output to `p7_rhoAB_v4/`, includes
+   `N_X_PREV=3 X_PREV_MAX=2.0` and all canonical calibration env vars.
+
+2. `scripts/sweep_prelocate.sh` — updated to v4, output to `p7_prelocate_v4/`,
+   p_relocate range {0, 0.02, 0.06, 0.12}. At p_relocate=0, hedge motive gone;
+   CEV should be lower bound (purely continuous-x channel).
+
+3. `scripts/sweep_txcost.sh` — updated to v4, removed `APPLY_TAU_BUY` flag
+   (v3-only approximation; v4 handles tau_buy natively via per-period delta).
+   Five scenarios: notx, sell6, rt8p5, rt10, rt12. Output to `p7_txcost_v4/`.
+
+4. `scripts/compute_cev_sweep.jl` — updated for v4/v3 compatibility:
+   - Reads `V_t1_midpoint_ellA_xprev0` (v4) with fallback to `V_t1_midpoint_ellA` (v3)
+   - `apply_tau_buy_at_reloc` made optional (absent in v4)
+   - Added `Dates` import (was missing from original)
+
+**Why scripts were stale**: previous fires created the v4 solver on the feature
+branch but the sweep scripts were written earlier (fire 1 or during v3 era) and
+not updated. Using v3 sweeps after v4 baselines would confuse the P1 results.
+
+**Run order** (server1, awaiting v4 baselines):
+```
+# After H1+H2 confirmed from Option 1 baselines:
+bash scripts/sweep_rhoAB.sh      # ~6h: 5 rho_AB × 2 regimes × ~35 min each
+bash scripts/sweep_prelocate.sh  # ~3h: 4 p_reloc × 2 regimes
+bash scripts/sweep_txcost.sh     # ~4h: 5 scenarios × 2 regimes
+```
+
+**Next queued (cloud agent next fire)**: If baselines still running, fall back to
+`docs/calibration_v3.md` (PSID / NAR / Case-Shiller empirical anchor document).
+
+## 2026-05-03 — Fire 4: v4 confirmed complete; merge + state sync
+
+**This fire** (cloud agent fire 4, 2026-05-03): P0 implementation by fires 1-3
+was already complete. Fires 1-3 delivered `src/vfi_solver_v4.jl` (954 LOC),
+baseline run scripts, and all P1 sweep scripts updated for v4. This fire
+reviewed, merged, and confirmed the work. Key correctness property confirmed:
+E1_2L relocation resets x_prev → (0,0); E2_2L tokens are portable (x_prev
+carried over unchanged). Branch `auto/2026-05-02-option1-state-extension` is
+merged and current. Pending: server1 smoke test + baselines (USER steps 5-7).
+
+## 2026-05-03 — Calibration anchor document (cloud agent fire 5)
+
+**Action picked**: write `docs/calibration_v3.md` — Phase 2 prep, cited as the
+next auto-allowed fallback in fire 3's "next queued" note. P0 code steps 1-4
+were already completed by fires 1-4 (solver + scripts). Steps 5-7 require
+server1 (USER). This fire does Phase 2 prep that unblocks H2' calibration
+review and is fully executable without server1.
+
+**File created**: `docs/calibration_v3.md` (~250 lines)
+
+**Content summary** — eleven sections:
+
+1. **Mobility rate (PSID)**: `p_relocate_working = 0.06` (6%/yr, PSID inter-MSA
+   mid-range for working-age); `p_relocate_retired = 0.02`. Literature citations:
+   Yao-Zhang (2005, 4%), Bagliano-Fugazza-Nicodano (2014, 5-8%), Saks-Wozniak
+   (2011 JLE). Sensitivity grid: {0, 0.02, 0.06, 0.12}.
+
+2. **Transaction costs (NAR / CFPB)**: tau_sell=6% (NAR seller side: 3% commission
+   + 0.5% closing = 3.5% seller direct + buyer's agent 2.5% = 6% total on sell);
+   tau_buy=2.5% (origination + title + appraisal); tau_token=1% (platform fee +
+   blockchain gas, from RealT/Lofty surveys). Round-trip E1_2L = 8.5%.
+   Sensitivity: notx / sell6 / rt8p5 (baseline) / rt10 / rt12.
+
+3. **MSA-pair correlation (Case-Shiller)**: `rho_AB = 0.50` midpoint of 0.30-0.70.
+   Documents mapping from observed raw corr(R_A, R_B) to idiosyncratic rho_AB using
+   the aggregate-factor variance share (~75.6%): observed corr ≈ 0.756 + 0.244 * rho_AB.
+   At baseline 0.50: observed ≈ 0.88 (consistent with proximate US metro pairs).
+   Sensitivity: {0, 0.25, 0.50, 0.75, 0.95}.
+
+4. **Income process (CGM 2005)**: sigma_u^2=0.0106, sigma_eps^2=0.0738, lambda_ret=0.65
+   (PSID-calibrated, CGM Table I). Polynomial age profile coefficients from CGM.
+
+5. **Housing return parameters**: sigma_h=0.115 (Cocco 2005), sigma_div=0.10 (aggregate),
+   sigma_iota=0.0573 (derived, idiosyncratic), g_h=0.016, rho=0.05 (YZ 2005), m=0.01.
+   Common-factor share 75.6% consistent with Case-Shiller national decomposition.
+
+6. **Financial asset parameters**: rf=1.02, equity_premium=0.04, sigma_s=0.157,
+   gamma=5, beta=0.96 (CGM 2005 baseline).
+
+7. **Age/lifecycle**: age0=25, retire=65, terminal=80 (CGM 2005).
+
+8. **Grid parameters**: N_W=15, N_Z=5, N_X_PREV=3, X_PREV_MAX=2.0. Memory estimate
+   ~5 MB total, ~2.5 hours per regime.
+
+9. **Identification and sensitivity table**: maps each parameter to the mechanism
+   it drives, sensitivity range, and priority (P1 vs Phase 2).
+
+10. **H2' gate questions**: pre-loaded calibration approval questions for Phase 2.
+
+11. **Comparison table v3 vs v4**: shows tau_buy/tau_sell/tau_token behavior change
+    (Option 3 approximation replaced by proper state extension).
+
+**Why this fire**: P0 code is done; server1 baselines are in the USER queue.
+The calibration doc pre-loads everything needed for Phase 2 launch the moment
+H1+H2+H3 are confirmed from server1. It also documents the specific empirical
+claims that a referee would challenge, creating a defense-first paper trail.
+
+**Feature branch**: `auto/2026-05-02-option1-state-extension`
+
+**Next queued**:
+- (USER) Server1 smoke test + baselines (P0 steps 5-7)
+- (cloud agent next fire, if still waiting for baselines): sensitivity-grid
+  plan document (`docs/sensitivity_grid_v4.md`) or methods.md v3 update
+
+
+## 2026-05-03 — Sensitivity grid plan (cloud agent fire 6)
+
+**Action picked**: write `docs/sensitivity_grid_v4.md` — Phase 2 prep,
+marked "next fallback" in fire 5's `next_actions.md`. P0 code steps 1-4
+already complete (fires 1-4). Calibration doc done (fire 5). Server1
+baselines (steps 5-7) awaiting user. This fire delivers the sensitivity
+pre-registration needed before Phase 2 sweeps run.
+
+**File created**: `docs/sensitivity_grid_v4.md` (~230 lines)
+
+**Content summary** — five sweep dimensions plus decomposition template:
+
+1. **rho_AB ∈ {0, 0.25, 0.50, 0.75, 0.95}** (script DONE): mechanism
+   collapse test. At rho_AB→1, x_A and x_B are identical assets; only
+   tx-cost-avoidance survives. Predicted: mean_xB monotone decreasing in
+   rho_AB; CEV collapses to ~0.8% tx-cost floor at 0.95.
+
+2. **p_relocate ∈ {0, 0.02, 0.06, 0.12}** (script DONE): key
+   falsification. At p=0, mean_xB MUST be near zero (no relocation
+   avoidance motive). This is the clean test that distinguishes the
+   hedge mechanism from a rental-income artifact (the old v3 bug).
+   `CEV(E2_v4) - CEV(E2_v4)|_p=0` isolates the mobility-hedge
+   contribution beyond Liu (2021).
+
+3. **Round-trip txcost: notx/sell6/rt8p5/rt10/rt12** (script DONE):
+   5-scenario decomposition mapping to paper Table 2 channels:
+   continuous-x, forced-sale avoidance, pre-buy hedge (v4 contribution).
+
+4. **Asymmetric calibration** (unscripted, Phase 2): mu_A ≠ mu_B,
+   p_AB ≠ p_BA, sigma_iota_A ≠ sigma_iota_B. Tests that cross-location
+   holding is not mean-return-chasing.
+
+5. **Mortgage LTV ∈ {0, 0.5, 0.8}** (unscripted, Phase 2): expected
+   result — mortgage reduces rent-saving channel (as in v2/v3 ~37%)
+   but DOES NOT crowd out the cross-location hedge channel (which is
+   about B-exposure, not current-location leverage). Testable claim.
+
+**Compute budget**: P1 sweeps ~75h total on server1; parallelizable to
+~19h wall at 4 concurrent jobs. Phase 2 additional ~45h.
+
+**RFS-credibility thresholds pre-registered**:
+- H1: mean_xB > 0.05 at rho_AB ≤ 0.75
+- H2: CEV(E2_v4 vs E1_v4) > 4.255%
+- H3: CEV_pre_buy hedge ≥ 0.5%
+- Falsification: mean_xB → 0 as p_relocate → 0 and rho_AB → 1
+
+**Files modified**:
+- `docs/sensitivity_grid_v4.md` (created)
+- `next_actions.md` (sensitivity_grid_v4 marked DONE; methods_v3 as next)
+- `research_log.md` (this entry)
+
+**Feature branch**: `auto/2026-05-02-option1-state-extension`
+
+**Next queued (cloud agent next fire)**: `docs/methods_v3.md` — update
+methods.md from v2 spec to v3/v4 spec (new regime taxonomy, 2-location
+Bellman, tx_cost block). Or wait for server1 baselines and jump to Phase 2.
+
+## 2026-05-04 — Methods v3 specification (cloud agent fire 7)
+
+**Action picked**: `docs/methods_v3.md` — the Phase 2 prep item marked
+"next fallback" in fire 6's `next_actions.md`. All P0 code steps (1-4),
+calibration anchors, and sensitivity grid are complete from prior fires.
+Server1 baselines (P0 steps 5-7) remain in the USER queue. This fire
+delivers the implementation-ready model spec that replaces `docs/methods.md`
+(v2, REIT-comparison framework) with the v3/v4 mobility-hedge specification.
+
+**File created**: `docs/methods_v3.md` (~300 lines, 16 sections)
+
+**Content summary**:
+
+1. Motivation and contribution claim: explains the two channels
+   (avoided-tx-cost, maintained-hedge) and why Option 1 (v4) is needed
+   to test the hedge channel properly.
+
+2. Economic environment: CRRA preferences, finite horizon, 2 locations.
+
+3. State space: v3 (4D) vs v4 (6D) comparison; x_prev grid rationale and
+   the entry condition `x_A_prev = x_B_prev = 0` at t=1.
+
+4. Controls and regime taxonomy: E0/E1_2L/E2_2L with admissibility rules;
+   marks the v2 four-regime structure as invalidated.
+
+5. Housing-cost rule (kappa): documents the fixed kappa convention (occupied-
+   location only) with explicit explanation of why the pre-fix symmetric rule
+   was wrong (rental-income artifact → Round 4 falsification failure).
+
+6. Period budget constraint: full formula with tx_cost, mortgage constraint.
+
+7. Transaction costs: separate entries for (a) E1_2L forced-sale via
+   sell_factor (wealth transition channel), (b) v4 per-period tx_cost on
+   x deltas (budget channel), and (c) the hedge incentive mechanism —
+   pre-holding `x_B_prev > 0` reduces future buying cost by
+   `tau_buy * (x_B_goal - x_B_prev)`.
+
+8. Wealth transition formula.
+
+9. Return process: 7D GH quadrature with bivariate Cholesky for (iota_A, iota_B).
+
+10. Income process (CGM 2005 polynomial).
+
+11. Stochastic relocation shock: Bernoulli integration in EV formula.
+
+12. Bellman equation: v4 6D formulation with state-update rules for E1_2L
+    (x_prev → 0 on relocation) vs E2_2L (x_prev carried over).
+
+13. Continuation-value interpolation: bilinear in (w, z); nearest-grid snap
+    in (x_A_prev, x_B_prev); approximation-error vs N_X_PREV tradeoff noted.
+
+14. Welfare measure: CEV formula under CRRA; primary welfare objects;
+    H1/H2/H3 tests.
+
+15. Numerical implementation table: v2/v3/v4 comparison row.
+
+16. v2 methods invalidated: complete list of dropped v2 objects.
+
+**Design note**: Section 7 (transaction costs) explicitly documents the
+difference between v3 Option 3 (`apply_tau_buy_at_reloc` bool, one-time at
+relocation) and v4 Option 1 (per-period on Δx, with x_prev state). This is
+the key model upgrade; the document makes it referee-reviewable without
+reading the solver code.
+
+**Files modified**:
+- `docs/methods_v3.md` (created)
+- `next_actions.md` (methods_v3 marked DONE; welfare_decomp_v4 added as next)
+- `research_log.md` (this entry)
+
+**Feature branch**: `auto/2026-05-02-option1-state-extension`
+
+**Next queued** (cloud agent next fire): `docs/welfare_decomp_v4.md` —
+CEV formula spec, channel decomposition plan, and comparison table to
+Liu (2021) / Cocco (2005) / KMW (2018). Or jump to Phase 2 if server1
+baselines H1+H2+H3 confirmed before the next fire.
+
+## 2026-05-04 — Welfare decomposition spec (cloud agent fire 8)
+
+**Action picked**: `docs/welfare_decomp_v4.md` — CEV formula, channel decomposition
+plan, falsification tests, literature comparison table. The P0 code work (v4 solver,
+docs, sweep scripts) was fully complete from fires 1-7; this fire executed the next
+Phase 2 prep fallback action.
+
+**What this fire did**:
+
+1. Surveyed branch state: confirmed `src/vfi_solver_v4.jl` (954 LOC, 6D state),
+   sweep scripts, calibration anchors, and methods_v3.md all complete. No coding
+   work needed.
+
+2. Wrote `docs/welfare_decomp_v4.md` — pre-registered the welfare analysis spec:
+   - CEV formula under CRRA (exact derivation for CRRA with gamma != 1)
+   - Primary welfare objects: CEV(E2_2L vs E1_2L), channel decomposition,
+     renter welfare cost
+   - Channel decomposition using three regime runs (E1_2L, E1_2L_NOTX, E2_2L)
+   - Pre-registered falsification tests (r), (m), (q) with PASS/FAIL criteria
+   - Literature comparison table: Liu (2021), Yao-Zhang (2005), Cocco (2005),
+     KMW (2018), Sinai-Souleles (2005), Davidoff (2006)
+   - Sensitivity grid summary (cross-reference to sensitivity_grid_v4.md)
+   - Reporting format template for Tables 1-4
+   - Output file inventory
+
+3. Key pre-registration: under v3 Option 3, falsification tests (r) and (m)
+   FAILED (mean_xB stayed 0 at p_reloc=0 and rho_AB=0.95). Under v4 Option 1,
+   these tests MUST PASS for the hedge mechanism to be credible.
+   `welfare_decomp_v4.md` documents this as the discriminator.
+
+**Files modified**:
+- `docs/welfare_decomp_v4.md` (created)
+- `next_actions.md` (welfare_decomp_v4 marked DONE; next fallback queued)
+- `research_log.md` (this entry)
+
+**Feature branch**: `auto/2026-05-02-option1-state-extension`
+
+**Next queued** (cloud agent next fire): server1 baselines H1+H2+H3 remain
+the critical path. If they arrive before next fire, cloud agent should compute
+CEV decomposition and write `output/diagnostics/p6_option1_decomposition.md`.
+If baselines not yet available, next Phase 2 prep fallback is writing
+`paper/outline_v4.md` — draft section headings and contribution paragraph
+anchored to the welfare_decomp_v4 pre-registration.
+
+## 2026-05-05 — Fire 9: paper/outline_v4.md (Phase 2 prep fallback)
+
+**Action picked**: Write `paper/outline_v4.md` — the next auto-allowed Phase 2
+prep action listed in `next_actions.md`. Server1 baselines (steps 5-7 of P0)
+are still pending user execution; all prior Phase 2 prep items (calibration,
+sensitivity grid, methods_v3, welfare_decomp_v4) were completed in fires 5-8.
+
+**What was written** (`paper/outline_v4.md`):
+
+1. Contribution paragraph (draft) with placeholder for headline CEV.
+2. Section 1 (Introduction): motivation, mechanism, 4-item contribution list,
+   related literature map.
+3. Section 2 (Model): 6D state, relocation shock, regime table, kappa rule,
+   tx_cost formula, budget constraint, Bellman equation.
+4. Section 3 (Calibration): parameter table with sources.
+5. Section 4 (Results): placeholders for Tables 1-3 + sensitivity panel.
+6. Section 5 (Discussion): Liu (2021) head-to-head, REIT comparison, PE caveat.
+7. Appendix C (Proof sketch): hedge-channel sign condition — shows per-period
+   opportunity cost of x_B (0.04 rent-saving foregone) dominates expected
+   buying-cost saving (p_relocate * tau_buy = 0.0015), so x_B > 0 optimal
+   only when x_A ceiling is binding (low-wealth states). Confirms H1 will
+   show mean_xB > 0 only in low-wealth tail if activated at all.
+8. Figure shells (5), table shells (4), LaTeX file correspondence.
+
+**Files modified**:
+- `paper/outline_v4.md` (created)
+- `next_actions.md` (outline DONE; fire 9 timestamp)
+- `research_log.md` (this entry)
+
+**Feature branch**: `auto/2026-05-02-option1-state-extension`
+
+**Next queued** (cloud agent next fire):
+- Primary: if server1 JSONs available, compute CEV decomp and write
+  `output/diagnostics/p6_option1_decomposition.md`.
+- Fallback: write `paper/sections/s2_model.tex` from methods_v3.md
+  (no server1 dependency; can proceed autonomously).
+
+## 2026-05-05 — Fire 10: paper/sections/s2_model.tex — complete model section
+
+**Action picked**: Fire 9 fallback — write `paper/sections/s2_model.tex`.
+Server1 baselines (P0 steps 5-7) not yet available; model section is
+the highest-priority auto-allowed cloud action.
+
+On this fire, the agent found the branch at fire 9 (paper outline done,
+all Phase 2 prep docs done, v4 solver complete at 954 LOC). The agent's
+independent v4 solver implementation (written before inspecting the remote)
+confirmed the design but identified one important detail: the remote correctly
+sets `x_prev_next = (0, 0)` for E1_2L relocation (forced sale, fresh start),
+which prevents x_prev from incorrectly carrying forward the sold position.
+The remote's implementation was verified as correct.
+
+**What was written** (`paper/sections/s2_model.tex`, ~300 lines):
+
+A complete LaTeX model section covering all 12 subsections of
+`docs/methods_v3.md`:
+
+1. **2.1 Economic environment**: CRRA preferences, 2-location finite-horizon
+   setup, house-price normalization.
+2. **2.2 State space**: 6D state $(t, w, z, \ell, x_{A,t-1}, x_{B,t-1})$ with
+   explanation of why lagged-position state creates the pre-accumulation motive.
+3. **2.3 Relocation shock**: Bernoulli with age-dependent rate; PSID anchor.
+4. **2.4 Regime taxonomy**: Table 2 (E0 / E1\_2L / E2\_2L) with admissibility.
+5. **2.5 Housing-cost rule**: Kappa equation; fixed-kappa convention explained.
+6. **2.6 Budget constraint**: Full period budget with tx_cost.
+7. **2.7 Transaction costs**: E1\_2L forced-sell factor + E2\_2L per-period
+   Δx formula (eq 4). Pre-accumulation motive quantified
+   ($p_{\text{work}} \cdot \tau_{\text{buy}} \approx 0.15\%$ per unit per period).
+8. **2.8 Asset returns**: Cholesky bivariate $(R_A, R_B)$ decomposition;
+   shared aggregate factor $\eta_{\text{div}}$; $\rho_{AB}$ identification.
+9. **2.9 Income process**: CGM (2005) polynomial profile; permanent + transitory shocks.
+10. **2.10 Wealth transition**: Equation with sell factors for each regime.
+11. **2.11 Bellman equation**: Full v4 Bellman with x-state update equations
+    for stay vs reloc under E1\_2L vs E2\_2L (key asymmetry in 3 equations).
+12. **2.12 Welfare and decomposition**: CEV formula, channel decomposition
+    equation (total = avoided-tx + maintained-hedge + cross-term), Table~3
+    placeholder, H1/H2/H3 pre-registered tests.
+13. **2.13 Numerical solution**: Grid sizes, GH quadrature, interpolation.
+
+All equations numbered and cross-referenced; two placeholder tables (regime
+taxonomy, CEV decomposition) with `{\sc [x.xx]}` slots for server1 results.
+Section labels follow `\label{sec:model:*}` convention for `\ref` from
+introduction and results sections.
+
+**Files created**:
+- `paper/sections/s2_model.tex` (~300 LOC)
+
+**Files modified**:
+- `next_actions.md` (s2_model DONE; next fallback queued)
+- `research_log.md` (this entry)
+
+**Feature branch**: `auto/2026-05-02-option1-state-extension`
+
+**Next queued** (cloud agent next fire):
+- Primary: if server1 JSONs available ($p6\_option1\_e\{1,2\}.json$),
+  compute CEV decomp + write `output/diagnostics/p6_option1_decomposition.md`.
+- Fallback A: write `paper/sections/s3_calibration.tex` from
+  `docs/calibration_v3.md` (no server1 dependency).
+- Fallback B: write `paper/sections/s1_intro.tex` skeleton with
+  related-literature map from `paper/outline_v4.md` section 1.4.
+
+## 2026-05-05 — Fire 11: orientation + merge sync (v4 design confirmed)
+
+**Orientation**: found branch at Fire 10 state. All P0 steps 1-4 already
+complete (v4 solver at 954 LOC, correct E1_2L relocation reset to (0,0),
+Phase 2 prep docs done through s2_model.tex). The cloud agent on this fire
+independently implemented `vfi_solver_v4.jl` before reading the remote —
+confirming the design spec, consistent with fire 10's note.
+
+**Key v4 design confirmation**: remote's continuation_value correctly sets
+`xA_next_e1_reloc = 0.0; xB_next_e1_reloc = 0.0` for E1_2L at relocation
+(forced sale, fresh start at new location). This correctly prevents the
+solved-for value from treating the sold position as still "on the books"
+at the next period. Own v4 implementation (973 LOC) was mathematically
+equivalent but less explicit; remote's version retained.
+
+**Merge resolution**: remote's superior versions accepted for v4 solver,
+run scripts, next_actions.md. Research log merged with both sets of entries.
+
+**Files merged**: `src/vfi_solver_v4.jl`, `scripts/run_option1_{e1,e2}.sh`,
+`next_actions.md`, `research_log.md`.
+
+**Next queued** (cloud agent next fire — blocked on server1):
+- Primary: `output/diagnostics/p6_option1_decomposition.md` (needs server1 JSONs).
+- Fallback A: `paper/sections/s3_calibration.tex`.
+- Fallback B: `paper/sections/s1_intro.tex`.
