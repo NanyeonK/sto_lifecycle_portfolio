@@ -62,6 +62,15 @@ If any fails: fall back to Path D (REE/JHE) at +4.26%.
 |---|---|---|
 | P1-prep | `docs/welfare_decomp_v4.md` — CEV formula, channel decomp plan, comparison table spec | **DONE** 2026-05-04 |
 | P1-prep | `paper/outline_v4.md` — section headings + contribution paragraph anchored to welfare_decomp_v4 | **DONE** 2026-05-05 |
+| P1-prep | `paper/sections/s2_model.tex` — complete LaTeX model section (13 subsections, 2 tables, all equations) | **DONE** 2026-05-05 (fire 10) |
+
+## Phase 2 prep — next fallbacks (cloud agent, no server1 needed)
+
+| Priority | Action | Status |
+|---|---|---|
+| P1-prep | `paper/sections/s3_calibration.tex` — Table 1 + parameter sources from calibration_v3.md | queued |
+| P1-prep | `paper/sections/s1_intro.tex` — introduction skeleton + related literature | queued |
+| P0-primary | `output/diagnostics/p6_option1_decomposition.md` — CEV decomp once server1 JSONs land | blocked (server1) |
 
 ## P1 (after Option 1 resolves)
 

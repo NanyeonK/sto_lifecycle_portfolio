@@ -1403,3 +1403,66 @@ sensitivity grid, methods_v3, welfare_decomp_v4) were completed in fires 5-8.
   `output/diagnostics/p6_option1_decomposition.md`.
 - Fallback: write `paper/sections/s2_model.tex` from methods_v3.md
   (no server1 dependency; can proceed autonomously).
+
+## 2026-05-05 — Fire 10: paper/sections/s2_model.tex — complete model section
+
+**Action picked**: Fire 9 fallback — write `paper/sections/s2_model.tex`.
+Server1 baselines (P0 steps 5-7) not yet available; model section is
+the highest-priority auto-allowed cloud action.
+
+On this fire, the agent found the branch at fire 9 (paper outline done,
+all Phase 2 prep docs done, v4 solver complete at 954 LOC). The agent's
+independent v4 solver implementation (written before inspecting the remote)
+confirmed the design but identified one important detail: the remote correctly
+sets `x_prev_next = (0, 0)` for E1_2L relocation (forced sale, fresh start),
+which prevents x_prev from incorrectly carrying forward the sold position.
+The remote's implementation was verified as correct.
+
+**What was written** (`paper/sections/s2_model.tex`, ~300 lines):
+
+A complete LaTeX model section covering all 12 subsections of
+`docs/methods_v3.md`:
+
+1. **2.1 Economic environment**: CRRA preferences, 2-location finite-horizon
+   setup, house-price normalization.
+2. **2.2 State space**: 6D state $(t, w, z, \ell, x_{A,t-1}, x_{B,t-1})$ with
+   explanation of why lagged-position state creates the pre-accumulation motive.
+3. **2.3 Relocation shock**: Bernoulli with age-dependent rate; PSID anchor.
+4. **2.4 Regime taxonomy**: Table 2 (E0 / E1\_2L / E2\_2L) with admissibility.
+5. **2.5 Housing-cost rule**: Kappa equation; fixed-kappa convention explained.
+6. **2.6 Budget constraint**: Full period budget with tx_cost.
+7. **2.7 Transaction costs**: E1\_2L forced-sell factor + E2\_2L per-period
+   Δx formula (eq 4). Pre-accumulation motive quantified
+   ($p_{\text{work}} \cdot \tau_{\text{buy}} \approx 0.15\%$ per unit per period).
+8. **2.8 Asset returns**: Cholesky bivariate $(R_A, R_B)$ decomposition;
+   shared aggregate factor $\eta_{\text{div}}$; $\rho_{AB}$ identification.
+9. **2.9 Income process**: CGM (2005) polynomial profile; permanent + transitory shocks.
+10. **2.10 Wealth transition**: Equation with sell factors for each regime.
+11. **2.11 Bellman equation**: Full v4 Bellman with x-state update equations
+    for stay vs reloc under E1\_2L vs E2\_2L (key asymmetry in 3 equations).
+12. **2.12 Welfare and decomposition**: CEV formula, channel decomposition
+    equation (total = avoided-tx + maintained-hedge + cross-term), Table~3
+    placeholder, H1/H2/H3 pre-registered tests.
+13. **2.13 Numerical solution**: Grid sizes, GH quadrature, interpolation.
+
+All equations numbered and cross-referenced; two placeholder tables (regime
+taxonomy, CEV decomposition) with `{\sc [x.xx]}` slots for server1 results.
+Section labels follow `\label{sec:model:*}` convention for `\ref` from
+introduction and results sections.
+
+**Files created**:
+- `paper/sections/s2_model.tex` (~300 LOC)
+
+**Files modified**:
+- `next_actions.md` (s2_model DONE; next fallback queued)
+- `research_log.md` (this entry)
+
+**Feature branch**: `auto/2026-05-02-option1-state-extension`
+
+**Next queued** (cloud agent next fire):
+- Primary: if server1 JSONs available ($p6\_option1\_e\{1,2\}.json$),
+  compute CEV decomp + write `output/diagnostics/p6_option1_decomposition.md`.
+- Fallback A: write `paper/sections/s3_calibration.tex` from
+  `docs/calibration_v3.md` (no server1 dependency).
+- Fallback B: write `paper/sections/s1_intro.tex` skeleton with
+  related-literature map from `paper/outline_v4.md` section 1.4.
