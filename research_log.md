@@ -1366,3 +1366,40 @@ CEV decomposition and write `output/diagnostics/p6_option1_decomposition.md`.
 If baselines not yet available, next Phase 2 prep fallback is writing
 `paper/outline_v4.md` — draft section headings and contribution paragraph
 anchored to the welfare_decomp_v4 pre-registration.
+
+## 2026-05-05 — Fire 9: paper/outline_v4.md (Phase 2 prep fallback)
+
+**Action picked**: Write `paper/outline_v4.md` — the next auto-allowed Phase 2
+prep action listed in `next_actions.md`. Server1 baselines (steps 5-7 of P0)
+are still pending user execution; all prior Phase 2 prep items (calibration,
+sensitivity grid, methods_v3, welfare_decomp_v4) were completed in fires 5-8.
+
+**What was written** (`paper/outline_v4.md`):
+
+1. Contribution paragraph (draft) with placeholder for headline CEV.
+2. Section 1 (Introduction): motivation, mechanism, 4-item contribution list,
+   related literature map.
+3. Section 2 (Model): 6D state, relocation shock, regime table, kappa rule,
+   tx_cost formula, budget constraint, Bellman equation.
+4. Section 3 (Calibration): parameter table with sources.
+5. Section 4 (Results): placeholders for Tables 1-3 + sensitivity panel.
+6. Section 5 (Discussion): Liu (2021) head-to-head, REIT comparison, PE caveat.
+7. Appendix C (Proof sketch): hedge-channel sign condition — shows per-period
+   opportunity cost of x_B (0.04 rent-saving foregone) dominates expected
+   buying-cost saving (p_relocate * tau_buy = 0.0015), so x_B > 0 optimal
+   only when x_A ceiling is binding (low-wealth states). Confirms H1 will
+   show mean_xB > 0 only in low-wealth tail if activated at all.
+8. Figure shells (5), table shells (4), LaTeX file correspondence.
+
+**Files modified**:
+- `paper/outline_v4.md` (created)
+- `next_actions.md` (outline DONE; fire 9 timestamp)
+- `research_log.md` (this entry)
+
+**Feature branch**: `auto/2026-05-02-option1-state-extension`
+
+**Next queued** (cloud agent next fire):
+- Primary: if server1 JSONs available, compute CEV decomp and write
+  `output/diagnostics/p6_option1_decomposition.md`.
+- Fallback: write `paper/sections/s2_model.tex` from methods_v3.md
+  (no server1 dependency; can proceed autonomously).
