@@ -991,3 +991,74 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-05-06 — Path B Option 1: v4 solver implementation complete
+
+**Action picked**: P0 step 1-4 from `next_actions.md` — implement `src/vfi_solver_v4.jl`
+with 6D state extension for proper tau_buy hedge mechanism.
+
+**Rationale**: The previous v3 solver showed zero cross-location hedge (mean_xB=0 at
+ell=A) because tau_buy was applied only at relocation events — too late for the household
+to pre-position. Option 1 makes `(x_A_prev, x_B_prev)` explicit state variables so the
+household can optimally build cross-location positions BEFORE relocation occurs, paying
+tau_buy incrementally vs. the lump-sum tau_sell+tau_buy at forced E1_2L relocation.
+
+**What was implemented:**
+
+1. **6D state** `(t, w, z, ell, x_A_prev, x_B_prev)`: `SolverResult_v4` uses 6D arrays.
+   Memory at coarse defaults (T=57, N_W=15, N_Z=5, N_ell=2, N_xprev=3×3):
+   57×15×5×2×3×3 = 76,950 elements ≈ 0.6 MB per array. Trivial.
+
+2. **x_prev grid**: coarse 3-point grid {0.0, 0.5, 1.0} (env-var N_X_PREV=3, X_PREV_MAX=1.0).
+   E2_2L choices constrained to grid points → no interpolation on x_prev dimension (exact
+   index lookup). E1_2L binary {0,1} aligns exactly with grid endpoints[1] and [end].
+
+3. **Regime-aware tx_cost** (`compute_tx_cost_v4`): charged on x deltas at choice time.
+   - E1_2L sells: `tau_sell * max(-delta, 0)` (traditional sale, ~6% NAR)
+   - E1_2L buys:  `tau_buy  * max(delta,  0)` (~2.5%)
+   - E2_2L sells: `tau_token* max(-delta, 0)` (liquid secondary market, ~1%)
+   - E2_2L buys:  `tau_buy  * max(delta,  0)` (~2.5%)
+
+4. **No sell_factor in next_wealth**: removed from v4. All tx_costs are budget deductions
+   at choice time. This is the key architectural change from v3: relocation costs now emerge
+   naturally from the state-update logic (E1_2L forced to set x_{ell'}=0 → pays tau_sell;
+   E2_2L keeps x_A across relocation → delta=0, zero cost).
+
+5. **Hedge mechanism via tx_cost asymmetry** (key economic insight):
+   - E1_2L at ell=B (just relocated from A with x_A_prev=1):
+     must set x_A_new=0 (admissibility), delta_A=-1 → tx=tau_sell=6%
+     and if buying B, delta_B=+1 → tx+=tau_buy=2.5% → total 8.5% round-trip
+   - E2_2L at ell=B with x_A_prev=0.5:
+     can keep x_A_new=0.5 → delta_A=0 → tx=0! Pre-held tokens portable across moves.
+   This is the structurally novel mechanism Option 1 is designed to capture.
+
+6. **Smoke test** (`smoke_test_v4`): 15 assertions covering sigma decomp, grid sizes,
+   x=1.0 on grid, 6D array shape, 6 tx_cost cases including the key asymmetry invariant
+   (E2_2L hold cost = 0 < E1_2L forced sell = tau_sell), housing cost rule, shock block,
+   p_relocate, terminal slice. No VFI run (Julia not available in cloud env).
+
+7. **Run scripts**: `scripts/run_option1_{smoke,e1,e2}.sh` with correct env-var defaults.
+
+**Files created/modified:**
+- `src/vfi_solver_v4.jl` (~700 LOC)
+- `scripts/run_option1_smoke.sh`
+- `scripts/run_option1_e1.sh`
+- `scripts/run_option1_e2.sh`
+- `next_actions.md` (steps 1-4 marked DONE)
+- `research_log.md` (this entry)
+
+**Feature branch**: `auto/2026-05-02-option1-state-extension`
+
+**Next queued for user on server1:**
+1. `bash scripts/run_option1_smoke.sh` — smoke test (~30s)
+2. `bash scripts/run_option1_e1.sh` — E1_2L baseline (~30-90 min)
+3. `bash scripts/run_option1_e2.sh` — E2_2L baseline (~90-240 min)
+4. Cloud agent next fire: compute CEV decomposition from JSON outputs
+
+**Hypotheses to test after runs:**
+- H1: mean_xB > 0 at ell=A (genuine hedge pre-positioning)
+- H2: CEV(E2_2L_v4 vs E1_2L_v4) > 4.255% (v3 Option 3 baseline)
+- H3: hedge channel `CEV(E2_2L_v4 vs E2_2L_v3)` ≈ 0.5-1.5%
+
+If H1+H2+H3 hold: RFS-credible mechanism confirmed. Continue to Phase 2.
+If H1 fails: mechanism dead even with proper state; fall back to Path D (REE).
+
