@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
-# Smoke test for v4 solver — struct init and tx_cost checks only; no VFI.
-# Run on server1 first before the full baseline runs.
-# Expected wall time: < 30 seconds.
-
+# Smoke test for v4 solver (no VFI; runs in seconds).
+# Execute on server1: bash scripts/run_option1_smoke.sh
 set -euo pipefail
-cd "$(git -C "$(dirname "$0")" rev-parse --show-toplevel)"
 
-OUTDIR=output/diagnostics
+OUTDIR="output/diagnostics"
 mkdir -p "$OUTDIR"
 
-julia src/vfi_solver_v4.jl --smoke-test 2>&1 | tee "$OUTDIR/p6_option1_smoke.md"
+echo "=== v4 smoke test ==="
+date
 
-echo "Smoke test complete. Output: $OUTDIR/p6_option1_smoke.md"
+julia src/vfi_solver_v4.jl --smoke-test 2>&1 | tee "$OUTDIR/p6_option1_smoke_stdout.log"
+
+echo "Smoke test done."
+date
