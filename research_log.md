@@ -1605,3 +1605,31 @@ Server1 baselines (steps 5-7) still pending — primary action blocked.
 next fire should write `paper/sections/s4_results.tex` (results skeleton
 with table shells for Table 2 CEV decomposition and Table 3 sensitivity).
 
+
+
+## 2026-05-06 — Fire 15: orientation + merge + s4_results.tex queued
+
+**Orientation**: current fire discovered remote branch already at fire-14
+state with: 954-LOC v4 solver, Phase 2 docs all done, paper sections
+s1-s3 done, server1 baselines still pending.
+
+**Action taken**: resolved merge conflict between local 590-LOC v4
+skeleton (written this fire) and remote 954-LOC canonical version.
+Accepted remote v4 solver (correct E1_2L relocation zeroing: forced
+sale resets x_prev to (0,0); avoids double-charging selling cost that
+is already in sell_factor). Merged all remote fire-13/14 content
+(docs, paper sections, scripts).
+
+**Key design note confirmed in remote v4**: 
+- E1_2L relocation sets x_prev_next = (0,0) — fresh-start after
+  forced sale — which means first-time buying at new location pays
+  tau_buy correctly without any double-count from carry-forward state.
+- E2_2L x_prev carries through relocation (tokens portable) — the
+  hedge mechanism: incremental x_B purchases at ell=A build a
+  position that avoids the lump-sum tau_buy at future relocation.
+
+**Branch state**: pushed to origin at commit 92fb4f5.
+
+**Next fire fallback** (server1 still blocked): `paper/sections/s4_results.tex`
+— results skeleton with shells for Table 2 (CEV decomposition) and
+Table 3 (sensitivity grid), plus Figure 1 placeholder.
