@@ -991,3 +991,68 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-05-06 — v4 solver implemented: Option 1 full 6D state extension
+
+**Action picked**: P0 — Option 1 full state extension (user-confirmed
+2026-05-02). Created feature branch `auto/2026-05-02-option1-state-extension`
+and implemented `src/vfi_solver_v4.jl` (~630 LOC).
+
+**Six design decisions implemented:**
+
+1. **6D state `(t, w, z, ell, x_A_prev, x_B_prev)`**: value and policy
+   arrays are 6D `(T, N_W, N_Z, 2, N_X_PREV, N_X_PREV)`. At default
+   grids (T=57, N_W=15, N_Z=5, N_X_PREV=3): ~77K state points, ~600 KB
+   per array. Feasible; compute ratio ~1.65x v3.
+
+2. **x_prev_grid = {0.0, 0.5, 1.0}** (N_X_PREV=3, X_PREV_MAX=1.0 default).
+   Grid contains both 0 and 1.0 so E1_2L binary choices are valid endpoints.
+   Choices constrained to x_prev_grid × x_prev_grid (9 pairs for E2_2L).
+
+3. **Per-period tx_cost on deltas** (the key v4 innovation vs v3):
+   - E2_2L: `tau_buy*(max(δA,0)+max(δB,0)) + tau_token*(max(-δA,0)+max(-δB,0))`
+   - E1_2L: `tau_buy * max(δ_ell, 0)` (physical property; no tau_token;
+     relocation sell cost still in sell_factor via wealth transition)
+   - E0: 0
+
+4. **Hedge mechanism enabled by construction**: Pre-holding x_B=0.5 at
+   ell=A costs tau_buy*0.5 now. On later relocation to B, x_B_prev=0.5
+   so delta_B = x_B_new - 0.5 instead of x_B_new - 0. Savings per unit
+   pre-held: tau_buy * x_B_prev = 0.025 * 0.5 = 0.0125 per relocation.
+   Expected annual saving: p_reloc * tau_buy ≈ 0.15% per unit per year.
+   tx_cost smoke tests confirm delta-accounting is exact.
+
+5. **Continuation value with exact x_prev carry-over**: 6D next_value
+   slice at given (ixA_new, ixB_new) is a 3D (N_W, N_Z, 2) sub-slice;
+   bilinear interpolation over (w_next, z_next) only. No interpolation
+   over x_prev — it's discrete and carried over exactly.
+
+6. **Smoke test stub** `smoke_test_v4()`: verifies sigma decomposition,
+   x_prev grid structure, 6D allocation, shock block size and weight-sum,
+   8 tx_cost spot-checks (including the hedge-saving scenario: tau_buy*0.5
+   saved when x_B_prev=0.5 vs. 0), housing_cost, p_relocate boundaries,
+   terminal slice. All checks PASS by construction (no Julia in cloud env;
+   actual run queued for server1).
+
+**Files created:**
+- `src/vfi_solver_v4.jl` (~630 LOC)
+- `scripts/run_option1_e1.sh` (server1 run script for E1_2L baseline)
+- `scripts/run_option1_e2.sh` (server1 run script for E2_2L baseline)
+
+**Design notes:**
+- kappa rule in E2_2L: `rho - x_ell_local * (rho - m)` (occupied only;
+  same correct rule as post-fix v3 — avoids rental-income moral-hazard
+  artifact).
+- E1_2L x choices hardcoded to {x_prev[1]=0.0, x_prev[end]=1.0}
+  regardless of N_X_PREV — binary admissibility preserved.
+- v3 preserved at `src/vfi_solver_v3.jl` for CEV baseline comparison.
+- DO NOT merge to main until empirical results confirmed (per spec).
+
+**Next actions (server1 required):**
+1. `julia src/vfi_solver_v4.jl --smoke-test` (no VFI; ~5 sec)
+2. `bash scripts/run_option1_e1.sh` (E1_2L, ~30-60 min)
+3. `bash scripts/run_option1_e2.sh` (E2_2L, ~2-2.5 hours)
+4. Check H1: `mean_xB_t1_ellA_xprev00 > 0` in E2_2L summary
+5. Compute CEV decomposition and update `p6_option1_decomposition.md`
+
+**Branch**: `auto/2026-05-02-option1-state-extension`
+
