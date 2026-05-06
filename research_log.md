@@ -991,3 +991,63 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-05-06 — v4 solver (Option 1 full state extension) implemented
+
+**Action picked**: P0 from `next_actions.md` — create `src/vfi_solver_v4.jl`
+with 6D state `(t, w, z, ell, x_A_prev, x_B_prev)` and proper per-delta
+tau_buy charging. Steps 1-4 of the Option 1 plan completed this fire.
+
+**Why this action**: Option 1 is the only remaining mechanism-saving route.
+Under v3 + Option 3, the cross-location hedge was empirically dead (mean_xB=0
+at any p_relocate) because x_B_prev was not tracked as state, so the solver
+had no way to price the tau_buy savings from pre-holding. The full state
+extension is required to make the hedge motive structurally operative.
+
+**Key design decisions in v4**:
+
+1. **6D state**: `(T, n_w, n_z, 2, n_xpA, n_xpB)` arrays. Default grids:
+   N_W=15, N_Z=5, N_X_PREV=3 ({0, 0.5, 1.0} for x_prev), X_PREV_MAX=1.5.
+   Net compute factor vs v3: ~4.6x per regime.
+
+2. **tx_cost per delta** (at choice time, in budget constraint):
+   ```
+   tx_cost = tau_buy * (max(dA,0) + max(dB,0))
+           + tau_token * (max(-dA,0) + max(-dB,0))
+   ```
+   This is the correct spec: pre-holding x_B incrementally (small dB each
+   period) accumulates position cheaply, deferring a large lump-sum buy
+   at forced relocation in E1_2L. Expected savings per unit x_B per year:
+   p_relocate * tau_buy ≈ 0.06 * 0.025 = 0.15%.
+
+3. **State-update snapping**: x_A_new / x_B_new choices snap to nearest
+   x_prev grid point for next-period value lookup. Coarse 3-pt grid
+   introduces discretisation error; acceptable for first-cut test.
+
+4. **Continuation value**: passes `ix_A_next`, `ix_B_next` (nearest grid
+   indices) as the next-period x_prev state for interpolation lookup.
+   VFI result is a 6D array; terminal slice fills all (ix_A, ix_B) slices
+   identically (no x_prev at terminal age).
+
+5. **E1_2L relocation**: tau_sell still applied as sell_factor at relocation
+   (forced sale). E2_2L: tokens portable, no sell_factor adjustment.
+   tau_buy on E2_2L increments is charged at choice time via tx_cost.
+
+6. **Smoke test**: `smoke_test_v4()` checks sigma decomposition, 6D array
+   allocation (~10-20 MB at default grids), tx_cost arithmetic (4 cases:
+   no-rebalance, pure buy, pure token sale, mixed), terminal slice integrity,
+   housing_cost_v4 spot checks.
+
+**Files created**:
+- `src/vfi_solver_v4.jl` (~480 LOC)
+- `scripts/run_option1_e1.sh` (E1_2L baseline run script)
+- `scripts/run_option1_e2.sh` (E2_2L Option 1 run script)
+
+**Feature branch**: `auto/2026-05-02-option1-state-extension`
+
+**Next steps (USER on server1)**:
+1. `julia src/vfi_solver_v4.jl --smoke-test` — verify struct + tx_cost logic
+2. `bash scripts/run_option1_e1.sh` — E1_2L baseline (~2.5h wall)
+3. `bash scripts/run_option1_e2.sh` — E2_2L Option 1 (~2.5h wall)
+4. Check `mean_xB > 0` at ellA in E2_2L JSON output (H1 test)
+5. Compute CEV(E2_2L_v4 vs E1_2L_v4) and channel decomposition
+
