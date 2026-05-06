@@ -10,12 +10,15 @@
 # computes CEV at the midpoint state (iw_mid, iz_mid, ell=A),
 # and writes a Markdown table to stdout.
 #
+# Compatible with both v3 JSON (V_t1_midpoint_ellA) and v4 JSON
+# (V_t1_midpoint_ellA_xprev0 at initial state x_prev=0).
+#
 # CEV formula: (V_E2 / V_E1)^(1/(1-γ)) − 1
 # For γ=5:      (V_E2 / V_E1)^(−1/4) − 1
 # Both V values are negative (CRRA with γ>1); V_E2 > V_E1 (less negative) implies ratio < 1,
 # giving CEV > 0 after the negative exponent flips the inequality.
 
-using JSON3, Printf
+using JSON3, Printf, Dates
 
 function compute_cev(V_E2::Float64, V_E1::Float64, gamma::Float64)::Float64
     ratio = V_E2 / V_E1
@@ -25,14 +28,21 @@ end
 
 function read_summary(path::String)
     d = JSON3.read(read(path, String))
-    V  = Float64(d["V_t1_midpoint_ellA"])
-    gm = Float64(d["params"]["gamma"])
-    ts = Float64(d["params"]["tau_sell"])
-    tb = Float64(d["params"]["tau_buy"])
-    ap = Bool(d["params"]["apply_tau_buy_at_reloc"])
+    # v4 uses V_t1_midpoint_ellA_xprev0; v3 uses V_t1_midpoint_ellA
+    V = if haskey(d, "V_t1_midpoint_ellA_xprev0")
+        Float64(d["V_t1_midpoint_ellA_xprev0"])
+    else
+        Float64(d["V_t1_midpoint_ellA"])
+    end
+    gm    = Float64(d["params"]["gamma"])
+    ts    = Float64(d["params"]["tau_sell"])
+    tb    = Float64(d["params"]["tau_buy"])
+    # apply_tau_buy_at_reloc is v3-only; v4 always applies per-delta (native)
+    ap    = get(d["params"], "apply_tau_buy_at_reloc", false)
     rhoAB = Float64(d["params"]["rho_AB"])
     preloc = Float64(d["params"]["p_relocate_working"])
-    return (; V, gm, ts, tb, ap, rhoAB, preloc)
+    solver = get(d, "solver_version", "v3")  # v4 sets this field
+    return (; V, gm, ts, tb, ap=Bool(ap), rhoAB, preloc, solver)
 end
 
 function cev_row(dir, tag_e1, tag_e2)
@@ -43,7 +53,8 @@ function cev_row(dir, tag_e1, tag_e2)
     s1 = read_summary(f_e1)
     s2 = read_summary(f_e2)
     cev = compute_cev(s2.V, s1.V, s1.gm)
-    return (; V_E1=s1.V, V_E2=s2.V, cev, gamma=s1.gm, s1.ts, s1.tb, s1.ap, s1.rhoAB, s1.preloc), nothing
+    return (; V_E1=s1.V, V_E2=s2.V, cev, gamma=s1.gm, s1.ts, s1.tb, s1.ap,
+              s1.rhoAB, s1.preloc, s1.solver), nothing
 end
 
 function main()
