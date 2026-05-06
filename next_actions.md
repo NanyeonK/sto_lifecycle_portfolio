@@ -69,7 +69,8 @@ If any fails: fall back to Path D (REE/JHE) at +4.26%.
 | Priority | Action | Status |
 |---|---|---|
 | P1-prep | `paper/sections/s3_calibration.tex` — Table 1 + parameter sources from calibration_v3.md | **DONE** 2026-05-06 (fire 12) |
-| P1-prep | `paper/sections/s1_intro.tex` — introduction skeleton + related literature | queued |
+| P1-prep | `paper/sections/s1_intro.tex` — introduction skeleton + related literature | **DONE** 2026-05-06 (fire 13) |
+| P1-prep | `paper/sections/s4_results.tex` — results section skeleton with table shells | queued (next fallback) |
 | P0-primary | `output/diagnostics/p6_option1_decomposition.md` — CEV decomp once server1 JSONs land | blocked (server1) |
 
 ## P1 (after Option 1 resolves)

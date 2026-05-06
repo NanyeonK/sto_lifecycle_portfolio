@@ -1545,3 +1545,47 @@ Proceeded with Fallback A: write `paper/sections/s3_calibration.tex`.
 - Fallback A (next cloud action): `paper/sections/s1_intro.tex` — introduction
   skeleton with related-literature map from `paper/outline_v4.md` section 1.
 - Fallback B: Liu/YZ/Cocco/KMW comparison table shell.
+
+## 2026-05-06 — Fire 13: merge sync + paper/sections/s1_intro.tex
+
+**Orientation**: found branch at Fire 12 state. P0 steps 1-4 confirmed DONE
+(canonical v4 solver at 954 LOC). Phase 2 prep through s3_calibration.tex DONE.
+Server1 baselines (steps 5-7) still pending — primary action blocked.
+
+**Fire 13 actions**:
+
+1. **Merge sync (fires 1-12)**: this fire independently implemented `vfi_solver_v4.jl`
+   before reading the remote state (design consistently confirmed for the 3rd time;
+   see fires 4 and 11). Remote's canonical solver accepted:
+   - 954 LOC with 4D bilinear interpolation over `(w, z, x_A_prev, x_B_prev)`.
+   - Correct E1_2L relocation reset: `x_prev_next = (0.0, 0.0)` on relocation.
+   - X_PREV_MAX = 2.0 (allows x > 1 for leveraged positions).
+
+2. **`paper/sections/s1_intro.tex` written** (~170 LOC):
+   - Full introduction skeleton with [PLACEHOLDER] markers for numerical results.
+   - Motivation: PSID mobility 5-7%/year; 8-10% round-trip cost; location-exposure
+     loss at relocation; REITs offer no location-specific hedge.
+   - Mechanism: token portability at ~1% vs 8.5% round-trip; pre-accumulation
+     motive via 6D state; cross-location hedge unique to tokens.
+   - Results (placeholder): CEV headline equation; three-channel decomposition
+     (avoided-tx, maintained-hedge, continuous-x); falsification structure (r, m, q).
+   - Related literature: four strands with citations:
+     (1) Lifecycle housing (YZ2005, Cocco2005, KMW2018, Liu2021);
+     (2) Housing as hedge (Sinai-Souleles2005, Davidoff2006, BFN2014);
+     (3) Transaction costs (Flavin-Yamashita2002, Han2013, Piazzesi-Schneider2016);
+     (4) Tokenization (Cong-Li-Wang2021, Swinkels2023).
+   - Road map to sections 2-6.
+
+**Files created**:
+- `paper/sections/s1_intro.tex` (~170 LOC)
+
+**Files modified**:
+- `next_actions.md` (s1_intro DONE; s4_results queued as next fallback)
+- `research_log.md` (this entry)
+
+**Feature branch**: `auto/2026-05-02-option1-state-extension`
+
+**Next queued** (cloud agent next fire):
+- Primary: `output/diagnostics/p6_option1_decomposition.md` (blocked on server1).
+- Fallback A: `paper/sections/s4_results.tex` — results section skeleton.
+- Fallback B: Liu/YZ/Cocco/KMW comparison table shell (Table 4).
