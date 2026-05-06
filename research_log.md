@@ -991,3 +991,60 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-05-06 — v4 solver skeleton: 6D state extension (Option 1)
+
+**Action picked**: P0 in `next_actions.md` — create `src/vfi_solver_v4.jl`
+(Path B Option 1 full state extension). This is the highest-priority
+auto-allowed action: the spec in `handoff/tau_buy_option1_spec.md` was
+already approved 2026-05-02 and required only code implementation.
+
+**What was built** (`src/vfi_solver_v4.jl`, ~590 LOC):
+
+**6D state** `(t, w, z, ell, x_A_prev, x_B_prev)` with coarse x_prev
+grid (`N_X_PREV=3`, default {0.0, 0.75, 1.5} configurable via
+`X_PREV_MAX`). Grid sizes reduced to compensate the ~4.6x state-space
+increase: `N_W=15` (was 21), `N_Z=5` (was 7).
+
+**Delta-based transaction costs** — the key mechanism change vs v3:
+```
+E2_2L:  tx = tau_buy*(max(δA,0)+max(δB,0)) + tau_token*(max(-δA,0)+max(-δB,0))
+E1_2L:  tx = tau_buy*max(δ_ell, 0)     [sell cost in sell_factor; no double-charge]
+```
+Under this rule, a household at ell=A can incrementally accumulate
+x_B_new > 0 by paying tau_buy * x_B_new per unit NOW, rather than a
+lump-sum tau_buy at future relocation. This is the mechanism that
+should activate the cross-location hedge.
+
+**4D interpolation** `interp_value_v4()` — bilinear in (w, z) for
+each of 4 corners in (x_A_prev, x_B_prev) space, then bilinear
+combination. Called from `continuation_value_v4()` which passes
+`(x_A_new, x_B_new)` as the next-period x_prev lookup coordinates.
+
+**Smoke test stub** `smoke_test_v4()` — 10 checks: sigma decomp,
+6D array shape and allocation, terminal slice, shock block, 6
+tx_cost spot-checks (E2_2L buy/sell/hold, E1_2L buy/hold/sell-no-
+double-charge), interp constant-field test, p_relocate, housing_cost.
+VFI not run (cloud env; run on server1).
+
+**Design choices**:
+- For E1_2L negative deltas (sell after relocation), tx_cost is NOT
+  charged — the sell cost is already captured via `sell_factor =
+  (1 - tau_sell)` in the wealth transition, preventing double-counting.
+- `x_prev` grid is shared for both A and B. For E1_2L the binary
+  admissibility constraint ensures x_ell_new ∈ {0,1} and
+  x_{ell'}_new = 0, so only the 0 and 1 grid points are ever
+  reached as endpoints in that regime.
+- E2_2L budget conservatively uses `(w - rho) / (1 - delta_own + tau_buy)`
+  as the max X_total to ensure feasibility even with buy costs.
+
+**Branch**: `auto/2026-05-02-option1-state-extension`
+**File created**: `src/vfi_solver_v4.jl`
+
+**Next steps** (all server1 / human):
+1. Run `julia src/vfi_solver_v4.jl --smoke-test` on server1 — verify
+   checks pass and report memory estimate.
+2. Run E1_2L baseline (N_X_PREV=3, N_W=15, N_Z=5) — establish V
+   value for CEV comparison.
+3. Run E2_2L baseline — confirm mean_xB > 0 at ell=A (hedge hypothesis H1).
+4. Compute CEV(E2_2L_v4 vs E1_2L_v4); compare to v3 baseline 4.255%.
+
