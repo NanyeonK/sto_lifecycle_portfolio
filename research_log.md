@@ -1492,3 +1492,56 @@ run scripts, next_actions.md. Research log merged with both sets of entries.
 - Primary: `output/diagnostics/p6_option1_decomposition.md` (needs server1 JSONs).
 - Fallback A: `paper/sections/s3_calibration.tex`.
 - Fallback B: `paper/sections/s1_intro.tex`.
+
+## 2026-05-06 — Fire 12: paper/sections/s3_calibration.tex — complete calibration section
+
+**Orientation on fire start**: found branch at Fire 11 state. P0 steps 1-4
+all DONE (v4 solver 954 LOC). Phase 2 prep through s2_model.tex DONE.
+Server1 baselines (steps 5-7) still pending — primary action blocked.
+Proceeded with Fallback A: write `paper/sections/s3_calibration.tex`.
+
+**Fire 12 actions**:
+
+1. **Merge sync**: merged remote fire-11 branch into local (which had an
+   independent v4 solver implementation from before reading the remote state).
+   Remote's canonical v4 solver (954 LOC with 4D bilinear interpolation and
+   correct E1_2L relocation reset to (0,0)) accepted. Design independently
+   confirmed: same tx_cost formulas, same hedge mechanism.
+
+2. **`paper/sections/s3_calibration.tex` written** (~200 LOC):
+   - Section 3 with 5 subsections + 2 tables.
+   - **Table 1** (`tab:parameters`): full parameter table with 25 rows,
+     sources (CGM 2005, Cocco 2005, Yao-Zhang 2005, NAR 2023, CFPB, PSID,
+     Case-Shiller), formatted with booktabs.
+   - **3.1 Preferences and Income**: CGM calibration; polynomial income
+     profile equation; permanent + transitory shock variances.
+   - **3.2 Housing Return Decomposition**: sigma_div/sigma_iota derivation;
+     aggregate factor variance share 75.6%; Cholesky equations for
+     correlated (iota_A, iota_B).
+   - **3.3 Mobility Rate**: PSID inter-MSA anchoring (5-7% annual);
+     p_relocate_working=6% justification; literature comparison
+     (Bagliano-Fugazza-Nicodano, Saks-Wozniak, Yao-Zhang).
+   - **3.4 Transaction Costs**: NAR seller + CFPB buyer cost breakdown;
+     round-trip = 8.5%; token cost 1% from platform surveys; hedge premium
+     equation (p_reloc * tau_buy = 0.15%/period).
+   - **3.5 Cross-Location Correlation**: rho_AB=0.50 mapping to observed
+     return corr ~0.88 via the 75.6% common-factor formula; Case-Shiller
+     MSA-pair range; hedge-channel sign condition (collapses at rho_AB→1).
+   - **Table 2** (`tab:sensitivity_grid`): pre-registered P1 sweeps
+     (rho_AB, p_relocate, tau_buy) + Phase 2 sweeps; falsification
+     boundary conditions stated.
+
+**Files created**:
+- `paper/sections/s3_calibration.tex` (~200 LOC)
+
+**Files modified**:
+- `next_actions.md` (s3_calibration DONE; fire 12 timestamp)
+- `research_log.md` (this entry)
+
+**Feature branch**: `auto/2026-05-02-option1-state-extension`
+
+**Next queued** (cloud agent next fire — server1 still needed for primary):
+- Primary: if server1 JSONs available, write `p6_option1_decomposition.md`.
+- Fallback A (next cloud action): `paper/sections/s1_intro.tex` — introduction
+  skeleton with related-literature map from `paper/outline_v4.md` section 1.
+- Fallback B: Liu/YZ/Cocco/KMW comparison table shell.
