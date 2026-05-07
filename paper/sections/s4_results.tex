@@ -1,0 +1,393 @@
+% s4_results.tex — Results section
+% Paper: "Tokenized Housing and Lifecycle Portfolio Choice:
+%         A Decoupling of Location from Housing Exposure"
+%
+% Source: docs/welfare_decomp_v4.md (CEV formula, table shells, channel plan)
+%         docs/sensitivity_grid_v4.md (sweep design)
+%         paper/outline_v4.md (section 4 structure)
+%
+% Status: SKELETON — numerical placeholders marked [PLACEHOLDER] throughout.
+%         All table shells match the pre-registered spec in welfare_decomp_v4.md.
+%         Figures 1 and 2 are placeholder stubs.
+%         Fill numerical entries once output/diagnostics/p6_option1_*.json land.
+%
+% Compilation: included from main.tex via \input{sections/s4_results}
+%              Requires amsmath, booktabs, multirow, siunitx, graphicx, caption.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Results}
+\label{sec:results}
+% ─────────────────────────────────────────────────────────────────────────────
+
+We report the baseline welfare results in Section~\ref{sec:results:baseline},
+the channel decomposition in Section~\ref{sec:results:decomp}, the
+pre-registered falsification tests in Section~\ref{sec:results:falsification},
+and sensitivity analysis in Section~\ref{sec:results:sensitivity}.
+
+All welfare gains are expressed as consumption equivalent variations (CEV) at the
+initial state
+$\mathbf{s}_0 = (t{=}1,\,w_{\text{mid}},\,z_{\text{mid}},\,\ell{=}A,\,x_{A,0}{=}0,\,x_{B,0}{=}0)$:
+\begin{equation}
+    \text{CEV}(R_a \text{ vs } R_b) \;=\;
+    \left(\frac{V_1^{R_a}(\mathbf{s}_0)}{V_1^{R_b}(\mathbf{s}_0)}\right)^{1/(1-\gamma)}
+    - 1,
+    \label{eq:cev}
+\end{equation}
+where $V_1^{R}(\mathbf{s}_0)$ is the time-1 value function under regime $R$
+evaluated at $\mathbf{s}_0$.%
+\footnote{Both value functions are negative under CRRA with finite wealth,
+so the ratio is positive and the formula is well-defined for $\gamma \neq 1$.
+The CEV measures the fraction of lifetime consumption in regime $R_b$ that the
+household would give up to gain permanent access to regime $R_a$.}
+Appendix~\ref{app:numerical} reports convergence diagnostics and full-grid
+robustness.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\subsection{Baseline Welfare Results}
+\label{sec:results:baseline}
+% ─────────────────────────────────────────────────────────────────────────────
+
+The headline welfare result is reported in Table~\ref{tab:cev_baseline}.
+The first row gives $\text{CEV}(\text{E2\_2L vs E1\_2L})$, the lifetime
+welfare value of tokenization relative to traditional binary homeownership.
+Rows 2--4 decompose this gain into three channels (detailed in
+Section~\ref{sec:results:decomp}).
+Row 5 reports $\text{CEV}(\text{E0 vs E1\_2L})$ as a sanity-check benchmark:
+the welfare cost of pure renting relative to traditional ownership.
+
+\begin{table}[t]
+\centering
+\caption{Welfare Value of Tokenization: Baseline and Robustness Panel
+         (CEV, percentage points of lifetime consumption)}
+\label{tab:cev_baseline}
+\small
+\begin{tabular}{lcccccc}
+\toprule
+ & Baseline & $\rho_{AB}=0$ & $\rho_{AB}=0.50$ & $\rho_{AB}=0.95$
+ & $p_{\text{reloc}}=0$ & $p_{\text{reloc}}=0.12$ \\
+\midrule
+$\text{CEV}(\text{E2\_2L vs E1\_2L})$
+    & \textsc{[P]} & \textsc{[P]} & \textsc{[P]} & \textsc{[P]}
+    & \textsc{[P]} & \textsc{[P]} \\[2pt]
+\quad Avoided-tx channel
+    & \textsc{[P]} & \textsc{[P]} & \textsc{[P]} & \textsc{[P]}
+    & \textsc{[P]} & \textsc{[P]} \\
+\quad Maintained-hedge channel
+    & \textsc{[P]} & \textsc{[P]} & \textsc{[P]} & \textsc{[P]}
+    & \textsc{[P]} & \textsc{[P]} \\
+\quad Cross-term $\xi$
+    & \textsc{[P]} & \textsc{[P]} & \textsc{[P]} & \textsc{[P]}
+    & \textsc{[P]} & \textsc{[P]} \\[4pt]
+$\text{CEV}(\text{E0 vs E1\_2L})$ (renter benchmark)
+    & \textsc{[P]} & --- & --- & --- & --- & --- \\
+\addlinespace
+Mean $\bar{x}_B$ at $\ell{=}A$
+    & \textsc{[P]} & \textsc{[P]} & \textsc{[P]} & \textsc{[P]}
+    & \textsc{[P]} & \textsc{[P]} \\
+\bottomrule
+\end{tabular}
+\vspace{4pt}
+\begin{minipage}{\linewidth}
+\small\textit{Notes:}
+Baseline: $\gamma=5$, $\beta=0.96$, $\rho_{AB}=0.50$,
+$p_{\text{reloc,work}}=0.06$, $\tau_{\text{sell}}=0.06$,
+$\tau_{\text{buy}}=0.025$, $\tau_{\text{token}}=0.01$.
+Grid: $N_W=15$, $N_Z=5$, $N_{x_{\text{prev}}}=3$ (coarse; full-grid
+robustness at $N_W=40$, $N_Z=9$, $N_{x_{\text{prev}}}=5$ in
+Appendix~\ref{app:numerical}).
+\textsc{[P]} = placeholder pending server1 baseline runs.
+\end{minipage}
+\end{table}
+
+The primary diagnostic for mechanism activation is $\bar{x}_B$ at $\ell{=}A$:
+the mean portfolio share of location-$B$ tokens held by households residing
+at location $A$.
+Under E1\_2L, $\bar{x}_B = 0$ by admissibility (binary tenure forbids
+non-occupancy-location ownership).
+Under E2\_2L, a positive $\bar{x}_B > 0$ at $\ell{=}A$ indicates that
+households voluntarily pre-accumulate location-$B$ tokens before relocation ---
+the mechanism that is uniquely enabled by token portability and the 6D state
+extension (Option~1).
+This is the key discriminator from the v3 Option~3 approximation, under which
+$\bar{x}_B = 0$ held at all mobility rates.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\subsection{Channel Decomposition}
+\label{sec:results:decomp}
+% ─────────────────────────────────────────────────────────────────────────────
+
+We decompose the total welfare gain using three regime runs.
+Let E1\_2L$_{\text{NT}}$ denote the no-transaction-cost counterfactual
+($\tau_{\text{sell}} = \tau_{\text{buy}} = 0$, binary tenure otherwise).
+The decomposition is:
+\begin{align}
+    \underbrace{\text{CEV}(\text{E2\_2L vs E1\_2L})}_{\text{total}}
+    &\;=\;
+    \underbrace{\text{CEV}(\text{E1\_2L}_{\text{NT}} \text{ vs E1\_2L})}_{\text{avoided-tx}}
+    \;+\;
+    \underbrace{\text{CEV}(\text{E2\_2L vs E1\_2L}_{\text{NT}})}_{\text{maintained-hedge}}
+    \;+\; \xi,
+    \label{eq:decomp}
+\end{align}
+where $\xi$ is the cross-term.
+This decomposition is pre-registered in \texttt{docs/welfare\_decomp\_v4.md}
+and is exact up to the cross-term, which was empirically near zero in v3
+($\xi = 0.021$\%) and is expected to remain small in v4.
+
+\begin{table}[t]
+\centering
+\caption{Channel Decomposition of the Tokenization Welfare Gain
+         (CEV, percentage points of lifetime consumption)}
+\label{tab:decomp}
+\small
+\begin{tabular}{lccl}
+\toprule
+Channel & CEV (\%) & Share of total & Description \\
+\midrule
+Total: $\text{CEV}(\text{E2\_2L vs E1\_2L})$
+    & \textsc{[P]} & 100\% & Headline tokenization gain \\
+\addlinespace
+\quad (i)~Avoided-tx
+    & \textsc{[P]} & \textsc{[P]}\%
+    & $\tau_{\text{sell}} + \tau_{\text{buy}}$ burden of E1\_2L moves \\
+\qquad of which $\tau_{\text{sell}}$
+    & \textsc{[P]} & \textsc{[P]}\%
+    & NAR selling commission (6\%) \\
+\qquad of which $\tau_{\text{buy}}$
+    & \textsc{[P]} & \textsc{[P]}\%
+    & Buying closing costs (2.5\%) \\[4pt]
+\quad (ii)~Maintained-hedge
+    & \textsc{[P]} & \textsc{[P]}\%
+    & Continuous-x + pre-buying hedge vs E1\_2L$_\text{NT}$ \\[4pt]
+\quad (iii)~Cross-term $\xi$
+    & \textsc{[P]} & \textsc{[P]}\%
+    & Interaction; expected $\approx 0$ \\
+\midrule
+v3 Option~3 (no state ext.)
+    & $+4.255$\% & (reference) & Previous fire's upper-bound approx \\
+\quad of which avoided-tx
+    & $+0.816$\% & 19.2\% & From v3 full-grid run \\
+\quad of which continuous-x
+    & $+3.411$\% & 80.2\% & Liu (2021) territory \\
+\quad of which pre-buying hedge
+    & $\approx 0$\% & $\approx 0$\% & Absent without state ext. (Option~3 limit) \\
+\bottomrule
+\end{tabular}
+\vspace{4pt}
+\begin{minipage}{\linewidth}
+\small\textit{Notes:}
+Upper panel: v4 Option~1 results (\textsc{[P]} = placeholder).
+Lower panel: v3 Option~3 reference numbers (confirmed from server1 run,
+commit 186da13).
+The maintained-hedge channel in v4 encompasses both the continuous-x
+subchannel (present in v3) and the new pre-buying hedge subchannel
+enabled by the 6D state; a fourth regime decomposition
+($\text{E2\_2L}_{\text{NT}}$) can further separate the two if H1 is confirmed.
+\end{minipage}
+\end{table}
+
+The maintained-hedge channel in v4 captures two sub-mechanisms:
+\begin{enumerate}
+    \item \emph{Continuous-$x$ sub-channel} (present in v3): continuous
+    fractional ownership of the occupied unit avoids the binary kink at
+    $x_\ell = 1$, delivering a Liu~(2021)-style indivisibility relaxation.
+    \item \emph{Pre-buying hedge sub-channel} (new in v4): by tracking
+    $(x_{A,t-1}, x_{B,t-1})$ in the state, households face a per-period
+    buying cost $\tau_{\text{buy}} \cdot \max(\Delta x, 0)$ and can
+    pre-accumulate location-$B$ tokens at location $A$, arriving at $B$
+    with $x_{B,t-1} > 0$ and avoiding the lump-sum purchase cost.
+    The expected per-period premium per unit held is
+    $p_{\text{reloc}} \times \tau_{\text{buy}} = 0.06 \times 0.025 = 0.15$\%
+    (see Appendix~\ref{app:proof}).
+\end{enumerate}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\subsection{Falsification Tests}
+\label{sec:results:falsification}
+% ─────────────────────────────────────────────────────────────────────────────
+
+We conduct three pre-registered falsification tests designed to identify
+the pre-buying hedge channel.
+These tests were pre-registered in \texttt{docs/welfare\_decomp\_v4.md}
+before server1 runs were executed.
+Crucially, the analogous tests \emph{failed} under v3 Option~3 (which lacked
+the state extension): $\bar{x}_B$ remained zero at all mobility rates,
+and the CEV was insensitive to $p_{\text{reloc}}$ and $\rho_{AB}$.
+
+\begin{table}[t]
+\centering
+\caption{Pre-Registered Falsification Tests
+         (Deviations from Baseline)}
+\label{tab:falsification}
+\small
+\begin{tabular}{llcccc}
+\toprule
+Test & Counterfactual & $\text{CEV}$ & $\bar{x}_B$ at $\ell{=}A$
+     & Pass criterion & Result \\
+\midrule
+(r) Relocation disabled
+    & $p_{\text{reloc}} = 0$
+    & \textsc{[P]}
+    & \textsc{[P]}
+    & $\bar{x}_B \to 0$;\; $\Delta\text{CEV} < -0.5$pp
+    & \textsc{[P]} \\[4pt]
+(m) Perfect correlation
+    & $\rho_{AB} = 0.95$
+    & \textsc{[P]}
+    & \textsc{[P]}
+    & $\bar{x}_B$ decreases;\; $\Delta\text{CEV} < 0$
+    & \textsc{[P]} \\[4pt]
+(q) No buying cost
+    & $\tau_{\text{buy}} = 0$
+    & \textsc{[P]}
+    & \textsc{[P]}
+    & Hedge channel $\to 0$;\; $\bar{x}_B \to 0$
+    & \textsc{[P]} \\
+\bottomrule
+\end{tabular}
+\vspace{4pt}
+\begin{minipage}{\linewidth}
+\small\textit{Notes:}
+All tests compare to the baseline E2\_2L v4 run.
+Pass criterion stated prior to server1 runs.
+``Hedge channel'' in test (q) is
+$\text{CEV}(\text{E2\_2L}_{\tau=0} \text{ vs E1\_2L}_{\text{NT}}) - \text{CEV}(\text{E2\_2L}_{\text{baseline}} \text{ vs E1\_2L}_{\text{NT}})$.
+\textsc{[P]} = placeholder.
+\end{minipage}
+\end{table}
+
+Test (r) shuts off the relocation shock entirely.
+Without future relocation, there is no value to pre-accumulating
+location-$B$ tokens while at $A$; the pre-buying hedge channel
+should collapse.
+If test (r) passes --- i.e., $\bar{x}_B \to 0$ when $p_{\text{reloc}} = 0$
+--- it provides strong evidence that the positive $\bar{x}_B$ in the
+baseline is driven by the pre-buying motive and not by a model artefact.
+
+Test (m) raises the cross-location correlation to $\rho_{AB} = 0.95$,
+nearly eliminating diversification benefit.
+When location-$A$ and location-$B$ price processes are nearly identical,
+holding $x_B$ at $\ell = A$ provides little hedge against diverging location returns.
+The CEV and $\bar{x}_B$ should both decrease relative to the baseline.
+
+Test (q) eliminates the buying cost ($\tau_{\text{buy}} = 0$), which
+removes the financial incentive to pre-accumulate $x_B$ (there is no lump-sum
+arrival cost to avoid).
+The pre-buying hedge channel should collapse to zero.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\subsection{Sensitivity Analysis}
+\label{sec:results:sensitivity}
+% ─────────────────────────────────────────────────────────────────────────────
+
+Figure~\ref{fig:sensitivity_heatmap} depicts the total welfare gain
+$\text{CEV}(\text{E2\_2L vs E1\_2L})$ as a function of the two primary
+mechanism parameters: the cross-location correlation $\rho_{AB}$ and
+the relocation probability $p_{\text{reloc}}$.
+The full sweep design follows the pre-registered plan in
+\texttt{docs/sensitivity\_grid\_v4.md}; only a subset is shown here.
+
+\begin{figure}[t]
+\centering
+%% PLACEHOLDER — replace with actual heatmap once sweep results available
+\fbox{%
+  \begin{minipage}{0.72\linewidth}
+  \vspace{2.5cm}
+  \centering
+  {\sffamily\small [PLACEHOLDER: Figure~2 — CEV sensitivity heatmap.
+  X-axis: $\rho_{AB} \in \{0, 0.25, 0.50, 0.75, 0.95\}$.
+  Y-axis: $p_{\text{reloc}} \in \{0, 0.02, 0.06, 0.12\}$.
+  Heat colour: total CEV(\%), from dark (low) to bright (high).
+  Source: sweep outputs from \texttt{scripts/sweep\_rhoAB.sh} and
+  \texttt{scripts/sweep\_prelocate.sh} once server1 runs complete.]}
+  \vspace{2.5cm}
+  \end{minipage}%
+}
+\caption{Welfare sensitivity to cross-location correlation and relocation rate.
+         Each cell reports $\text{CEV}(\text{E2\_2L vs E1\_2L})$ at
+         $(\rho_{AB},\, p_{\text{reloc}})$.
+         The mechanism prediction is a positive gradient in $p_{\text{reloc}}$
+         (higher mobility $\Rightarrow$ higher hedge value) and a negative
+         gradient in $\rho_{AB}$ (more correlated locations $\Rightarrow$
+         smaller diversification benefit).}
+\label{fig:sensitivity_heatmap}
+\end{figure}
+
+Table~\ref{tab:sensitivity} reports selected cross-sections of the
+sensitivity grid for other key parameters.
+
+\begin{table}[t]
+\centering
+\caption{Sensitivity of Headline CEV to Key Parameters
+         (Total CEV, \%; baseline value on diagonal)}
+\label{tab:sensitivity}
+\small
+\begin{tabular}{lcccccc}
+\toprule
+Parameter & & \multicolumn{5}{c}{Values} \\
+\midrule
+Risk aversion $\gamma$
+    & & 3 & \textbf{5} & 8 & & \\
+\quad $\text{CEV}(\text{E2\_2L vs E1\_2L})$
+    & & \textsc{[P]} & \textsc{[P]} & \textsc{[P]} & & \\
+\addlinespace
+Buying cost $\tau_{\text{buy}}$
+    & & 0\% & 1\% & \textbf{2.5\%} & 4\% & 6\% \\
+\quad $\text{CEV}(\text{E2\_2L vs E1\_2L})$
+    & & \textsc{[P]} & \textsc{[P]} & \textsc{[P]} & \textsc{[P]} & \textsc{[P]} \\
+\addlinespace
+Relocation rate $p_{\text{reloc,work}}$
+    & & 0 & 0.02 & \textbf{0.06} & 0.12 & \\
+\quad $\text{CEV}(\text{E2\_2L vs E1\_2L})$
+    & & \textsc{[P]} & \textsc{[P]} & \textsc{[P]} & \textsc{[P]} & \\
+\quad $\bar{x}_B$ at $\ell{=}A$
+    & & \textsc{[P]} & \textsc{[P]} & \textsc{[P]} & \textsc{[P]} & \\
+\addlinespace
+Cross-location corr.\ $\rho_{AB}$
+    & & 0 & 0.25 & \textbf{0.50} & 0.75 & 0.95 \\
+\quad $\text{CEV}(\text{E2\_2L vs E1\_2L})$
+    & & \textsc{[P]} & \textsc{[P]} & \textsc{[P]} & \textsc{[P]} & \textsc{[P]} \\
+\bottomrule
+\end{tabular}
+\vspace{4pt}
+\begin{minipage}{\linewidth}
+\small\textit{Notes:}
+Bold entries mark the baseline value.
+One parameter varies at a time; all others held at baseline.
+Sweep scripts: \texttt{scripts/sweep\_rhoAB.sh},
+\texttt{scripts/sweep\_prelocate.sh}, \texttt{scripts/sweep\_txcost.sh}.
+\textsc{[P]} = placeholder pending server1 sweep runs.
+\end{minipage}
+\end{table}
+
+Two monotonicity predictions follow from the model mechanism.
+First, for $\tau_{\text{buy}}$: as the buying cost rises, the pre-accumulation
+motive strengthens and $\bar{x}_B$ should increase, lifting the hedge sub-channel.
+Second, for $p_{\text{reloc}}$: higher mobility raises the expected value of
+pre-accumulated $x_B$ holdings; at $p_{\text{reloc}} = 0$ the hedge channel
+collapses (falsification test r).
+If these monotonicity patterns hold in the sweep results, they constitute
+additional evidence for the pre-buying hedge mechanism.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\subsection{Summary of Mechanism Evidence}
+\label{sec:results:summary}
+% ─────────────────────────────────────────────────────────────────────────────
+
+The results establish \textsc{[P]} as the headline lifetime welfare gain from
+tokenization under the baseline calibration.
+The gain decomposes additively into an avoided-transaction-cost channel
+(\textsc{[P]}\%) and a maintained-hedge channel (\textsc{[P]}\%), with
+a near-zero cross-term.
+The maintained-hedge channel is itself divisible into the continuous-$x$
+sub-channel present in prior work (Liu, 2021) and the novel pre-buying hedge
+sub-channel unlocked by the 6D state extension.
+
+The three falsification tests provide mechanism identification.
+Under all three counterfactuals --- zero relocation, high cross-location
+correlation, zero buying cost --- the pre-buying hedge channel should
+attenuate or collapse.
+Confirmation of these patterns will establish that the welfare gain reported
+in Table~\ref{tab:cev_baseline} reflects the model's structural mechanism
+rather than a calibration artefact.
+\textsc{[Fill in pass/fail outcomes from output/diagnostics/p6\_option1\_decomposition.md.]}

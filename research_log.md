@@ -1633,3 +1633,56 @@ is already in sell_factor). Merged all remote fire-13/14 content
 **Next fire fallback** (server1 still blocked): `paper/sections/s4_results.tex`
 — results skeleton with shells for Table 2 (CEV decomposition) and
 Table 3 (sensitivity grid), plus Figure 1 placeholder.
+
+## 2026-05-07 — Fire 16: s4_results.tex written (results section skeleton)
+
+**Orientation**: merged remote fire-15 state. Confirmed:
+- v4 solver canonical at 954 LOC (accepted; consistent with this session's
+  independent implementation before merge).
+- Phase 2 prep docs all done (fires 5–8): calibration_v3.md,
+  methods_v3.md, sensitivity_grid_v4.md, welfare_decomp_v4.md.
+- Paper sections s1_intro.tex, s2_model.tex, s3_calibration.tex done
+  (fires 9–13). Server1 baselines still pending (steps 5–7).
+
+**Action**: wrote `paper/sections/s4_results.tex` (~393 LOC), the queued
+next-fallback per fires 13–15.
+
+**Content of s4_results.tex**:
+1. CEV formula \eqref{eq:cev} with footnote on sign convention.
+2. **Table 2** (tab:cev\_baseline): 6-column robustness panel — baseline
+   plus $\rho_{AB} \in \{0, 0.50, 0.95\}$ and $p_{\text{reloc}} \in \{0, 0.12\}$,
+   rows for total CEV, three channel components, cross-term $\xi$, renter
+   benchmark, and $\bar{x}_B$. Matches `welfare_decomp_v4.md` Table 1 shell.
+3. **Table 3** (tab:decomp): three-regime channel decomposition with v3
+   Option~3 reference row (confirmed numbers from commit 186da13:
+   +4.255% total, +0.816% avoided-tx, +3.411% continuous-x).
+4. Mechanism text for the two sub-channels (continuous-x and pre-buying hedge)
+   with expected premium formula ($p_{\text{reloc}} \times \tau_{\text{buy}}$
+   = 0.15\%/period/unit).
+5. **Table 4** (tab:falsification): three pre-registered falsification tests
+   (r) $p_{\text{reloc}}=0$, (m) $\rho_{AB}=0.95$, (q) $\tau_{\text{buy}}=0$,
+   with stated pass criteria. Emphasises that tests (r) and (m) FAILED under
+   v3 Option~3; passage under v4 Option~1 is the key discriminator.
+6. **Figure 2 placeholder**: CEV sensitivity heatmap ($\rho_{AB} \times
+   p_{\text{reloc}}$) with descriptive stub.
+7. **Table 5** (tab:sensitivity): single-dimension cross-sections over
+   $\gamma$, $\tau_{\text{buy}}$, $p_{\text{reloc}}$, $\rho_{AB}$.
+8. Summary sub-section with mechanism-evidence synthesis paragraph; [FILL IN]
+   markers throughout for server1 numerical results.
+
+All numerical cells marked \textsc{[P]} (placeholder). Structure matches
+pre-registered specs in `welfare_decomp_v4.md` exactly.
+
+**Files created/modified**:
+- `paper/sections/s4_results.tex` (393 LOC) — new
+- `next_actions.md` (s4\_results marked DONE; s5\_discussion queued as next fallback)
+- `research_log.md` (this entry)
+
+**Feature branch**: `auto/2026-05-02-option1-state-extension`
+
+**Next queued** (cloud agent next fire):
+- Primary: `output/diagnostics/p6_option1_decomposition.md` (blocked: server1).
+- Fallback: `paper/sections/s5_discussion.tex` — discussion section skeleton
+  covering Liu (2021) head-to-head comparison, REIT vs token mechanism,
+  partial-equilibrium caveat.
+

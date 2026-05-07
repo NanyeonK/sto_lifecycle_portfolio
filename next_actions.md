@@ -1,7 +1,7 @@
 # Next Actions (Path B Option 1 in flight, ASAP-tempered to 6h cron)
 
 Project: sto_lifecycle_portfolio
-Updated: 2026-05-06 (cloud agent fire 12)
+Updated: 2026-05-07 (cloud agent fire 16)
 
 ## ⭐ P0 — Option 1 full state extension (USER CHOSE B, OPTION 1)
 
@@ -70,8 +70,9 @@ If any fails: fall back to Path D (REE/JHE) at +4.26%.
 |---|---|---|
 | P1-prep | `paper/sections/s3_calibration.tex` — Table 1 + parameter sources from calibration_v3.md | **DONE** 2026-05-06 (fire 12) |
 | P1-prep | `paper/sections/s1_intro.tex` — introduction skeleton + related literature | **DONE** 2026-05-06 (fire 13) |
-| P1-prep | `paper/sections/s4_results.tex` — results section skeleton with table shells | queued (next fallback) |
+| P1-prep | `paper/sections/s4_results.tex` — results section skeleton with table shells | **DONE** 2026-05-07 (fire 16) |
 | P0-primary | `output/diagnostics/p6_option1_decomposition.md` — CEV decomp once server1 JSONs land | blocked (server1) |
+| P1-prep | `paper/sections/s5_discussion.tex` — discussion + Liu comparison skeleton | queued (next fallback) |
 
 ## P1 (after Option 1 resolves)
 
