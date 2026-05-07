@@ -991,3 +991,73 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-05-07 — v4 solver: Option 1 full state extension implemented
+
+**Action picked**: create `src/vfi_solver_v4.jl` — the Option 1 full
+state extension as specified in `handoff/tau_buy_option1_spec.md`.
+This is the P0 item in `next_actions.md` (user confirmed 2026-05-02:
+Option 1 is P0).
+
+**What was built**:
+
+State extension from 4D `(t, w, z, ell)` to 6D
+`(t, w, z, ell, ix_A_prev, ix_B_prev)`. The x_prev grid tracks
+previous-period housing holdings per location, defaulting to
+`N_X_PREV=3` points (`{0.0, 0.5, 1.0}` at `X_PREV_MAX=1.0`).
+
+Per-period transaction cost block (E2_2L only):
+```
+delta_A  = x_A_new - x_A_prev
+delta_B  = x_B_new - x_B_prev
+tx_cost  = tau_buy  * (max(dA,0) + max(dB,0))
+         + tau_token * (max(-dA,0) + max(-dB,0))
+```
+Budget: `c + kappa(x_ell_new) + b + s + x_A_new + x_B_new + tx_cost = w`.
+
+**Hedge mechanism enabled**: a household at ell=A holding x_B_prev=0.5
+pays zero tau_buy to maintain x_B=0.5 next period. If relocating to B,
+they arrive with x_B_prev=0.5 (portable tokens) — no additional buy
+cost to maintain position. E1_2L relocating household arrives with
+x_prev=0 and must pay tau_buy to establish any position at B.
+
+Expected hedge premium per unit x_B pre-held:
+`p_relocate * tau_buy ≈ 0.06 * 0.025 = 0.15%` per period per unit.
+Lifetime CEV impact conjecture: +0.5-1.5% on top of Option 3 (+4.26%).
+
+**Key design choices**:
+- Choice set for E2_2L: `(x_A_new, x_B_new)` restricted to x_prev_grid
+  (N_X_PREV^2 = 9 combinations at default). Enables exact x_prev lookup
+  without interpolation in x_prev dims; tractable at small N_X_PREV.
+- E1_2L relocation: sets next-period x_prev=(0,0) (forced liquidation —
+  household must re-buy at B paying tau_buy). E2_2L: tokens portable,
+  x_prev unchanged by relocation.
+- Housing cost rule: fixed kappa (only x_ell_local saves rent).
+- Shock block: same 7D GH quadrature as v3 (3^7=2187 points at n=3).
+
+**Files created**:
+- `src/vfi_solver_v4.jl` (~570 LOC)
+- `scripts/run_option1_e1.sh` (E1_2L baseline run script)
+- `scripts/run_option1_e2.sh` (E2_2L baseline + hedge diagnostic)
+
+**Smoke test** embedded in `--smoke-test` flag. Checks:
+- 6D array allocation (~0.5 MB at small grids — fine)
+- Terminal slice consistency
+- tx_cost computation (buy, sell, no-change cases)
+- Housing cost rule spot-checks (E0, E1_2L, E2_2L)
+- x_prev identity: tx_cost=0 when x_new == x_prev
+- Shock block size and weight sum
+
+**Feature branch**: `auto/2026-05-07-v4-state-extension`
+
+**Next queued (all require server1)**:
+1. Run `julia src/vfi_solver_v4.jl --smoke-test` (USER, ~30s)
+2. Run `bash scripts/run_option1_e1.sh` (USER, ~30-90 min)
+3. Run `bash scripts/run_option1_e2.sh` (USER, ~30-90 min)
+4. Report `mean_xB_t1_xprev0_ellA` from E2_2L JSON:
+   - > 0 → hedge mechanism activates → H1/H2/H3 hypotheses testable
+   - = 0 → mechanism dead even with proper state → fall back to Path D
+
+**Compute note**: 6D state with N_W=15, N_Z=5, N_X_PREV=3 gives
+~4.6x the v3 compute (per spec estimate). Per-regime wall time on
+server1: ~30-90 min (single thread). Both regimes: ~1-3 hours total.
+

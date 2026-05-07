@@ -12,13 +12,14 @@ proper tau_buy hedge mechanism.
 
 | Step | Action | Owner | Done artifact |
 |---|---|---|---|
-| 1 | Open new branch `auto/2026-05-02-option1-state-extension` | cloud agent | branch on origin |
-| 2 | Create `src/vfi_solver_v4.jl`: 6D state `(t, w, z, ell, x_A_prev, x_B_prev)` + tx_cost on deltas | cloud agent | file pushed |
-| 3 | Use coarse `x_prev` grid: `N_X_PREV=3` (e.g., {0, 0.5, 1.0}); reduce N_W=15, N_Z=5 to compensate | cloud agent | env-var configurable |
-| 4 | Smoke test stub `smoke_test_v4()` checking 6D allocation, tx_cost computation, state update consistency | cloud agent | callable via `--smoke-test` |
-| 5 | Smoke test on server1 (USER) | user/me | `output/diagnostics/p6_option1_smoke.md` |
-| 6 | Run E1_2L_v4 + E2_2L_v4 baselines (USER) | user/me | `p6_option1_e*.json` |
-| 7 | Compute decomposition + write up | user/me | `p6_option1_decomposition.md` |
+| 1 | Open new branch `auto/2026-05-07-v4-state-extension` | cloud agent | branch on origin — **DONE 2026-05-07** |
+| 2 | Create `src/vfi_solver_v4.jl`: 6D state `(t, w, z, ell, x_A_prev, x_B_prev)` + tx_cost on deltas | cloud agent | **DONE 2026-05-07** — `src/vfi_solver_v4.jl` (~570 LOC) |
+| 3 | Use coarse `x_prev` grid: `N_X_PREV=3` (`{0.0, 0.5, 1.0}`); reduce N_W=15, N_Z=5 | cloud agent | **DONE 2026-05-07** — env-var configurable |
+| 4 | Smoke test stub `smoke_test_v4()` checking 6D allocation, tx_cost computation, state update | cloud agent | **DONE 2026-05-07** — callable via `--smoke-test` |
+| 4b | Write `scripts/run_option1_e1.sh` and `run_option1_e2.sh` | cloud agent | **DONE 2026-05-07** |
+| 5 | `julia src/vfi_solver_v4.jl --smoke-test` on server1 | **USER** | `output/diagnostics/p6_option1_smoke.md` |
+| 6 | Run `bash scripts/run_option1_e1.sh` + `run_option1_e2.sh` on server1 (~1-3h total) | **USER** | `p6_option1_e1.json`, `p6_option1_e2.json` |
+| 7 | Report `mean_xB_t1_xprev0_ellA` from E2_2L JSON; compute CEV decomposition | **USER** | `p6_option1_decomposition.md` |
 
 ## Hypotheses to test (after step 6)
 
