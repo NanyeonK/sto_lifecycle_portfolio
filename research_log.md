@@ -570,3 +570,59 @@ register (re-categorized).
 **Dropped from v2**: 4-regime REIT comparison (E1+, E2+),
 multi-property x_other, hedge channel via corr(iota, eps),
 service-asset wedge framing.
+
+## 2026-05-07 — Option 1 v4 solver implemented: 6D state with proper tau_buy
+
+**Action**: P0 Step 2 from `next_actions.md` — create `src/vfi_solver_v4.jl`
+implementing the full 6D state extension per `handoff/tau_buy_option1_spec.md`.
+
+**Rationale for this being P0**: v3 empirically showed the cross-location hedge
+channel is zero under the FIXED kappa rule and symmetric calibration, because the
+household can freely rebalance between x_A and x_B at zero cost each period. With
+per-period `tau_buy` on positive deltas (Option 1), pre-holding x_B at ell=A has
+a real option value: it avoids paying `tau_buy * x_B` in a lump sum at relocation.
+
+**What was built** (`src/vfi_solver_v4.jl`, ~570 LOC):
+
+1. **6D state `(t, w, z, ell, x_A_prev, x_B_prev)`**. Array dims at defaults:
+   T=57, N_W=15, N_Z=5, n_ell=2, N_X_PREV=3, N_X_PREV=3 → 76,950 states/array,
+   ~5 MB total. Well within memory budget.
+
+2. **x_prev grid `{0.0, 0.5, 1.0}`** for N_X_PREV=3, X_PREV_MAX=1.0.
+   x_new choices constrained to grid → no interpolation in x_prev dimensions.
+   Continuation value: bilinear in (w,z); exact lookup in (ell, ixA_new, ixB_new).
+
+3. **Per-period tx_cost (budget deduction on quantity deltas)**:
+   - E2_2L: `tau_buy * max(dA,0) + tau_token * max(-dA,0)` per location
+   - E1_2L: `tau_buy * max(d_ell,0) + tau_sell * max(-d_ell,0)` (real estate rates)
+   Covers both ongoing rebalancing AND relocation state transitions naturally.
+
+4. **FIXED kappa** (only occupied token saves rent): `rho - x_ell * (rho - m)`.
+
+5. **No sell_factor in wealth transition** (tc deducted from budget, not return).
+   Second-order approximation: error ≈ tau_sell * x * (R - 1) ≈ 0.12%/unit/period.
+
+6. **E1_2L relocation** correctly handled: at (ell=B, x_A_prev=1), admissibility
+   forces x_A_new=0, delta_A=-1, tc includes tau_sell*1. Realistic burden captured.
+
+7. **Smoke test** (`--smoke-test`): 8 tx_cost checks, 4 kappa checks, 6D shape and
+   memory, terminal-slice x_prev-independence, sigma decomp, shock block.
+
+**Why hedge should activate now**: Pre-holding x_B at ell=A costs `tau_buy * delta_B`
+now. At relocation to B: x_B_prev = delta (already paid); tc ≈ 0 for B-holding.
+E1_2L at ell=B: x_B_prev=0, must buy: tc = tau_buy. Premium ≈ p_reloc * tau_buy =
+0.0015/unit/period. Lifecycle CEV conjecture: +1-2% on top of Option 3 (+4.26%).
+
+**Files**:
+- `src/vfi_solver_v4.jl` (NEW)
+- `scripts/run_option1_e1.sh` (NEW)
+- `scripts/run_option1_e2.sh` (NEW)
+
+**Feature branch**: `auto/2026-05-07-option1-state-extension`
+
+**Next (server1, user)**:
+- `julia src/vfi_solver_v4.jl --smoke-test`  (< 1 min)
+- `bash scripts/run_option1_e1.sh`           (E1_2L baseline, ~2-3h)
+- `bash scripts/run_option1_e2.sh`           (E2_2L Option 1, ~2-3h)
+- Check `mean_xB_t1_xprev0_ellA > 0` in E2 JSON → Hypothesis 1
+- Compute CEV from V_t1_midpoint values → Hypothesis 2

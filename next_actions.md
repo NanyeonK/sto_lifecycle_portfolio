@@ -1,29 +1,65 @@
-# Next Actions (v3 — post mobility-hedge pivot)
+# Next Actions (v3 + Option 1 state extension)
 
 Project: sto_lifecycle_portfolio
-Updated: 2026-05-01 (full pivot)
+Updated: 2026-05-07
 
-## Phase 0 — Design and pivot (this week)
+## ⭐ P0 — Option 1 full state extension (6D, v4 solver)
 
-| Priority | Action | Auto allowed? | Owner | Done artifact |
+**Spec**: `handoff/tau_buy_option1_spec.md`
+**Branch**: `auto/2026-05-07-option1-state-extension`
+**Background**: v3 hedge channel empirically zero under FIXED kappa + symmetric calibration
+(pre-holding x_B at ell=A had no benefit since rebalancing was free). Option 1 adds
+per-period `tau_buy` on positive x increments, creating a real pre-purchase incentive.
+
+| Step | Action | Owner | Status | Done artifact |
 |---|---|---|---|---|
-| DONE | Pivot memo | yes | claude | `question/pivots/2026-05-01_full_pivot_to_mobility_hedge.md` |
-| DONE | Bellman v3 design | yes | claude | `~/Library/.../wiki/research-ideas/tokenized-housing-mobility-hedge-bellman.md` |
-| DONE | Rewrite `main_question.md` | yes | claude | `question/main_question.md` v3 |
-| P0 | Scheduled agent setup for autonomous Phase 1 progression | yes | claude | `/schedule` config |
-| P0 | (H1') Confirm new title and abstract framing | no | human | reply |
-| P0 | (H2') Approve calibration anchors: PSID mobility, NAR transaction costs, Case-Shiller MSA correlations | no | human | reply with data sources |
+| 1 | Open feature branch `auto/2026-05-07-option1-state-extension` | cloud agent | DONE | branch on origin |
+| 2 | Create `src/vfi_solver_v4.jl` — 6D state + tx_cost on deltas | cloud agent | DONE | file pushed |
+| 3 | Smoke test on server1 | user | pending | `output/diagnostics/p6_option1_smoke.md` |
+| 4 | Run E1_2L_v4 baseline on server1 | user | pending | `output/diagnostics/p6_option1_e1.json` |
+| 5 | Run E2_2L_v4 baseline on server1 | user | pending | `output/diagnostics/p6_option1_e2.json` |
+| 6 | Compute CEV + check Hypothesis 1 (mean_xB > 0 at ellA) | user | pending | `output/diagnostics/p6_option1_decomposition.md` |
 
-## Phase 1 — Solver v3 implementation (4-6 weeks, autonomous)
+**Server1 commands**:
+```bash
+julia src/vfi_solver_v4.jl --smoke-test        # < 1 min
+bash scripts/run_option1_e1.sh                 # E1_2L, ~2-3h
+bash scripts/run_option1_e2.sh                 # E2_2L, ~2-3h
+```
 
-| Priority | Action | Auto allowed? | Notes |
-|---|---|---|---|
-| P1 | Extend v2 solver to 2-location state: add `ell_t in {A, B}` | yes | Add 4-D state grid (t, w, z, ell) |
-| P1 | Add stochastic relocation shock with age-dependent `p_relocate(t)` | yes | PSID-anchored |
-| P1 | Add transaction-cost block: `tau_sell` (NAR ~6%), `tau_buy` (~2-3%), `tau_token` (~0.5-2%) | yes | env-var params |
-| P1 | Implement E0, E1_2L, E2_2L regimes | yes | Drop E1+, E2+, E2plusTOK, E2plusBOTH |
-| P1 | Add location-correlated returns: `R_A`, `R_B` with shared `eta_div` and idio `iota_A`, `iota_B` (corr `rho_AB`) | yes | Case-Shiller anchored |
-| P1 | Smoke test at small grids; verify NaN/Inf clean and feasibility | yes | Same as P1a in old plan |
+## Hypotheses to test (after Step 5)
+
+| Hypothesis | Test | Pass criterion |
+|---|---|---|
+| H1 | `mean_xB_t1_xprev0_ellA > 0` in E2_2L_v4 | Hedge activates |
+| H2 | `CEV(E2_2L_v4 vs E1_2L_v4) > 4.255%` | Beats Option 3 baseline |
+| H3 | `CEV(E2_2L_v4 vs E2_2L_v3)` ≈ 0.5-1.5% | Hedge channel magnitude |
+
+If H1+H2 pass: RFS-credible direction confirmed. → Phase 2 calibration + sensitivity.
+If fails: fall back to Path D (REE/JHE) at +4.26% with tx-cost channel.
+
+## Phase 0 — Design and pivot (DONE)
+
+| Priority | Action | Status |
+|---|---|---|
+| DONE | Pivot memo | `question/pivots/2026-05-01_full_pivot_to_mobility_hedge.md` |
+| DONE | Bellman v3 design | second_brain wiki |
+| DONE | Rewrite `main_question.md` | v3 framing |
+| DONE | (H1') Title deferred | — |
+| DONE | (H2') Calibration anchors deferred | — |
+
+## Phase 1 — Solver v3 implementation (DONE)
+
+| Item | Status |
+|---|---|
+| 4D state `(t, w, z, ell)` | DONE — `src/vfi_solver_v3.jl` |
+| Relocation shock `p_relocate(t)` | DONE |
+| Transaction-cost block (tau_sell, tau_buy, tau_token) | DONE |
+| E0 / E1_2L / E2_2L regimes | DONE |
+| Location-correlated returns R_A, R_B | DONE |
+| Smoke test | DONE |
+| FIXED kappa rule (only x_ell saves rent) | DONE — `fix/2026-05-01-housing-cost-only-occupied` |
+| Baseline VFI E1_2L + E2_2L (server1) | DONE — v3 hedge channel = 0 under symmetric calib |
 
 ## Phase 2 — Calibration + initial results (4-6 weeks, autonomous)
 
