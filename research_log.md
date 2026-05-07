@@ -570,3 +570,70 @@ register (re-categorized).
 **Dropped from v2**: 4-regime REIT comparison (E1+, E2+),
 multi-property x_other, hedge channel via corr(iota, eps),
 service-asset wedge framing.
+
+## 2026-05-07 — v4 solver implemented: 6D state extension (Path B Option 1)
+
+**Action picked**: implement `src/vfi_solver_v4.jl` — the full 6D state extension
+per `handoff/tau_buy_option1_spec.md` (P0 step 2). This is the highest-priority
+auto-allowed action in `next_actions.md`.
+
+**Why this action**: the v3 hedge mechanism was empirically dead (mean_xB=0 at
+ell=A) because the v3 kappa rule correction plus Option 3 tau_buy approximation
+only penalised E1_2L at relocation — it gave E2_2L no per-period incentive to
+pre-hold x_B. Option 1 adds (x_A_prev, x_B_prev) as explicit state variables so
+that the tau_buy cost on each period's delta correctly incentivises incremental
+pre-holding. Expected hedge premium: p_relocate × tau_buy ≈ 0.06 × 0.025 =
+0.15% per unit per period — small but potentially compounding over a 40-year
+working life to 1-2% lifetime CEV.
+
+**Files created on branch `auto/2026-05-07-option1-v4-solver`**:
+
+- `src/vfi_solver_v4.jl` (~730 LOC): complete 6D VFI solver with:
+  1. **6D state** `(t, w, z, ell, x_A_prev, x_B_prev)` — new x_prev grid
+     `{0.0, 0.75, 1.5}` at N_X_PREV=3 (env-var configurable).
+  2. **Per-period tx_cost** formula `tau_buy*max(Δx,0) + tau_sell_x*max(-Δx,0)`:
+     - E1_2L: `tau_sell_x = tau_sell = 6%` (property sale cost)
+     - E2_2L: `tau_sell_x = tau_token = 1%` (token sale cost)
+     Forced relocation sale in E1_2L handled automatically: at loc B after
+     relocation from A, x_A_new=0 forced (admissibility), triggering
+     `tau_sell × x_A_prev` as tx_cost in that t+1 period's budget.
+  3. **No sell_factor** in continuation value (clean break from v3 approximation):
+     portfolio returns are received in full; tx_cost charged at choice time.
+  4. **4D linear interpolation** `interp_4d_v4` over (w, z, x_A_prev, x_B_prev)
+     — 16-corner hypercube — for the continuation value lookup.
+  5. **Corrected kappa rule** (from v3 fix): `kappa = rho - x_ell_local*(rho-m)`,
+     only the occupied-location token saves rent; non-occupied earns cap-gain only.
+  6. **Reduced grids** per spec: N_W=15, N_Z=5 (compensate 9× state expansion);
+     net ~4.6× compute vs v3 baseline (~2-3h per regime on server1).
+  7. **Smoke test** `smoke_test_v4()` — all checks without VFI:
+     - sigma decomposition invariant
+     - 6D array shape and memory (~4.3 MB for default grids)
+     - tx_cost spot-checks (buy, sell, round-trip, no-change)
+     - interp_1d_bracket interior bracket
+     - terminal slice x_prev-invariance
+     - housing_cost kappa rule
+     - p_relocate boundary checks
+
+- `scripts/run_option1_e1.sh`: server1 run script for E1_2L baseline.
+- `scripts/run_option1_e2.sh`: server1 run script for E2_2L baseline with
+  inline CEV computation instructions.
+
+**Design decisions made**:
+- x_prev grid: `range(0.0, x_prev_max; length=n_x_prev)` uniform, default
+  `{0.0, 0.75, 1.5}`. Alternative `{0.0, 0.5, 1.0}` also works (set
+  `X_PREV_MAX=1.0`). The 1.5 max allows E2_2L over-unit token holdings.
+- E1_2L admissibility in 6D: x_{ell'}_prev can be non-zero (e.g., after
+  relocation carrying x_A_prev=1 to loc B). Solver forces x_{ell'}_new=0
+  in the choice enumeration; tx_cost formula correctly charges the forced sale.
+- Continuation value: no need to split wealth by relocation outcome (unlike v3)
+  because all assets are "carried" at their full gross return. The sell/buy
+  transaction cost is charged in the NEXT period when the household rebalances.
+
+**Next queued (server1 required)**:
+- Run `julia src/vfi_solver_v4.jl --smoke-test` (fast, no Julia simulation)
+- Run `bash scripts/run_option1_e1.sh` (~2-3h)
+- Run `bash scripts/run_option1_e2.sh` (~2-3h)
+- Record output to `output/diagnostics/p6_option1_{e1,e2}.json`
+- Compute CEV and check H1/H2/H3 hypotheses
+
+**Feature branch**: `auto/2026-05-07-option1-v4-solver`.

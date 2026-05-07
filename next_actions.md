@@ -1,81 +1,79 @@
-# Next Actions (v3 — post mobility-hedge pivot)
+# Next Actions (Path B Option 1 in flight)
 
 Project: sto_lifecycle_portfolio
-Updated: 2026-05-01 (full pivot)
+Updated: 2026-05-07
 
-## Phase 0 — Design and pivot (this week)
+## ⭐ P0 — Option 1 full state extension (USER CHOSE B, OPTION 1)
 
-| Priority | Action | Auto allowed? | Owner | Done artifact |
-|---|---|---|---|---|
-| DONE | Pivot memo | yes | claude | `question/pivots/2026-05-01_full_pivot_to_mobility_hedge.md` |
-| DONE | Bellman v3 design | yes | claude | `~/Library/.../wiki/research-ideas/tokenized-housing-mobility-hedge-bellman.md` |
-| DONE | Rewrite `main_question.md` | yes | claude | `question/main_question.md` v3 |
-| P0 | Scheduled agent setup for autonomous Phase 1 progression | yes | claude | `/schedule` config |
-| P0 | (H1') Confirm new title and abstract framing | no | human | reply |
-| P0 | (H2') Approve calibration anchors: PSID mobility, NAR transaction costs, Case-Shiller MSA correlations | no | human | reply with data sources |
+User confirmed 2026-05-02: proceed with full state extension for
+proper tau_buy hedge mechanism. See spec: `handoff/tau_buy_option1_spec.md`.
 
-## Phase 1 — Solver v3 implementation (4-6 weeks, autonomous)
-
-| Priority | Action | Auto allowed? | Notes |
+| Step | Action | Owner | Status |
 |---|---|---|---|
-| P1 | Extend v2 solver to 2-location state: add `ell_t in {A, B}` | yes | Add 4-D state grid (t, w, z, ell) |
-| P1 | Add stochastic relocation shock with age-dependent `p_relocate(t)` | yes | PSID-anchored |
-| P1 | Add transaction-cost block: `tau_sell` (NAR ~6%), `tau_buy` (~2-3%), `tau_token` (~0.5-2%) | yes | env-var params |
-| P1 | Implement E0, E1_2L, E2_2L regimes | yes | Drop E1+, E2+, E2plusTOK, E2plusBOTH |
-| P1 | Add location-correlated returns: `R_A`, `R_B` with shared `eta_div` and idio `iota_A`, `iota_B` (corr `rho_AB`) | yes | Case-Shiller anchored |
-| P1 | Smoke test at small grids; verify NaN/Inf clean and feasibility | yes | Same as P1a in old plan |
+| 1 | Open new branch `auto/2026-05-07-option1-v4-solver` | cloud agent | **DONE 2026-05-07** |
+| 2 | Create `src/vfi_solver_v4.jl`: 6D state + tx_cost on deltas + smoke test | cloud agent | **DONE 2026-05-07** |
+| 3 | `N_X_PREV=3`, `N_W=15`, `N_Z=5`; `smoke_test_v4()` via `--smoke-test` | cloud agent | **DONE 2026-05-07** |
+| 4 | `scripts/run_option1_e1.sh` + `run_option1_e2.sh` created | cloud agent | **DONE 2026-05-07** |
+| 5 | Smoke test on server1: `julia src/vfi_solver_v4.jl --smoke-test` | **USER** | pending |
+| 6 | E1_2L baseline: `bash scripts/run_option1_e1.sh` (~2-3h) | **USER** | pending |
+| 7 | E2_2L baseline: `bash scripts/run_option1_e2.sh` (~2-3h) | **USER** | pending |
+| 8 | CEV + H1/H2/H3 check + decomposition write-up | **USER** | pending |
 
-## Phase 2 — Calibration + initial results (4-6 weeks, autonomous)
+## Hypotheses to test after step 7
 
-| Priority | Action | Auto allowed? | Notes |
-|---|---|---|---|
-| P2 | Empirical anchors document: PSID mobility, NAR costs, Case-Shiller correlations | yes | `docs/calibration_v3.md` |
-| P2 | Run baseline calibration: medium-mobility, medium-cost, medium-correlation | yes | One canonical run |
-| P2 | Compute `CEV(E2_2L vs E1_2L)` headline | yes | Decompose into avoided-tx and maintained-hedge channels |
-| P2 | Sensitivity: `(p_relocate, tau_sell, rho_AB)` 3-D grid | yes | ~9-27 runs |
+- **H1**: `mean_xB > 0` at ell=A in E2_2L (hedge mechanism genuinely activates with 6D state)
+- **H2**: `CEV(E2_2L_v4 vs E1_2L_v4) > 4.255%` (exceeds Option 3 baseline)
+- **H3**: Hedge channel `CEV(E2_2L_v4 vs E2_2L_v3)` ≈ 0.5-1.5% (marginal v4 contribution)
 
-## Phase 3 — Referee + iteration (2-3 weeks)
+If H1+H2+H3 all hold: RFS-credible. Continue to Phase 2 (calibration,
+sensitivity, manuscript prep).
 
-| Priority | Action | Auto allowed? | Notes |
-|---|---|---|---|
-| P3 | Round 4 sub-agent referee on new framing | yes | Spawn after Phase 2 results |
-| P3 | Triage and address findings | mixed | Auto for tractable; human for redirection |
-| P3 | Round 5 referee after iteration | yes | If applicable |
+If any fails: fall back to Path D (REE/JHE) at +4.26% with two
+cleanly-decomposed channels (continuous-x + tx-cost-avoidance).
 
-## Phase 4 — Manuscript (4-6 weeks)
+## DONE — History to date
 
-| Priority | Action | Auto allowed? | Notes |
-|---|---|---|---|
-| P4 | (H3') Final framing approval | no | human at writing kickoff |
-| P4 | Writing kickoff per `02_workflows/writing_kickoff_deep_interview.md` | mixed | Auto-drafted, human-approved |
-| P4 | Paragraph cowrite per `02_workflows/paper_cowrite.md` | mixed | Standard framework |
+| Status | Action |
+|---|---|
+| DONE | v3 solver (4D state, 881 LOC) — cloud fire 2026-05-01 |
+| DONE | Smoke test v3 on server1 |
+| DONE | Reduced + full-grid v3 baselines |
+| DONE | Round 4 referee — MAJOR REVISION with credit |
+| DONE | Channel decomposition under OLD kappa → kappa rule fix |
+| DONE | Fixed kappa + p_relocate sweep → hedge dead in v3 |
+| DONE | Path B Option 3 (tau_buy approximation): CEV=+4.255%, mean_xB=0 |
+| DONE | Merged fix + Option 3 into main (commit 186da13) |
+| DONE | Option 1 spec written: `handoff/tau_buy_option1_spec.md` |
+| DONE | v4 solver implemented (this fire 2026-05-07) |
 
-## Phase 5 — Submission
+## P1 (after Option 1 hypothesis tests resolve)
 
-| Priority | Action | Owner |
-|---|---|---|
-| P5 | Referee audit per `02_workflows/referee_audit.md` | claude/human |
-| P5 | (H4') Submission decision | human |
+| Priority | Action |
+|---|---|
+| P1 | Sensitivity sweep: `rho_AB ∈ {0, 0.25, 0.5, 0.75, 0.95}` on best v4 |
+| P1 | Sensitivity: `p_relocate ∈ {0, 0.06, 0.12, 0.30}` on best v4 |
+| P1 | Asymmetric robustness (`mu_A != mu_B`, `p_AB != p_BA`) |
+| P1 | Mortgage activation (`ltv_max ∈ {0.5, 0.8}`) |
+| P1 | Liu/YZ/Cocco/KMW comparison table |
+| P2 | If Option 1 successful: writing kickoff (H3' approval needed) |
 
-## Current Gate
+## Cleanup queue
 
-Gate: Phase 0 completion + scheduled agent active.
+- 5 redundant `auto/` branches from overnight cron (2026-05-01/02) — delete after Option 1 confirms direction
+- Cron tuned: `0 */6 * * *` (every 6h)
 
-Autonomy level: A2_ANALYZE (solver design + implementation can proceed
-autonomously; human gates at Phase 0 H1'/H2' confirmation, Phase 4
-H3', Phase 5 H4').
+## Cloud routine
 
-## Parking Lot
+- Cron: `0 */6 * * *`
+- **Option 1 steps 1-4 DONE** — next auto action: P1 sensitivity (after user runs steps 5-8)
+- If user has not yet run steps 5-8 by next fire, cloud agent should proceed to P1 prep work
+  (e.g., write `docs/calibration_v3.md` empirical anchors doc)
 
-- Information-asymmetry extension (deferred to companion paper)
-- Tax-wedge extension (deferred to companion paper)
-- Default option / mortgage limited-recourse (deferred)
-- Reversible relocation (robustness; first-cut is one-time)
-- N-location structure (robustness; first-cut is 2-location)
+## Human gates
 
-## Retired (from v2)
-
-- 4-regime REIT-comparison structure
-- Multi-property x_other extension
-- Hedge channel via corr(iota, eps)
-- "Service-asset wedge" / "service-rights coupling" framing
+- (H1') Title — defer
+- (H2') Calibration anchor approval — defer (PSID/NAR/Case-Shiller anchors)
+- (H3') Framing approval at writing kickoff — defer
+- (H4') Submission decision — defer
+- B/C/D decision DONE 2026-05-01 → chose B
+- B Option 1 vs Option 3 decision DONE 2026-05-02 → Option 1
