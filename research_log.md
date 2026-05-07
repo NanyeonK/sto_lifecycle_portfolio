@@ -991,3 +991,69 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-05-07 — v4 solver: 6D state extension (Option 1) implemented
+
+**Action picked**: P0 from `next_actions.md` — create `src/vfi_solver_v4.jl`
+with full state extension `(t, w, z, ell, x_A_prev, x_B_prev)` per
+`handoff/tau_buy_option1_spec.md`.
+
+**Why this action**: Option 1 is the sole P0 item in `next_actions.md`. User
+approved this on 2026-05-02 as the mechanism-test that could resurrect the
+cross-location hedge channel. All human gates (H1'–H4') are deferred; no
+blockers.
+
+**Six key implementation decisions**:
+
+1. **6D state**: arrays shaped `(T, N_W, N_Z, 2, N_X_PREV, N_X_PREV)`.
+   Default N_X_PREV=3, N_W=15, N_Z=5; net state-space ~4.6× v3 baseline
+   (spec target). Estimated ~2–3 h/regime on server1.
+
+2. **tx_cost per period on deltas**:
+   ```julia
+   tx_cost = tau_buy   * (max(xA_new-xA_prev,0) + max(xB_new-xB_prev,0))
+           + tau_token * (max(xA_prev-xA_new,0) + max(xB_prev-xB_new,0))
+   ```
+   Budget: `c + kappa + x_A_new + x_B_new + tx_cost + b + s = w`.
+
+3. **Carry rules** (regime-dependent):
+   - E2_2L: tokens portable → `(x_A_carry, x_B_carry) = (x_A_new, x_B_new)`
+     regardless of whether the household stays or relocates.
+   - E1_2L staying: `(x_ell_new, 0)`.
+   - E1_2L relocating: forced sale via `sell_factor` in wealth transition;
+     carry = `(0, 0)`. Household arrives at new location with no prior
+     holdings, so buying at new location incurs full `tau_buy*1`.
+
+4. **4D interpolation** `interp_4d_v4`: bilinear in `(w, z, x_A_carry, x_B_carry)`;
+   2^4 = 16 corners; slices a `(n_w, n_z, n_xp, n_xp)` view per ell from
+   the 5D next_value_slice.
+
+5. **E2_2L choice grid**: independent 1D grids for `x_A_new` and `x_B_new`
+   (not the v3 `X_total + alpha` parameterization). This allows asymmetric
+   choices (e.g., x_A=0 while x_B=0.5) which is the hedge mechanism.
+
+6. **Smoke test** `smoke_test_v4()`: verifies struct shape, 6D array
+   allocation, tx_cost spot-checks (5 cases), carry-rule assertions,
+   housing_cost spot-checks, shock block, sigma decomposition, and
+   memory/compute estimates. VFI NOT run (cloud env has no Julia).
+
+**File created**: `src/vfi_solver_v4.jl` (934 LOC).
+**v3 preserved**: `src/vfi_solver_v3.jl` unchanged (v3 Option 3 baseline
+at +4.255% is the comparison point).
+
+**Feature branch**: `auto/2026-05-02-option1-state-extension`
+
+**Hedge mechanism expected to activate because**:
+Pre-holding x_B at ell=A pays `tau_buy * delta` incrementally each period.
+On relocation to B, x_B_carry = x_B_new (E2_2L: tokens portable), so the
+household arrives at B with x_B_prev > 0 and pays less tau_buy to reach
+desired x_B level. Expected premium per unit per period: `p_relocate * tau_buy
+≈ 0.06 * 0.025 = 0.0015`. Over a lifecycle with repeated relocation this can
+accumulate to ~0.5–1.5% CEV above Option 3.
+
+**Next queued** (Steps 5–7 in `next_actions.md` P0 table; require server1):
+- Step 5: run `julia src/vfi_solver_v4.jl --smoke-test` on server1.
+- Step 6: run E1_2L_v4 + E2_2L_v4 baselines; produce
+  `output/diagnostics/p6_option1_e*.json`.
+- Step 7: compute `CEV(E2_2L_v4 vs E1_2L_v4)` and channel decomposition.
+  Check hypotheses H1 (mean_xB > 0), H2 (CEV > 4.255%), H3 (hedge channel ≈ 0.5–1.5%).
+
