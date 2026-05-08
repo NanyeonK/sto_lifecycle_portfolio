@@ -991,3 +991,78 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-05-08 — v4 solver (6D state, Option 1 full state extension)
+
+**Action picked**: P0 from `next_actions.md` — create `src/vfi_solver_v4.jl`
+with full state extension per `handoff/tau_buy_option1_spec.md`.
+
+**Motivation**: v3 hedge mechanism was empirically dead at all tested
+p_relocate values because tau_buy was applied as a lump sum at relocation
+with no per-period state tracking. The Option 1 spec requires tracking
+`(x_A_prev, x_B_prev)` as state so that per-period positive deltas incur
+tau_buy, creating a genuine incentive to pre-accumulate x_B tokens before
+relocation. Expected hedge premium per unit x_B pre-held:
+`p_relocate * tau_buy ≈ 0.06 * 0.025 = 0.0015` per year.
+
+**What was implemented** (`src/vfi_solver_v4.jl`, ~530 LOC):
+
+1. **6D state**: `(t, w, z, ell, ix_A_prev, ix_B_prev)`. `ix_A_prev` and
+   `ix_B_prev` are integer indices into a coarse `x_prev` grid of size
+   `N_X_PREV=3` (default: `{0.0, 0.75, 1.5}` with `X_PREV_MAX=1.5`).
+
+2. **Per-period tx_cost on x deltas**:
+   ```
+   tx_cost = tau_buy   * (max(dA,0) + max(dB,0))
+           + tau_token * (max(-dA,0) + max(-dB,0))
+   ```
+   where `dA = x_A_new - x_A_prev`, `dB = x_B_new - x_B_prev`.
+   This replaces v3's lump-sum approximation at relocation.
+
+3. **Budget identity updated**: `c + kappa + b + s + x_A + x_B + tx_cost = w`.
+   `x_prev` state snapped to grid after each choice via `snap_to_xprev()`.
+
+4. **E1_2L**: binary tenure unchanged — no token-delta tx_cost within regime
+   (physical-unit admissibility). Forced-sale tau_sell at relocation preserved
+   via sell_factor (identical to v3). E1_2L x_prev state tracks zero holdings
+   (non-token regime has no persistent token position).
+
+5. **E0 and E2_2L**: E0 unchanged (no housing). E2_2L gets full per-period
+   tx_cost on both x_A and x_B deltas — this is the mechanism.
+
+6. **Continuation value**: next-period 6D slice indexed by `(ix_A_snap, ix_B_snap)`
+   passed as a closure `next_value_fn`. The inner quadrature loop is still
+   O(Q × n_w × n_z) — no additional quadrature dimension.
+
+7. **Summary**: reports at `ix_A_prev=1, ix_B_prev=1` (zero prior holdings =
+   initial period t=1 entry state), matching v3 comparison baseline.
+
+8. **Smoke test** (`--smoke-test`): 6D array allocation + memory check,
+   tx_cost spot-checks (buy, sell, mixed, no-rebalance), snap_to_xprev,
+   housing_cost rules, terminal slice, shock block. No VFI run.
+
+9. **Run scripts**: `scripts/run_option1_e1.sh` and `scripts/run_option1_e2.sh`
+   with all env vars set to Option 1 spec defaults.
+
+**Grid sizing**: `N_W=15, N_Z=5, N_X_PREV=3` → 6D array per policy:
+`57 × 15 × 5 × 2 × 3 × 3 = ~77k elements = ~0.6 MB`. Total memory
+(7 policy arrays) ≈ 4 MB — well within server1 budget.
+
+**Compute estimate**: ~4.6x v3 per regime at small grids → ~15-30 min
+wall single-thread. Full grids: ~2-3 hours. VFI not run in cloud env.
+
+**Feature branch**: `auto/2026-05-02-option1-state-extension`.
+
+**Files created / modified**:
+- `src/vfi_solver_v4.jl` (new, ~530 LOC)
+- `scripts/run_option1_e1.sh` (new)
+- `scripts/run_option1_e2.sh` (new)
+- `next_actions.md` (steps 1-4 marked DONE; server1 run commands added)
+- `research_log.md` (this entry)
+
+**Next queued** (server1, user/me):
+1. `julia src/vfi_solver_v4.jl --smoke-test`  (~5 s, no VFI)
+2. `bash scripts/run_option1_e1.sh`  (E1_2L baseline)
+3. `bash scripts/run_option1_e2.sh`  (E2_2L baseline)
+4. Compute `CEV(E2_2L_v4 vs E1_2L_v4)` — if mean_xB > 0 and CEV > 4.255%,
+   hedge mechanism is confirmed alive under Option 1.
+
