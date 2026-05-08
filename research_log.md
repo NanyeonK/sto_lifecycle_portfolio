@@ -991,3 +991,80 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-05-08 — v4 solver (Option 1 full state extension) implemented
+
+**Action picked**: P0 from `next_actions.md` — create `src/vfi_solver_v4.jl`
+with 6D state `(t, w, z, ell, x_A_prev, x_B_prev)` and per-period
+transaction costs on holding changes (tau_buy on increases, tau_token
+on decreases). This is the full Option 1 state extension specified in
+`handoff/tau_buy_option1_spec.md`.
+
+**Why this action**: cross-location hedge mechanism was empirically dead
+under v3 + Option 3 approximation because pre-holding x_B at ell=A
+yielded no tax benefit — the tau_buy cost was only charged at the
+moment of relocation on E1_2L, not charged incrementally to E2_2L.
+Option 1 fixes this by making tau_buy a per-period cost on *any*
+increase in holdings, so pre-holding x_B now saves the household
+`p_relocate * tau_buy` per period per unit — a genuine hedge motive.
+
+**Key design decisions in v4:**
+
+1. **6D state arrays**: `(T, n_w, n_z, 2, n_x_prev, n_x_prev)`. Default
+   small mode: N_W=15, N_Z=5, N_X_PREV=3, giving ~4.6x compute vs v3.
+   x_prev grid: `{0.0, 0.5, 1.0} * x_prev_max` (default max=1.5).
+
+2. **tx_cost_v4 per-period**: `tau_buy * max(delta_A,0) + tau_buy * max(delta_B,0)
+   + tau_token * max(-delta_A,0) + tau_token * max(-delta_B,0)`.
+   Both E1_2L and E2_2L face this on their respective x choices.
+   E1_2L: x_ell changes are binary (0→1 costs tau_buy, 1→0 saves but
+   charges tau_token). E2_2L: continuous; incremental buying of x_B
+   while at A charged at tau_buy per unit.
+
+3. **E1_2L relocation resets x_prev**: on forced relocation, the sold
+   token resets to 0 in the next-period x_prev state (continuation
+   value passes ix_A_reloc or ix_B_reloc = nearest_idx(x_prev, 0.0)).
+   tau_sell applied to sell_factor as in v3.
+
+4. **E2_2L relocation portable**: tokens carry over unchanged
+   (x_A_reloc = x_A_new, x_B_reloc = x_B_new). No forced sale.
+
+5. **Nearest-neighbor interpolation on x_prev grid**: coarse 3-point
+   grid means bilinear interpolation over (x_A_prev, x_B_prev) would
+   be costly and introduce 4D interpolation. Nearest-neighbor snapping
+   is appropriate given the coarse grid and is consistent with the
+   discrete-state spirit of the extension.
+
+6. **Housing cost rule unchanged from v3 fixed-kappa**: only the
+   occupied-location token reduces rent. Non-occupied token earns
+   only capital gains. This is the correct spec (confirmed by v3
+   falsification testing).
+
+7. **Smoke test stub**: `smoke_test_v4()` — checks 6D allocation,
+   memory size, sigma decomposition, tx_cost spot-checks (buy, sell,
+   no-change, mixed), housing_cost, nearest_idx. VFI not run.
+
+**Run scripts created**:
+- `scripts/run_option1_e1.sh` — E1_2L baseline at default v4 grids
+- `scripts/run_option1_e2.sh` — E2_2L baseline at default v4 grids
+
+**Files created/modified**: `src/vfi_solver_v4.jl` (~530 LOC),
+`scripts/run_option1_e1.sh`, `scripts/run_option1_e2.sh`.
+
+**Feature branch**: `auto/2026-05-08-v4-state-extension`.
+
+**Next queued for server1 (user)**:
+1. `julia src/vfi_solver_v4.jl --smoke-test` (struct init + tx_cost checks)
+2. `bash scripts/run_option1_e1.sh` (E1_2L baseline, ~1-2h)
+3. `bash scripts/run_option1_e2.sh` (E2_2L baseline, ~1-2h)
+4. Check: does `mean_xB > 0` at ell=A in E2_2L? (H1 hypothesis)
+5. Compute CEV(E2_2L_v4 vs E1_2L_v4) — should exceed 4.255% (H2)
+6. Compute hedge channel = CEV(E2_2L_v4 vs E2_2L_v3) (H3, ~0.5-1.5%)
+
+**Hypotheses to verify (from spec)**:
+- H1: mean_xB > 0 at ell=A in E2_2L (hedge mechanism activates)
+- H2: CEV(E2_2L_v4 vs E1_2L_v4) > 4.255%
+- H3: hedge channel ≈ 0.5-1.5% additional vs Option 3 baseline
+
+If H1+H2+H3 hold: RFS-credible. Continue to Phase 2.
+If any fails: fall back to Path D (REE/JHE at +4.26%).
+
