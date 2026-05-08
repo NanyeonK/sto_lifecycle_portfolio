@@ -1,7 +1,7 @@
 # Next Actions (Path B Option 1 in flight, ASAP-tempered to 6h cron)
 
 Project: sto_lifecycle_portfolio
-Updated: 2026-05-08
+Updated: 2026-05-07 (cloud agent fire 16)
 
 ## ⭐ P0 — Option 1 full state extension (USER CHOSE B, OPTION 1)
 
@@ -12,25 +12,13 @@ proper tau_buy hedge mechanism.
 
 | Step | Action | Owner | Done artifact |
 |---|---|---|---|
-| 1 | Open new branch `auto/2026-05-02-option1-state-extension` | cloud agent | DONE — branch on origin |
-| 2 | Create `src/vfi_solver_v4.jl`: 6D state `(t, w, z, ell, x_A_prev, x_B_prev)` + tx_cost on deltas | cloud agent | DONE — `src/vfi_solver_v4.jl` (~530 LOC) |
-| 3 | Use coarse `x_prev` grid: `N_X_PREV=3` (e.g., {0, 0.5, 1.0}); reduce N_W=15, N_Z=5 to compensate | cloud agent | DONE — env-var configurable, defaults set |
-| 4 | Smoke test stub `smoke_test_v4()` checking 6D allocation, tx_cost computation, state update consistency | cloud agent | DONE — callable via `--smoke-test` |
+| 1 | Open new branch `auto/2026-05-02-option1-state-extension` | cloud agent | **DONE** branch on origin |
+| 2 | Create `src/vfi_solver_v4.jl`: 6D state `(t, w, z, ell, x_A_prev, x_B_prev)` + tx_cost on deltas | cloud agent | **DONE** `src/vfi_solver_v4.jl` (954 LOC; 4D bilinear interp) |
+| 3 | Use coarse `x_prev` grid: `N_X_PREV=3`, `X_PREV_MAX=2.0`; reduce N_W=15, N_Z=5 | cloud agent | **DONE** env-var configurable |
+| 4 | Smoke test stub `smoke_test_v4()` checking 6D allocation, tx_cost computation, state update consistency | cloud agent | **DONE** callable via `--smoke-test` |
 | 5 | Smoke test on server1 (USER) | user/me | `output/diagnostics/p6_option1_smoke.md` |
 | 6 | Run E1_2L_v4 + E2_2L_v4 baselines (USER) | user/me | `p6_option1_e*.json` |
 | 7 | Compute decomposition + write up | user/me | `p6_option1_decomposition.md` |
-
-**Run commands (server1):**
-```bash
-# smoke test first (~5 seconds, no VFI):
-julia src/vfi_solver_v4.jl --smoke-test
-
-# E1_2L baseline (~15-30 min, small grids):
-bash scripts/run_option1_e1.sh
-
-# E2_2L baseline (~15-30 min, small grids):
-bash scripts/run_option1_e2.sh
-```
 
 ## Hypotheses to test (after step 6)
 
@@ -60,16 +48,43 @@ If any fails: fall back to Path D (REE/JHE) at +4.26%.
 | DONE | E1_2L with tau_buy active: CEV(E2_2L vs E1_2L_full) = +4.255% |
 | DONE | Final Path B Option 3 verdict: continuous-x 3.4% + tx-cost 0.8% = 4.26% |
 
+## Phase 2 prep (cloud agent can do while server1 baselines pending)
+
+| Priority | Action | Status |
+|---|---|---|
+| P1-prep | `docs/calibration_v3.md` — PSID/NAR/Case-Shiller anchors | **DONE** 2026-05-03 |
+| P1-prep | `docs/sensitivity_grid_v4.md` — grid plan + expected patterns | **DONE** 2026-05-03 |
+| P1-prep | `docs/methods_v3.md` — update methods.md from v2 to v3/v4 spec | **DONE** 2026-05-04 |
+
+## Phase 2 prep — continued (cloud agent can do while baselines pending)
+
+| Priority | Action | Status |
+|---|---|---|
+| P1-prep | `docs/welfare_decomp_v4.md` — CEV formula, channel decomp plan, comparison table spec | **DONE** 2026-05-04 |
+| P1-prep | `paper/outline_v4.md` — section headings + contribution paragraph anchored to welfare_decomp_v4 | **DONE** 2026-05-05 |
+| P1-prep | `paper/sections/s2_model.tex` — complete LaTeX model section (13 subsections, 2 tables, all equations) | **DONE** 2026-05-05 (fire 10) |
+
+## Phase 2 prep — next fallbacks (cloud agent, no server1 needed)
+
+| Priority | Action | Status |
+|---|---|---|
+| P1-prep | `paper/sections/s3_calibration.tex` — Table 1 + parameter sources from calibration_v3.md | **DONE** 2026-05-06 (fire 12) |
+| P1-prep | `paper/sections/s1_intro.tex` — introduction skeleton + related literature | **DONE** 2026-05-06 (fire 13) |
+| P1-prep | `paper/sections/s4_results.tex` — results section skeleton with table shells | **DONE** 2026-05-07 (fire 16) |
+| P0-primary | `output/diagnostics/p6_option1_decomposition.md` — CEV decomp once server1 JSONs land | blocked (server1) |
+| P1-prep | `paper/sections/s5_discussion.tex` — discussion + Liu comparison skeleton | queued (next fallback) |
+
 ## P1 (after Option 1 resolves)
 
-| Priority | Action |
-|---|---|
-| P1 | Sensitivity sweep: rho_AB ∈ {0, 0.25, 0.5, 0.75, 0.95} on best v4 |
-| P1 | Sensitivity: p_relocate ∈ {0, 0.06, 0.12, 0.30} on best v4 |
-| P1 | Asymmetric robustness (mu_A != mu_B, p_AB != p_BA) |
-| P1 | Mortgage activation (ltv_max ∈ {0.5, 0.8}) |
-| P1 | Liu/YZ/Cocco/KMW comparison table |
-| P2 | If Option 1 successful: writing kickoff |
+| Priority | Action | Script | Status |
+|---|---|---|---|
+| P1 | Sensitivity sweep: rho_AB ∈ {0, 0.25, 0.5, 0.75, 0.95} | `scripts/sweep_rhoAB.sh` (v4, DONE) | awaiting baselines |
+| P1 | Sensitivity: p_relocate ∈ {0, 0.02, 0.06, 0.12} | `scripts/sweep_prelocate.sh` (v4, DONE) | awaiting baselines |
+| P1 | Transaction-cost sweep: tau_buy ∈ {0, 2.5%, 4%, 6%} | `scripts/sweep_txcost.sh` (v4, DONE) | awaiting baselines |
+| P1 | Asymmetric robustness (mu_A != mu_B, p_AB != p_BA) | — | queued |
+| P1 | Mortgage activation (ltv_max ∈ {0.5, 0.8}) | — | queued |
+| P1 | Liu/YZ/Cocco/KMW comparison table | — | queued |
+| P2 | If Option 1 successful: writing kickoff | — | blocked H3' |
 
 ## Cleanup queue (non-critical)
 
