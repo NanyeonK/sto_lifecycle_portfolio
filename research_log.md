@@ -991,3 +991,73 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-05-08 — v4 solver (6D state, Option 1) implemented
+
+**Action picked**: P0 Step 2-4 — implement `src/vfi_solver_v4.jl` with proper
+6D state extension and per-period transaction costs on x deltas.
+
+**Rationale**: Per `next_actions.md` P0 queue (user-confirmed 2026-05-02),
+this is the highest-priority unblocked auto-allowed action. Steps 1-4 are
+all cloud-agent owned; steps 5-7 require server1 (user).
+
+**What was implemented:**
+
+`src/vfi_solver_v4.jl` (~490 LOC) — complete VFI solver with:
+
+1. **6D state** `(t, w, z, ell, x_A_prev, x_B_prev)`:
+   - 6D value and policy arrays; 6D main VFI loop over (iw, iz, iell, ixA_prev, ixB_prev).
+   - Memory at N_W=15, N_Z=5, N_X_PREV=3: ≈ 57 × 15 × 5 × 2 × 3 × 3 × 8 bytes ≈ 600 KB per array.
+
+2. **x choices restricted to x_prev grid**: x_A_new and x_B_new are always
+   grid points {0.0, 0.5, 1.0} (N_X_PREV=3, X_PREV_MAX=1.0). This eliminates
+   interpolation in x_prev dimensions — continuation value is looked up at exact
+   grid indices `(ix_A_new, ix_B_new)` via direct array slicing, then bilinear
+   interp in (w, z) as usual.
+
+3. **Per-period transaction costs** (proper Option 1 formulation):
+   - E2_2L: `tx = tau_buy * pos_delta + tau_token * neg_delta` (each position)
+   - E1_2L: `tx = tau_buy * pos(d_ell) + tau_sell * neg(d_ell) + tau_sell * neg(d_ell')`
+     where d_ell' = 0 - x_ellp_prev (forced sell of non-occupied position after relocation).
+   - Budget: `c + kappa + (x_A_new + x_B_new) + tx_cost + b + s = w`
+
+4. **Fixed kappa rule** (occupied-location only, v3 bug fix carried forward):
+   - E1_2L: kappa = m if x_ell ≥ 1 else rho
+   - E2_2L: kappa = rho - x_ell_local × delta_own (x_ell_local = x_A if ell=A)
+
+5. **Wealth transition** simplified: no sell_factor (all costs in budget constraint).
+   `w_next = (b*R_b + s*R_s + x_A_new*R_A + x_B_new*R_B) / hp_next + y_next`
+
+6. **Smoke test** `smoke_test_v4()` via `--smoke-test` flag:
+   - 6D array allocation and shape assertions
+   - sigma decomposition invariant
+   - `tx_cost_e2` spot-checks (no-change=0, buy=tau_buy×delta, sell=tau_token×delta, mixed)
+   - `housing_cost_v4` spot-checks (E1 rent/own, E2 occupied-only kappa)
+   - `p_relocate_v4` boundary checks
+   - Terminal slice NaN/feasibility
+
+7. **Run scripts**: `scripts/run_option1_e1.sh` and `scripts/run_option1_e2.sh`
+   (E1_2L and E2_2L at spec-recommended grid settings; output to `output/diagnostics/`).
+
+**Economic mechanism now properly modeled:**
+- At ell=A, E2_2L household can choose x_B_new ∈ {0.0, 0.5, 1.0}, paying
+  tau_buy × Δx_B now to avoid paying tau_buy × x_B_new at future relocation.
+  Expected hedge premium per unit: p_relocate × tau_buy ≈ 0.06 × 0.025 = 0.15% per period.
+- E1_2L household at ell=B after relocation from A will find x_A_prev > 0,
+  and must set x_A_new = 0 (admissibility), paying tau_sell × x_A_prev in the
+  budget constraint that period. This correctly charges the forced sale at the
+  relocation event via state propagation (not approximated).
+
+**Branch**: `auto/2026-05-08-option1-state-extension`
+
+**Files modified/created**:
+- `src/vfi_solver_v4.jl` (new)
+- `scripts/run_option1_e1.sh` (new)
+- `scripts/run_option1_e2.sh` (new)
+- `next_actions.md` (steps 1-4 marked DONE)
+- `research_log.md` (this entry)
+
+**Next queued (server1, user-owned)**:
+- Run `julia src/vfi_solver_v4.jl --smoke-test` → log in `output/diagnostics/p6_option1_smoke.md`
+- Run `bash scripts/run_option1_e1.sh` and `bash scripts/run_option1_e2.sh`
+- Compute `CEV(E2_2L_v4 vs E1_2L_v4)` and check H1 (mean_xB > 0 at ell=A), H2 (CEV > 4.255%), H3 (hedge channel ≈ 0.5-1.5%)
+
