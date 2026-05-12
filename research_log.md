@@ -991,3 +991,92 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-05-12 — v4 solver implemented: Option 1 full 6D state extension
+
+**Action picked**: P0 Step 2-4 from Option 1 queue — implement
+`src/vfi_solver_v4.jl` with the full state extension
+`(t, w, z, ell, x_A_prev, x_B_prev)`. This is the highest-priority
+auto-allowed action in `next_actions.md` (user confirmed 2026-05-02).
+
+**Why this action**: v3 empirically showed the cross-location hedge
+(mean_xB > 0 at ell=A) is zero at all p_relocate values under the
+corrected kappa rule (2026-05-01 finding). The only remaining
+mechanism-saving route is Option 1: track x_prev as a state, charge
+tau_buy on positive deltas each period, so that pre-holding x_B at
+ell=A gives LITERAL tau_buy savings when the household relocates to B.
+The expected hedge premium per unit x_B: p_relocate * tau_buy ≈ 0.06
+* 0.025 = 0.15% per period, with lifetime CEV impact ~1-2%.
+
+**File created**: `src/vfi_solver_v4.jl` (~650 LOC).
+
+**Key design decisions**:
+
+1. **6D state** `(t, w, z, ell, ix_xA_prev, ix_xB_prev)`: value
+   function and all policy arrays are 6D. Default dims (small mode):
+   `(57, 15, 5, 2, 3, 3)` ≈ 14 MB for 7 Float64 arrays + 1 BitArray.
+
+2. **x_prev_grid**: `linspace(0, x_prev_max, n_x_prev)` = {0.0, 0.5,
+   1.0} by default (N_X_PREV=3, X_PREV_MAX=1.0). Choices for E2_2L
+   are RESTRICTED to x_prev_grid so that the next-period state
+   (x_A_prev', x_B_prev') = (x_A_new, x_B_new) is always on-grid.
+   This avoids interpolation in the x_prev dimension — index lookup
+   only, bilinear in (w, z) as before.
+
+3. **tx_cost formula** (per period, charged in budget):
+   ```
+   delta_A = x_A_new - x_A_prev;  delta_B = x_B_new - x_B_prev
+   tx_cost = tau_buy*(max(δA,0)+max(δB,0)) + tau_token*(max(-δA,0)+max(-δB,0))
+   ```
+   Applied every period for both E1_2L and E2_2L.
+
+4. **E1_2L x_prev state transition**:
+   - Stay at ell: x_prev' carries forward from choice.
+   - Relocate: x_prev' RESET to (0, 0) — forced sell already
+     captured by sell_factor = (1-tau_sell) in wealth transition.
+     This avoids double-counting the sell cost.
+   - At new location after relocation: x_ell'_prev = 0, so first buy
+     costs tau_buy * 1 (correct: sell at tau_sell, buy at tau_buy).
+
+5. **E2_2L x_prev state transition**:
+   - Tokens portable: x_prev' = x_new for BOTH stay and relocate.
+   - No sell_factor (sf = 1.0 always for E2_2L).
+
+6. **Corrected kappa rule** (from 2026-05-01 fix, carried forward):
+   ```
+   E2_2L: kappa = rho - x_ell_local_new * (rho - m)
+   ```
+   Only the occupied-location token saves rent; non-local token is
+   a pure financial asset (capital gains only).
+
+7. **Smoke test** (`--smoke-test` flag): structural checks only, no
+   full VFI. Tests: sigma decomposition, x_prev grid shape, 6D array
+   allocation (~14 MB), terminal slice, tx_cost algebra (4 cases),
+   housing_cost_v4 (5 spot-checks), p_relocate boundaries, shock
+   block weight sum, and ONE single-state mini-VFI step at tiny grids
+   to verify no crash.
+
+**Run scripts written**:
+- `scripts/run_option1_e1.sh` — E1_2L baseline
+- `scripts/run_option1_e2.sh` — E2_2L Option 1
+
+**Smoke test instructions and expected output**:
+- `output/diagnostics/p6_option1_smoke.md` (stub; run pending on server1)
+
+**Branch**: `auto/2026-05-12-option1-state-extension`
+
+**Estimated server1 wall time per regime** (N_W=15, N_Z=5, N_X_PREV=3):
+~2.5 hours single thread (4.6x v3 baseline as spec predicted).
+
+**Next P0 actions (user runs on server1)**:
+1. `julia src/vfi_solver_v4.jl --smoke-test` — smoke test (~10s)
+2. `bash scripts/run_option1_e1.sh` — E1_2L baseline
+3. `bash scripts/run_option1_e2.sh` — E2_2L Option 1
+4. Compute CEV and check mean_xB (hypothesis H1)
+
+**Hypothesis reminder**:
+- H1: mean_xB > 0 at ell=A in E2_2L (hedge activates)
+- H2: CEV(E2_2L_v4 vs E1_2L_v4) > 4.255% (v3 Option 3 baseline)
+- H3: hedge channel = CEV(E2_2L_v4 vs E2_2L_v3) ≈ 0.5-1.5%
+
+If H1+H2+H3 hold → RFS-credible. If fail → Path D (REE/JHE).
+
