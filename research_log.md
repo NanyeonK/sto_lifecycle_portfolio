@@ -991,3 +991,82 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-05-13 — v4 solver implemented (Option 1 full 6D state extension)
+
+**Action picked**: create `src/vfi_solver_v4.jl` — the full state extension per
+`handoff/tau_buy_option1_spec.md`. This is the P0 item in `next_actions.md`.
+
+**Why this action**: Option 3 (synthetic tau_buy applied at relocation) was merged
+to main on 2026-05-02 but showed mean_xB = 0 — the hedge mechanism remained dead
+because the household had no incentive to pre-hold x_B when buying cost was
+charged at relocation regardless. Option 1 fixes this by tracking x_A_prev and
+x_B_prev as explicit state variables, charging tau_buy only on POSITIVE deltas
+each period. Pre-holding x_B at ell=A now costs tau_buy upfront but saves tau_buy
+when arriving at B with x_B_prev > 0 (no additional buying cost needed).
+
+**Architecture**:
+- State: `(t, w, z, ell, x_A_prev, x_B_prev)` — 6D arrays
+- Controls: same as v3 but choices for E2_2L drawn from the x_prev grid
+  {0.0, 0.5, 1.0} (N_X_PREV=3, X_PREV_MAX=1.0); ensures exact grid-index
+  lookup in continuation value (no interpolation in x_prev dims).
+- Per-period transaction cost: `tx_cost = tau_buy * sum(max(delta,0)) + sell_fee * sum(max(-delta,0))`
+  where `sell_fee = tau_sell` (E1_2L traditional property, ~6%) or `tau_token`
+  (E2_2L token transfer, ~0.5%). This regime-dependent asymmetry is structurally
+  important: tokens are cheaper to sell than traditional property.
+- E1_2L relocation: sell_factor = (1-tau_sell) in wealth formula (forced sale cost);
+  x_prev reset to (0,0) in continuation value for the relocation branch (arriving
+  at new location with zero holdings, then paying tau_buy to buy).
+- E2_2L relocation: sell_factor = 1.0 (portable); x_prev carries over in
+  continuation value — tokens held at A are immediately "available" at B.
+
+**Hedge mechanism**: at ell=A, E2_2L household pre-holds x_B_new > 0. On relocation
+to B, x_B_prev > 0 at B → zero tau_buy needed to reach x_B target. Expected saving
+= p_reloc * tau_buy ≈ 0.06 * 0.025 = 0.0015 per unit per period. Whether this is
+large enough to activate given the upfront cost (tau_buy at purchase + no rent saving
+from x_B at ell=A) is the empirical question answered by the server1 runs.
+
+**Contrast with E1_2L**: at ell=A, E1_2L x_prev is always (0 or 1 for occupied,
+0 for other). On relocation, x_prev resets to (0,0). At B, household starts with
+x_B_prev=0 → must pay tau_buy * 1 to own at B. This is the buying-cost friction
+that tokens avoid by pre-holding.
+
+**Files created / modified**:
+- `src/vfi_solver_v4.jl` (928 LOC): complete 6D state solver.
+  Key new components vs v3:
+  - `GridSpec_v4` / `Grids_v4`: adds `n_x_prev`, `x_prev_max`, `x_prev` grid.
+  - `SolverResult_v4`: 6D arrays (T × N_W × N_Z × 2 × N_X_PREV × N_X_PREV).
+  - `tx_cost_v4()`: regime-dependent per-period transaction cost.
+  - `continuation_value_v4()`: takes `ix_A_stay`, `ix_B_stay`, `ix_A_reloc`,
+    `ix_B_reloc` for exact x_prev grid index lookup in 5D next-value slice.
+  - `solve_state_v4()`: loops over x_prev grid choices for E2_2L;
+    E1_2L binary cases with correct relocation reset logic.
+  - `solve_v4()`: 6D outer loop (adds ix_A, ix_B dims).
+  - `smoke_test_v4()`: checks 6D array shape, tx_cost spot-checks (5 cases),
+    housing_cost checks, shock block, x_prev grid consistency, hedge economics.
+- `scripts/run_option1_e1.sh`: E1_2L baseline run script with env-var overrides.
+- `scripts/run_option1_e2.sh`: E2_2L baseline run script with env-var overrides.
+
+**Smoke test (structural, no VFI)**:
+- 6D array allocation: (T=57, N_W=15, N_Z=5, 2, N_X_PREV=3, N_X_PREV=3) = ~5 MB per array
+- tx_cost checks: buy E2_2L ✓, sell E2_2L (tau_token) ✓, sell E1_2L (tau_sell) ✓,
+  no-change ✓, mixed buy/sell ✓
+- housing_cost fixed-kappa: E0 ✓, E1_2L own/rent ✓, E2_2L occupied-only ✓
+- x_prev grid [0.0, 0.5, 1.0]: first=0, last=x_prev_max, enumerate consistent
+- Hedge premium log: p_reloc * tau_buy ≈ 0.0015/unit/period (not a pass/fail)
+
+**NOT run** (cloud env lacks Julia; server1 queue):
+- Step 5 (smoke test on server1): `julia src/vfi_solver_v4.jl --smoke-test`
+- Step 6 (E1_2L + E2_2L VFI baselines): `bash scripts/run_option1_e1.sh` then
+  `bash scripts/run_option1_e2.sh` (each ~2.5h single thread)
+- Step 7 (decomposition + write-up): pending run results
+
+**Branch**: `auto/2026-05-02-option1-state-extension`
+
+**Next queued**:
+- User runs smoke test on server1 (Step 5).
+- User runs E1_2L and E2_2L baselines (Step 6).
+- Cloud agent: once JSON outputs appear, compute CEV decomposition + update
+  `output/diagnostics/p6_option1_decomposition.md`.
+- Hypotheses to test: H1 (mean_xB > 0 at ellA), H2 (CEV > 4.255%),
+  H3 (hedge channel ~0.5-1.5%).
+
