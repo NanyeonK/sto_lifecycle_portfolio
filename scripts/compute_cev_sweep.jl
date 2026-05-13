@@ -4,7 +4,7 @@
 # Usage:
 #   julia scripts/compute_cev_sweep.jl <outdir> <sweep_type>
 #
-# sweep_type in {rhoAB, prelocate, txcost}
+# sweep_type in {rhoAB, prelocate, txcost, mortgage}
 #
 # Reads pairs of E1_2L and E2_2L summary JSONs from <outdir>,
 # computes CEV at the midpoint state (iw_mid, iz_mid, ell=A),
@@ -68,8 +68,7 @@ function main()
 
     if sweep == "rhoAB"
         println("| rho_AB | V(E1_2L) | V(E2_2L) | CEV (%) | note |")
-        println("|--------|----------|----------|---------|------|")
-        for (val, tag) in [(0.00,"0p00"), (0.25,"0p25"), (0.50,"0p50"), (0.75,"0p75"), (0.95,"0p95")]
+        println("|--------|----------|----------|---------|------|")        for (val, tag) in [(0.00,"0p00"), (0.25,"0p25"), (0.50,"0p50"), (0.75,"0p75"), (0.95,"0p95")]
             row, err = cev_row(outdir, "E1_2L_rhoAB$(tag).json", "E2_2L_rhoAB$(tag).json")
             if row === nothing
                 println("| $(val) | — | — | — | $err |")
@@ -82,8 +81,7 @@ function main()
 
     elseif sweep == "prelocate"
         println("| p_reloc | V(E1_2L) | V(E2_2L) | CEV (%) | note |")
-        println("|---------|----------|----------|---------|------|")
-        for (val, tag) in [(0.00,"0p00"), (0.02,"0p02"), (0.06,"0p06"), (0.12,"0p12")]
+        println("|---------|----------|----------|---------|------|")        for (val, tag) in [(0.00,"0p00"), (0.02,"0p02"), (0.06,"0p06"), (0.12,"0p12")]
             row, err = cev_row(outdir, "E1_2L_preloc$(tag).json", "E2_2L_preloc$(tag).json")
             if row === nothing
                 println("| $(val) | — | — | — | $err |")
@@ -114,14 +112,28 @@ function main()
                         row.V_E1, row.V_E2, row.cev * 100)
             end
         end
+
+    elseif sweep == "mortgage"
+        println("| LTV_MAX | V(E1_2L) | V(E2_2L) | CEV (%) | note |")
+        println("|---------|----------|----------|---------|------|")        for (val, tag) in [(0.00,"0p00"), (0.50,"0p50"), (0.80,"0p80")]
+            row, err = cev_row(outdir, "E1_2L_ltv$(tag).json", "E2_2L_ltv$(tag).json")
+            if row === nothing
+                println("| $(val) | — | — | — | $err |")
+            else
+                note = val == 0.0 ? "no mortgage (baseline)" :
+                       val >= 0.75 ? "high leverage" : ""
+                @printf("| %.2f | %.2f | %.2f | %+.3f%% | %s |\n",
+                        val, row.V_E1, row.V_E2, row.cev * 100, note)
+            end
+        end
     else
-        error("Unknown sweep type '$sweep'. Use: rhoAB, prelocate, txcost")
+        error("Unknown sweep type '$sweep'. Use: rhoAB, prelocate, txcost, mortgage")
     end
 
     println()
-    println("_CEV = ((V_E2/V_E1)^(1/(1−γ)) − 1)×100.  State: midpoint (iw_mid, iz_mid, ell=A)._")
-    println("_tau_buy approximation: owner who relocates pays tau_buy deducted from relocation wealth._")
-    println("_E2_2L: tokens portable across moves — no tau_sell, no tau_buy at relocation._")
+    println("_CEV = ((V_E2/V_E1)^(1/(1−γ)) − 1)×100.  State: midpoint (iw_mid, iz_mid, ell=A, x_prev=0)._")
+    println("_v4 solver: tau_buy charged per-period on positive deltas (proper state extension)._")
+    println("_E2_2L: tokens portable across moves — no forced tau_sell at relocation._")
 end
 
 using Dates
