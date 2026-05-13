@@ -991,3 +991,84 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-05-13 — v4 solver (Option 1 full state extension) implemented
+
+**Action picked**: P0 from `next_actions.md` — create `src/vfi_solver_v4.jl`
+with proper 6D state extension so tau_buy is charged on per-period
+positive deltas, giving the household a genuine incentive to pre-accumulate
+x_B tokens at location A before relocation.
+
+**Why this is P0**: v3 Option 3 approximation applied tau_buy only at
+relocation event but did not track prior holdings — mean_xB stayed 0.
+Option 1 tracks x_A_prev and x_B_prev as state variables, so a household
+at ell=A who pre-holds x_B arrives at B with x_B_prev > 0 next period,
+paying tau_buy only on any additional increment (not the full unit). This
+is the proper hedge-savings mechanism.
+
+**File created**: `src/vfi_solver_v4.jl` (916 LOC) on branch
+`auto/2026-05-13-option1-state-extension`.
+
+**Key design decisions**:
+
+1. **6D state**: `(t, w, z, ell, x_A_prev, x_B_prev)`. Value function and
+   all policy arrays are 6D. At default grids (N_W=15, N_Z=5, N_X_PREV=3):
+   total state points per period = 15 * 5 * 2 * 3 * 3 = 1350 vs v3's
+   294 → 4.6x compute factor as estimated in spec.
+
+2. **x_prev grid**: `N_X_PREV=3`, `X_PREV_MAX=1.0` → `{0.0, 0.5, 1.0}`.
+   Choice variables x_A_new / x_B_new are restricted to this grid, enabling
+   exact index lookup in the next period's value function (no interpolation
+   in x dimension).
+
+3. **tx_cost_v4()**: per-period transaction cost on delta positions.
+   `tau_buy * (max(Δ_A,0) + max(Δ_B,0)) + tau_token * (max(-Δ_A,0) + max(-Δ_B,0))`.
+   Charges tau_buy=2.5% on buying, tau_token=0.5% on token sells.
+
+4. **Continuation-value relocation state update** — the structural novelty:
+   - E2_2L (tokens portable): next x_prev = (ix_A_new, ix_B_new) regardless
+     of relocation. Pre-held x_B at A arrives intact at B.
+   - E1_2L (forced sale): next x_prev = (1, 1) = (0.0, 0.0) after
+     relocation. Household arrives bare at new location, must pay tau_buy
+     fresh next period.
+   This asymmetry is what gives E2_2L genuine option value for pre-holding
+   the non-occupied location token.
+
+5. **E1_2L admissibility**: binary x_ell ∈ {0, 1} (indices 1 and Nx of
+   x_prev grid); x_{ell'} = 0 forced. Only two cases enumerated in state
+   solver (rent vs own).
+
+6. **E2_2L**: all 9 (ix_A, ix_B) combinations from the 3-point grid.
+
+7. **Fixed kappa rule** (from fix/2026-05-01): only occupied-location token
+   reduces rent. `kappa = rho - x_ell * (rho - m)`.
+
+8. **Smoke test stub** (`smoke_test_v4()`): tests sigma decomposition,
+   tx_cost spot-checks (buy / sell / no-change / mixed), housing_cost_v4
+   spot-checks, 6D array allocation, terminal slice, p_relocate boundary,
+   memory estimate, and compute-factor vs v3 estimate. No VFI run.
+   Call: `julia src/vfi_solver_v4.jl --smoke-test`.
+
+**Run scripts created**:
+- `scripts/run_option1_e1.sh` — E1_2L baseline at v4 settings
+- `scripts/run_option1_e2.sh` — E2_2L baseline at v4 settings
+
+**Preserved from v3**: income profile, GH quadrature (7D, 3^7=2187 points),
+bilinear (w,z) interpolation, housing return decomposition
+(sigma_div / sigma_iota / rho_AB Cholesky), all calibration defaults.
+
+**NOT run** (server1 required per compute discipline):
+- `julia src/vfi_solver_v4.jl --smoke-test`
+- E1_2L and E2_2L full baseline runs
+- CEV decomposition
+
+**Next actions** (all server1, queued for user):
+1. `julia src/vfi_solver_v4.jl --smoke-test`
+2. `bash scripts/run_option1_e1.sh`
+3. `bash scripts/run_option1_e2.sh`
+4. Check H1: `mean_xB > 0 at ellA` (hedge activates)
+5. Compute `CEV(E2_2L_v4 vs E1_2L_v4)` (should exceed 4.255% Option 3 baseline)
+6. Compute hedge channel = `CEV(E2_2L_v4 vs E2_2L_v3)` (expected 0.5-1.5%)
+
+If H1+H2+H3 hold: RFS-credible. If not: fallback to Path D (REE/JHE).
+
+**Branch**: `auto/2026-05-13-option1-state-extension`
