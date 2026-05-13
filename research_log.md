@@ -1706,3 +1706,156 @@ No new solver code added (remote is more complete).
 **Next queued**:
 - Primary: server1 run steps 5–7 (blocked on user).
 - Fallback: `paper/sections/s5_discussion.tex` — discussion skeleton.
+
+## 2026-05-12 — Fire 18: s5_discussion.tex written
+
+**Action**: wrote `paper/sections/s5_discussion.tex` (~399 LOC) per
+fire-17 queued fallback. Sections: Liu (2021) head-to-head comparison,
+pre-buying hedge geometry, REIT vs token mechanism, literature summary
+table, robustness discussion, limitations, policy implications.
+No research_log entry was appended at fire time (log update deferred).
+
+## 2026-05-12 — Fire 19: s6_conclusion.tex + paper/main.tex
+
+**Orientation**: merged remote fire-18 state (commit 875574e). All
+cloud-auto-allowed work through s5_discussion.tex confirmed complete:
+v4 solver (954-LOC canonical, 4D multilinear interpolation), Phase 2 prep
+docs (calibration_v3.md, methods_v3.md, sensitivity_grid_v4.md,
+welfare_decomp_v4.md), paper sections s1–s5. Server1 baselines (steps 5–7)
+still pending (blocked on user).
+
+NOTE: this fire initially drafted a 520-LOC snap-to-grid v4 solver before
+discovering the remote already has the canonical 954-LOC version. The
+local commit was discarded; remote state accepted per fire-17 precedent.
+
+**Action picked**: next auto-allowed fallback — write
+`paper/sections/s6_conclusion.tex` (not yet in repo; outlined in
+paper/outline_v4.md §6) and `paper/main.tex` (master compilation driver).
+
+**s6_conclusion.tex** (~110 LOC): four-paragraph structure per outline §6:
+
+1. Opening: model overview, headline CEV [P]% at baseline,
+   6D state tracking enables forward-looking pre-buying motive.
+
+2. Decomposition: avoided-tx channel ([P]%) vs pre-buying hedge
+   channel ([P]%). States that hedge channel is absent in Option 3
+   / models without x_prev state. Falsification tests confirm.
+   Cross-term xi confirming additive separability.
+
+3. Contribution vs literature: avoided-tx channel outside Liu (2021) -
+   no relocation in Liu; pre-buying hedge requires four model ingredients
+   absent in all prior work (2 locations + relocation + tau_buy + x_prev
+   state). Table lit cross-referenced.
+
+4. Policy + limitations: regulatory implications for token design, tau_buy
+   sweet spot for hedge value. Partial equilibrium caveat; three future
+   extensions (GE pricing, heterogeneous agents, tax treatment).
+
+**paper/main.tex** (~160 LOC):
+- 12pt article, 1.2in margins, 1.5 spacing. natbib (plainnat, RFS
+  author-year). booktabs, hyperref, amsmath.
+- Custom macros: ph{} (red placeholder), cev, regime names, Greek shortcuts.
+- Abstract with [P] placeholders for headline CEV and channels.
+- input sections s1..s6 with clearpage between.
+- Three appendices: (A) numerical implementation details (grid sizes,
+  quadrature, interpolation), (B) convergence diagnostics table shell
+  for server1 output, (C) Proposition 1 - formal hedge-channel sign
+  condition p_reloc * tau_buy > delta_own - E[R_B - R_f].
+
+**Files created**:
+- `paper/sections/s6_conclusion.tex` (~110 LOC) - conclusion skeleton
+- `paper/main.tex` (~160 LOC) - master compilation driver + abstract + appendices
+
+**Branch**: `auto/2026-05-02-option1-state-extension`
+
+**All paper sections complete**: s1 (intro), s2 (model), s3 (calibration),
+s4 (results), s5 (discussion), s6 (conclusion), plus main.tex.
+Paper is a complete skeleton ready to fill with server1 numerical results.
+
+**Remaining blocked items** (all require server1 or human gate):
+- Server1: `p6_option1_smoke.md`, `p6_option1_e1.json`,
+  `p6_option1_e2.json`, `p6_option1_decomposition.md`.
+- H3' (human gate): framing approval before writing kickoff.
+- H2' (human gate): calibration anchor approval (NAR, PSID specifics).
+- H1' (human gate): title approval.
+
+No new cloud-auto-allowed fallback work identified beyond this fire.
+
+## 2026-05-13 — Fire 20: mortgage sweep script + pending log applied
+
+**Orientation**: fetched remote at fire-19 state (commit 633ed22). Confirmed:
+- v4 solver canonical 954-LOC version at `src/vfi_solver_v4.jl`.
+- Paper complete: s1–s6 + main.tex done (fires 10–19).
+- Phase 2 prep docs all done.
+- Server1 baselines (steps 5–7) still pending — primary blocked.
+- Sweep scripts done: sweep_rhoAB.sh, sweep_prelocate.sh, sweep_txcost.sh.
+- Liu comparison table in s5_discussion.tex (fire 18). Already DONE.
+- Pending log entries: `handoff/pending_log_entries_fire19.md` needed to be applied.
+
+**Actions this fire**:
+
+1. **Applied pending log entries** (`handoff/pending_log_entries_fire19.md`
+   → `research_log.md`): fires 18+19 entries now in the log.
+
+2. **Wrote `scripts/sweep_mortgage.sh`**: P1 robustness sweep over
+   `LTV_MAX ∈ {0.0, 0.50, 0.80}`, both E1_2L and E2_2L. Uses env var
+   `LTV_MAX` already in canonical v4 solver. Output directory:
+   `output/diagnostics/p7_mortgage_v4/`. Calls `compute_cev_sweep.jl`
+   with new "mortgage" sweep type.
+
+3. **Extended `scripts/compute_cev_sweep.jl`**: added `mortgage` case
+   reading `E1_2L_ltv<tag>.json` / `E2_2L_ltv<tag>.json` pairs.
+   Updated footer note to v4-accurate description.
+
+**Economic rationale for mortgage sweep**: v2 empirics showed mortgage
+shrinks `CEV(E2 vs E1)` by ~37% because E1 households substitute leverage
+for continuous-x relaxation. Under v4, the pre-buying hedge channel
+(`p_relocate * tau_buy` premium per unit x_B) is orthogonal to LTV
+leverage — mortgage should not eliminate it. This prediction distinguishes
+the two channels and is a referable empirical test.
+
+**Asymmetric robustness note**: the "queued" `sweep_asymmetric.sh`
+requires solver extension — current v4 has a single `mu_h` for both
+locations and a single `p_relocate_working` for both directions. Adding
+`MU_H_B` and `P_RELOCATE_AB` / `P_RELOCATE_BA` env vars is the next
+solver-level cloud task once the above are confirmed.
+
+**Feature branch**: `auto/2026-05-02-option1-state-extension`.
+
+## 2026-05-13 — Fire 21: orientation + apply pending log entries
+
+**Orientation**: reset to remote canonical state (commit e9cd7db, fire 20).
+Confirmed:
+- v4 solver canonical 954-LOC at `src/vfi_solver_v4.jl` (4D multilinear
+  interpolation; E1_2L forced-sale fresh-start on relocation; E2_2L tokens
+  portable; tau_buy on positive x deltas via state extension).
+- Paper complete skeleton: s1–s6 + main.tex + outline_v4.md (fires 9–19).
+- Phase 2 prep docs: calibration_v3.md, methods_v3.md,
+  sensitivity_grid_v4.md, welfare_decomp_v4.md (fires 3–8).
+- Sweep scripts: sweep_rhoAB.sh, sweep_prelocate.sh, sweep_txcost.sh,
+  sweep_mortgage.sh (v4-ready, awaiting server1 baselines).
+- Pending log entries for fires 18–20 were in
+  `handoff/pending_log_entries_fire19.md` and
+  `handoff/pending_log_entries_fire20.md` (push blocked by 403 proxy limit
+  in prior fires).
+
+**Action this fire**: applied all pending log entries (fires 18, 19, 20)
+to `research_log.md`; removed pending log files. All cloud-auto-allowed
+actions in `next_actions.md` are confirmed DONE. No new solver code or
+paper sections drafted — the canonical state is fully current.
+
+**Completed auto-allowed items**:
+- All P0 steps 1–4 (v4 solver, smoke test, run scripts): DONE (fires 2–9)
+- All Phase 2 prep docs: DONE (fires 3–8)
+- All paper sections s1–s6 + main.tex: DONE (fires 9–19)
+- Sweep scripts (rhoAB, p_reloc, txcost, mortgage): DONE (fires 9–20)
+- Liu comparison table in s5_discussion.tex: DONE (fire 18)
+
+**Remaining items all require server1 or human gate**:
+- Step 5: `julia src/vfi_solver_v4.jl --smoke-test` → `p6_option1_smoke.md`
+- Step 6: `bash scripts/run_option1_e1.sh` + `run_option1_e2.sh`
+- Step 7: CEV decomposition once JSONs land
+- H1' (title), H2' (calibration anchors), H3' (framing approval)
+
+**No new fallback work identified.** The project is in a holding pattern
+awaiting server1 baselines and human gate clearance.
