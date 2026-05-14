@@ -1905,3 +1905,45 @@ Output: `output/diagnostics/p8_asymmetric/`
 
 **Files modified**: `src/vfi_solver_v4.jl` (backward-compatible edits)
 **Files created**: `scripts/sweep_asymmetric.sh`
+
+## 2026-05-14 — Fire 23: exhibit memos + s4_results.tex update (fire 22 follow-up)
+
+**Orientation**: reset to remote canonical state (commit 1779b72, fire 22).
+All prior cloud-auto-allowed work confirmed DONE. This fire provides follow-on
+paper prep after fire 22's asymmetric robustness extension.
+
+**Action picked**: exhibit memos (missing from project) + paper consistency
+update (s4_results.tex not yet referencing fire 22/20 sweep dimensions).
+
+**1. Exhibit memos** (`paper/exhibit_memos/`, previously empty):
+
+- `paper/exhibit_memos/fig1_lifecycle_profiles.md`: full production spec for
+  Figure 1 — lifecycle x_A and x_B profiles under E1_2L vs E2_2L. Julia
+  extraction code (averaging policy arrays over feasible states per age),
+  Python two-panel plotting code, caption text, pre-registered qualitative
+  predictions (x_B > 0 during working years; x_B declines post-retirement;
+  x_B → 0 under p_reloc=0 falsification test r).
+
+- `paper/exhibit_memos/fig2_sensitivity_heatmap.md`: full production spec for
+  Figure 2 — 5×4 CEV heatmap over (rho_AB, p_reloc). Python heatmap code
+  with cell annotation and baseline marker, caption text, connection to
+  falsification tests, and note that 1D cross-sections are preferred for
+  first submission (full 2D sweep at revision).
+
+**2. s4_results.tex update** (paper consistency with fires 20 + 22):
+
+- Added "Asymmetric robustness" block to Table 3 (sensitivity): Delta_mu_B
+  sweep (location-B return premium) and directional mobility (p_AB, p_BA
+  pairs), referencing `scripts/sweep_asymmetric.sh`.
+- Added "Mortgage activation" block: LTV ceiling theta_max, referencing
+  `scripts/sweep_mortgage.sh`.
+- Added Figure 1 stub (lifecycle profiles placeholder) between baseline
+  welfare table and channel decomposition.
+
+**Files created**: `paper/exhibit_memos/fig1_lifecycle_profiles.md`,
+`paper/exhibit_memos/fig2_sensitivity_heatmap.md`.
+**Files modified**: `paper/sections/s4_results.tex`.
+
+**Status**: all cloud-auto-allowed non-server1 work is now complete.
+No new fallback work identified. Holding for server1 baselines (steps 5–7)
+and human gate clearance (H1'–H4').

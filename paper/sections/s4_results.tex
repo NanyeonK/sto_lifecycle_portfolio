@@ -111,6 +111,42 @@ extension (Option~1).
 This is the key discriminator from the v3 Option~3 approximation, under which
 $\bar{x}_B = 0$ held at all mobility rates.
 
+Figure~\ref{fig:lifecycle_profiles} illustrates the mechanism at the
+lifecycle level: the age profiles of mean $x_A$ and $x_B$ holdings
+under E1\_2L and E2\_2L.
+The key prediction is that $\bar{x}_B$ rises during working years (ages 25--65),
+when $p_{\text{reloc,work}} = 0.06$, and declines post-retirement when the
+relocation probability falls to $p_{\text{reloc,ret}} = 0.02$.
+This pattern --- confirmed or denied by the server1 policy-array output ---
+constitutes the strongest visual evidence for the pre-buying hedge mechanism.
+
+\begin{figure}[t]
+\centering
+%% PLACEHOLDER — replace with lifecycle profile plots once server1 policy arrays land.
+%% See paper/exhibit_memos/fig1_lifecycle_profiles.md for full production spec.
+\fbox{%
+  \begin{minipage}{0.88\linewidth}
+  \vspace{2.5cm}
+  \centering
+  {\sffamily\small [PLACEHOLDER: Figure~1 — Lifecycle token-holding profiles.
+  Panel A (E1\_2L): mean $x_A$ (solid) and $x_B = 0$ (dashed) over ages 25--80.
+  Panel B (E2\_2L): mean $x_A$ (solid) and mean $x_B > 0$ (dashed) over ages 25--80.
+  Source: per-age mean of \texttt{xA\_policy} and \texttt{xB\_policy} arrays at $\ell{=}A$,
+  averaged over feasible $(w, z, x_{\text{prev}})$ states.
+  Script: \texttt{scripts/plot\_lifecycle\_profiles.py}.]}
+  \vspace{2.5cm}
+  \end{minipage}%
+}
+\caption{Lifecycle mean token-holding profiles under traditional ownership (E1\_2L,
+         left panel) and tokenized ownership (E2\_2L, right panel) at location $A$.
+         E2\_2L households pre-accumulate location-$B$ tokens during working years
+         (positive $\bar{x}_B$), saving the buying cost $\tau_{\text{buy}}$ on
+         anticipated future relocation.
+         E1\_2L households hold $\bar{x}_B = 0$ at all ages by admissibility.
+         \textsc{[P]} = placeholder pending server1 run.}
+\label{fig:lifecycle_profiles}
+\end{figure}
+
 % ─────────────────────────────────────────────────────────────────────────────
 \subsection{Channel Decomposition}
 \label{sec:results:decomp}
@@ -347,6 +383,24 @@ Cross-location corr.\ $\rho_{AB}$
     & & 0 & 0.25 & \textbf{0.50} & 0.75 & 0.95 \\
 \quad $\text{CEV}(\text{E2\_2L vs E1\_2L})$
     & & \textsc{[P]} & \textsc{[P]} & \textsc{[P]} & \textsc{[P]} & \textsc{[P]} \\
+\addlinespace
+\multicolumn{7}{l}{\textit{Asymmetric robustness (solver v4 extension, fire 22)}} \\
+Location-$B$ return premium $\Delta\mu_B$
+    & & $-1\%$ & \textbf{0\%} & $+1\%$ & & \\
+\quad $\text{CEV}(\text{E2\_2L vs E1\_2L})$
+    & & \textsc{[P]} & \textsc{[P]} & \textsc{[P]} & & \\
+\quad $\bar{x}_B$ at $\ell{=}A$
+    & & \textsc{[P]} & \textsc{[P]} & \textsc{[P]} & & \\[2pt]
+Directional mobility ($p_{A\to B}$, $p_{B\to A}$)
+    & & (0.06, 0.06) & (0.10, 0.03) & (0.10, 0.10) & & \\
+\quad $\text{CEV}(\text{E2\_2L vs E1\_2L})$
+    & & \textsc{[P]} & \textsc{[P]} & \textsc{[P]} & & \\
+\addlinespace
+\multicolumn{7}{l}{\textit{Mortgage activation (LTV constraint)}} \\
+LTV ceiling $\theta_{\max}$
+    & & \textbf{0} & 0.50 & 0.80 & & \\
+\quad $\text{CEV}(\text{E2\_2L vs E1\_2L})$
+    & & \textsc{[P]} & \textsc{[P]} & \textsc{[P]} & & \\
 \bottomrule
 \end{tabular}
 \vspace{4pt}
@@ -355,7 +409,13 @@ Cross-location corr.\ $\rho_{AB}$
 Bold entries mark the baseline value.
 One parameter varies at a time; all others held at baseline.
 Sweep scripts: \texttt{scripts/sweep\_rhoAB.sh},
-\texttt{scripts/sweep\_prelocate.sh}, \texttt{scripts/sweep\_txcost.sh}.
+\texttt{scripts/sweep\_prelocate.sh}, \texttt{scripts/sweep\_txcost.sh},
+\texttt{scripts/sweep\_asymmetric.sh} (location-$B$ return premium and directional mobility),
+\texttt{scripts/sweep\_mortgage.sh} (LTV).
+$\Delta\mu_B = \mu_{h,B} - \mu_{h,A}$: the excess Jensen-corrected log-mean return of
+location $B$ relative to $A$.
+Positive $\Delta\mu_B$ strengthens the pre-buying motive for $x_B$ by adding a return
+premium to the tau\_buy-saving incentive.
 \textsc{[P]} = placeholder pending server1 sweep runs.
 \end{minipage}
 \end{table}
