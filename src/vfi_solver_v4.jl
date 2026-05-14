@@ -83,9 +83,13 @@ struct ModelParams_v4
     sigma_div::Float64
     sigma_iota::Float64
     rho_AB::Float64
-    # mobility
-    p_relocate_working::Float64
+    # mobility — symmetric baseline; asymmetric extension adds directional rates
+    p_relocate_working::Float64   # reference symmetric rate (= p_relocate_AB when symmetric)
     p_relocate_retired::Float64
+    # asymmetric robustness extension (defaults = symmetric baseline)
+    mu_h_B::Float64               # location-B mean log housing return (default = mu_h)
+    p_relocate_AB::Float64        # working-age A→B annual probability (default = p_relocate_working)
+    p_relocate_BA::Float64        # working-age B→A annual probability (default = p_relocate_working)
     # transaction costs
     tau_sell::Float64    # forced relocation sell (~0.06, NAR)
     tau_buy::Float64     # incremental buy (~0.025); now fully active via state extension
@@ -159,6 +163,8 @@ function default_params_v4()
     mu_s           = log(rf + eq_premium) - 0.5 * sigma_s^2
     mu_h_default   = log(1.0 + g_h) - 0.5 * sigma_h^2
     mu_h           = parse(Float64, get(ENV, "MU_H", string(mu_h_default)))
+    # Asymmetric location-B mean: defaults to mu_h (symmetric baseline)
+    mu_h_B         = parse(Float64, get(ENV, "MU_H_B", string(mu_h)))
     sigma_div      = parse(Float64, get(ENV, "SIGMA_DIV", "0.10"))
     sigma_div >= sigma_h && error("sigma_div ($sigma_div) >= sigma_h ($sigma_h)")
     sigma_iota     = sqrt(sigma_h^2 - sigma_div^2)
@@ -178,6 +184,12 @@ function default_params_v4()
         sigma_div, sigma_iota, rho_AB,
         parse(Float64, get(ENV, "P_RELOCATE_WORKING", "0.06")),
         parse(Float64, get(ENV, "P_RELOCATE_RETIRED", "0.02")),
+        # Asymmetric extension — defaults to symmetric if env vars not set
+        mu_h_B,
+        parse(Float64, get(ENV, "P_RELOCATE_AB",
+              get(ENV, "P_RELOCATE_WORKING", "0.06"))),   # A→B; default = p_relocate_working
+        parse(Float64, get(ENV, "P_RELOCATE_BA",
+              get(ENV, "P_RELOCATE_WORKING", "0.06"))),   # B→A; default = p_relocate_working
         parse(Float64, get(ENV, "TAU_SELL",           "0.06")),
         parse(Float64, get(ENV, "TAU_BUY",            "0.025")),
         parse(Float64, get(ENV, "TAU_TOKEN",          "0.01")),
@@ -266,10 +278,10 @@ function build_shock_block_v4(p::ModelParams_v4, cfg::SolveConfig_v4)
         for (i2,nd) in enumerate(nodes)
             eta_div = sqrt(2.0)*p.sigma_div*nd
             for (i3,nA) in enumerate(nodes)
-                iota_A = sqrt(2.0)*p.sigma_iota*nA;  ra_val = exp(p.mu_h + eta_div + iota_A)
+                iota_A = sqrt(2.0)*p.sigma_iota*nA;  ra_val = exp(p.mu_h   + eta_div + iota_A)
                 for (i4,nB) in enumerate(nodes)
                     iota_B = p.rho_AB*iota_A + sqrt1mr2*sqrt(2.0)*p.sigma_iota*nB
-                    rb_val = exp(p.mu_h + eta_div + iota_B)
+                    rb_val = exp(p.mu_h_B + eta_div + iota_B)   # uses location-B mean
                     for (i5,nh) in enumerate(nodes)
                         xi = sqrt(2.0)*p.sigma_xi*nh;  hp_val = exp(p.g_h + xi)
                         for (i6,nu) in enumerate(nodes)
@@ -301,9 +313,10 @@ end
     isapprox(gamma, 1.0; atol=1e-12) ? log(c) :
     c^(1.0 - gamma) / (1.0 - gamma)
 
-@inline function p_relocate_v4(p::ModelParams_v4, t::Int)::Float64
+@inline function p_relocate_v4(p::ModelParams_v4, t::Int, ell::Int)::Float64
     age = p.age0 + t - 1
-    return age <= p.retire_age ? p.p_relocate_working : p.p_relocate_retired
+    age > p.retire_age && return p.p_relocate_retired
+    return ell == LOC_A ? p.p_relocate_AB : p.p_relocate_BA
 end
 
 # Housing cost — FIXED kappa rule: only occupied-location token saves rent.
@@ -437,7 +450,7 @@ function continuation_value_v4(
     b::Float64, s::Float64, x_A::Float64, x_B::Float64,
     regime::Int,
 )
-    p_reloc = p_relocate_v4(p, t)
+    p_reloc = p_relocate_v4(p, t, ell)   # directional: A→B or B→A
     ell_alt = ell == LOC_A ? LOC_B : LOC_A
 
     # Sell factors for E1_2L relocation (tau_sell on the occupied unit)
@@ -769,6 +782,9 @@ function summary_v4(result::SolverResult_v4, grids::Grids_v4,
         "rho_AB"             => params.rho_AB,
         "p_relocate_working" => params.p_relocate_working,
         "p_relocate_retired" => params.p_relocate_retired,
+        "mu_h_B"             => params.mu_h_B,
+        "p_relocate_AB"      => params.p_relocate_AB,
+        "p_relocate_BA"      => params.p_relocate_BA,
         "tau_sell"           => params.tau_sell,
         "tau_buy"            => params.tau_buy,
         "tau_token"          => params.tau_token,
@@ -898,10 +914,20 @@ function smoke_test_v4()
     @assert abs(kappa_e2 - (p.rho - 0.5*(p.rho - p.m))) < 1e-12  "E2_2L kappa wrong"
     println("  housing_cost_v4 spot-checks: PASS")
 
-    # p_relocate_v4 boundary checks
-    @assert p_relocate_v4(p, 1)  == p.p_relocate_working   # age 25
-    @assert p_relocate_v4(p, 42) == p.p_relocate_retired   # age 66
-    println("  p_relocate_v4: PASS")
+    # p_relocate_v4 directional checks (asymmetric extension)
+    @assert p_relocate_v4(p, 1, LOC_A)  == p.p_relocate_AB    # age 25, at A → B rate
+    @assert p_relocate_v4(p, 1, LOC_B)  == p.p_relocate_BA    # age 25, at B → A rate
+    @assert p_relocate_v4(p, 42, LOC_A) == p.p_relocate_retired  # retired, direction-agnostic
+    @assert p_relocate_v4(p, 42, LOC_B) == p.p_relocate_retired  # retired, direction-agnostic
+    # Symmetric baseline: AB == BA == p_relocate_working (when env vars not set)
+    @assert p.p_relocate_AB == p.p_relocate_working "asymmetric default should equal p_relocate_working"
+    @assert p.p_relocate_BA == p.p_relocate_working "asymmetric default should equal p_relocate_working"
+    @printf("  p_relocate_v4 (directional): p_AB=%.3f  p_BA=%.3f  p_ret=%.3f  — PASS\n",
+            p.p_relocate_AB, p.p_relocate_BA, p.p_relocate_retired)
+    # mu_h_B: symmetric default = mu_h
+    @assert p.mu_h_B == params.mu_h "mu_h_B default should equal mu_h"
+    @printf("  mu_h_B delta: %.6f (default = symmetric = 0)\n", p.mu_h_B - p.mu_h)
+    println("  asymmetric extension defaults: PASS")
 
     println("=== smoke_test_v4: PASS ===")
     return true
@@ -929,8 +955,10 @@ function main_v4(args::Vector{String}=ARGS)
     @printf("  x_prev    : %s\n", string(grids_tmp.x_prev))
     @printf("  quadrature: %d nodes, %d points total\n",
             cfg.quadrature_nodes, cfg.quadrature_nodes^7)
-    @printf("  mobility  : p_reloc_work=%.3f p_reloc_ret=%.3f\n",
-            params.p_relocate_working, params.p_relocate_retired)
+    @printf("  mobility  : p_AB=%.3f p_BA=%.3f p_ret=%.3f\n",
+            params.p_relocate_AB, params.p_relocate_BA, params.p_relocate_retired)
+    @printf("  mu_h_B    : %.6f  (delta vs mu_h = %.6f)\n",
+            params.mu_h_B, params.mu_h_B - params.mu_h)
     @printf("  tx costs  : tau_sell=%.3f tau_buy=%.3f (NOW STATE) tau_token=%.3f\n",
             params.tau_sell, params.tau_buy, params.tau_token)
     @printf("  returns   : rho_AB=%.2f sigma_div=%.4f sigma_iota=%.4f\n",

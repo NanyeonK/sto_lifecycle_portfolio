@@ -1859,3 +1859,49 @@ paper sections drafted — the canonical state is fully current.
 
 **No new fallback work identified.** The project is in a holding pattern
 awaiting server1 baselines and human gate clearance.
+
+## 2026-05-14 — Fire 22: asymmetric robustness solver extension
+
+**Orientation**: reset to remote canonical state (commit 10be595, fire 21).
+Confirmed: v4 solver canonical 954-LOC; paper skeleton complete (s1–s6 +
+main.tex); all Phase 2 prep docs done; server1 baselines (steps 5–7) still
+pending. Fire 21 concluded "no new fallback work identified."
+
+**Action picked**: asymmetric robustness solver extension — identified in
+fire 20 as "the next solver-level cloud task" and classified as a code-only
+cloud-auto-allowed task not blocked by human gate.
+
+**Changes to `src/vfi_solver_v4.jl`** (backward-compatible; defaults preserve
+symmetric baseline behavior when env vars are not set):
+
+1. **Three new fields in `ModelParams_v4`**:
+   - `mu_h_B::Float64` — location-B Jensen-corrected mean log return.
+     Default = mu_h. Env var: `MU_H_B`.
+   - `p_relocate_AB::Float64` — working-age A→B annual prob.
+     Default = p_relocate_working. Env var: `P_RELOCATE_AB`.
+   - `p_relocate_BA::Float64` — working-age B→A annual prob.
+     Default = p_relocate_working. Env var: `P_RELOCATE_BA`.
+
+2. **`build_shock_block_v4`**: `rb_val` uses `p.mu_h_B` (was `p.mu_h`).
+
+3. **`p_relocate_v4(p, t, ell)`**: added `ell::Int` for directional lookup:
+   ell=A → p_relocate_AB; ell=B → p_relocate_BA; retired → p_relocate_retired.
+
+4. **`continuation_value_v4`**: calls `p_relocate_v4(p, t, ell)`.
+
+5. **`summary_v4` / `smoke_test_v4` / `main_v4`**: updated for new fields.
+
+**New file**: `scripts/sweep_asymmetric.sh` — two sweep dimensions:
+- Sweep 1: MU_H_B delta ∈ {-0.01, 0, +0.01} × {E1_2L, E2_2L}
+- Sweep 2: directional mobility (p_AB, p_BA): (0.06,0.06), (0.10,0.03), (0.10,0.10)
+  × {E1_2L, E2_2L}
+Output: `output/diagnostics/p8_asymmetric/`
+
+**Economic motivation**:
+- `mu_h_B > mu_h`: pre-holding x_B gives return premium AND hedge premium.
+  Tests whether realistic location-B return advantage activates hedge channel.
+- `p_AB > p_BA`: unidirectional pull → pre-buying x_B more valuable at A.
+  Tests direction-sensitivity of hedge motive.
+
+**Files modified**: `src/vfi_solver_v4.jl` (backward-compatible edits)
+**Files created**: `scripts/sweep_asymmetric.sh`

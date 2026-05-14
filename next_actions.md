@@ -83,7 +83,7 @@ If any fails: fall back to Path D (REE/JHE) at +4.26%.
 | P1 | Sensitivity sweep: rho_AB ∈ {0, 0.25, 0.5, 0.75, 0.95} | `scripts/sweep_rhoAB.sh` (v4, DONE) | awaiting baselines |
 | P1 | Sensitivity: p_relocate ∈ {0, 0.02, 0.06, 0.12} | `scripts/sweep_prelocate.sh` (v4, DONE) | awaiting baselines |
 | P1 | Transaction-cost sweep: tau_buy ∈ {0, 2.5%, 4%, 6%} | `scripts/sweep_txcost.sh` (v4, DONE) | awaiting baselines |
-| P1 | Asymmetric robustness (mu_A != mu_B, p_AB != p_BA) | — | queued — requires solver extension (single mu_h param; see research_log fire 20) |
+| P1 | Asymmetric robustness (mu_A != mu_B, p_AB != p_BA) | `scripts/sweep_asymmetric.sh` | **DONE** solver extension + sweep script (fire 22, 2026-05-14) |
 | P1 | Mortgage activation (ltv_max ∈ {0.5, 0.8}) | `scripts/sweep_mortgage.sh` | **DONE** 2026-05-13 (fire 20) |
 | P1 | Liu/YZ/Cocco/KMW comparison table | in `paper/sections/s5_discussion.tex` | **DONE** 2026-05-12 (fire 18) |
 | P2 | If Option 1 successful: writing kickoff | — | blocked H3' |
