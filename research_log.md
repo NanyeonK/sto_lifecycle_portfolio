@@ -1947,3 +1947,45 @@ update (s4_results.tex not yet referencing fire 22/20 sweep dimensions).
 **Status**: all cloud-auto-allowed non-server1 work is now complete.
 No new fallback work identified. Holding for server1 baselines (steps 5–7)
 and human gate clearance (H1'–H4').
+
+## 2026-05-14 — Fire 24: Fig 3 channel decomp exhibit memo + plotting script
+
+**Orientation**: reset to remote canonical state (commit 6d2126b, fire 23).
+Confirmed: v4 solver canonical (954 LOC, asymmetric extension); paper
+skeleton s1–s6 + main.tex complete; exhibit memos fig1 and fig2 done (fire 23);
+all other Phase 2 prep DONE. Server1 baselines still pending.
+
+**Gap identified**: paper outline specifies 5 figures; only fig1 (lifecycle
+profiles) and fig2 (sensitivity heatmap) have exhibit memos. Figures 3–5
+from the outline (channel decomp bar, V-slice, model timeline) are unspecced.
+The channel decomp bar is the most important mechanism visualization and can
+be fully specced using v3 pre-registered values as placeholders.
+
+**Action picked**: write exhibit memo for Figure 3 (channel decomp bar chart)
+plus the standalone Python plotting script.
+
+**Files created**:
+
+| File | Content |
+|---|---|
+| `paper/exhibit_memos/fig3_channel_decomp_bar.md` | Full production spec: decomp formula, pre-registered v3 placeholder values (+3.411% cont-x + 0.816% tx + 0% hedge = +4.255%), v4 expectations (hedge 0.5–1.5%), Python code, LaTeX integration, production checklist |
+| `scripts/plot_channel_decomp.py` | Standalone runnable script: loads 4 JSON files (e1, e1_notx, e2, e2_notau), computes CEV decomposition, plots horizontal stacked bar, prints H1/H2/H3 pass/fail, saves PDF to paper/figures/ |
+
+**Decomposition formula in plotting script**:
+```
+CEV_tx     = CEV(E1_NOTX vs E1)       — tx-cost avoidance
+CEV_cont_x = CEV(E2_NOTAU vs E1_NOTX) — continuous-x rent-saving
+CEV_hedge  = CEV(E2 vs E2_NOTAU)      — pre-buying hedge (H1/H3 signal)
+CEV_cross  = total - sum of above     — near-zero if additive
+```
+Requires two extra server1 runs beyond the baseline pair:
+- `REGIME=E1_2L TAU_SELL=0 TAU_BUY=0 julia src/vfi_solver_v4.jl` → e1_notx.json
+- `REGIME=E2_2L TAU_BUY=0 TAU_TOKEN=0 julia src/vfi_solver_v4.jl` → e2_notau.json
+
+**Note**: this fire found the working directory (main branch) out of sync with
+the feature branch (23 prior fires). Reset to remote state before proceeding.
+
+**Status after fire 24**: exhibit memos for fig1, fig2, fig3 are complete.
+fig4 (V-slice) and fig5 (model timeline) deferred — require server1 data and
+TikZ work respectively. No further cloud-auto-allowed fallback work identified.
+Holding for server1 baselines and human gate clearance (H1'–H4').

@@ -1,7 +1,7 @@
 # Next Actions (Path B Option 1 in flight, ASAP-tempered to 6h cron)
 
 Project: sto_lifecycle_portfolio
-Updated: 2026-05-14 (cloud agent fire 23)
+Updated: 2026-05-14 (cloud agent fire 24)
 
 ## ⭐ P0 — Option 1 full state extension (USER CHOSE B, OPTION 1)
 
@@ -77,6 +77,7 @@ If any fails: fall back to Path D (REE/JHE) at +4.26%.
 | P1-prep | `paper/main.tex` — master compilation driver + abstract + appendices A-C | **DONE** 2026-05-12 (fire 19) |
 | P1-prep | `paper/exhibit_memos/fig1_lifecycle_profiles.md` — Figure 1 production spec | **DONE** 2026-05-14 (fire 23) |
 | P1-prep | `paper/exhibit_memos/fig2_sensitivity_heatmap.md` — Figure 2 production spec | **DONE** 2026-05-14 (fire 23) |
+| P1-prep | `paper/exhibit_memos/fig3_channel_decomp_bar.md` — Figure 3 channel decomp bar spec + `scripts/plot_channel_decomp.py` | **DONE** 2026-05-14 (fire 24) |
 
 ## P1 (after Option 1 resolves)
 
