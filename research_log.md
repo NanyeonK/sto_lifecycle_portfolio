@@ -1989,3 +1989,52 @@ the feature branch (23 prior fires). Reset to remote state before proceeding.
 fig4 (V-slice) and fig5 (model timeline) deferred — require server1 data and
 TikZ work respectively. No further cloud-auto-allowed fallback work identified.
 Holding for server1 baselines and human gate clearance (H1'–H4').
+
+## 2026-05-15 — Fire 25: counterfactual run scripts + exhibit memos fig4 and fig5
+
+**Orientation**: reset to remote tip (commit 622dd55, fire 24). Confirmed:
+v4 solver canonical (954 LOC, x-choices restricted to x_prev grid for exact
+indexing); paper skeleton s1–s6 + main.tex complete; exhibit memos fig1/fig2/fig3
+done; all prior Phase 2 prep DONE.
+
+**Gap identified (two items)**:
+
+1. `plot_channel_decomp.py` (created fire 24) requires four JSON files to compute
+   the 3-channel decomposition: e1, e1_notx, e2, e2_notau. Run scripts for the
+   two *counterfactual* runs (E1\_NOTX and E2\_NOTAU) were absent. Without them,
+   the decomposition is blocked even after server1 delivers e1 and e2.
+
+2. The paper outline specifies 5 figures. Exhibit memos exist for fig1 (lifecycle
+   profiles / model timeline), fig2 (sensitivity heatmap), fig3 (channel decomp bar).
+   Fig4 (V-slice comparing E0/E1\_2L/E2\_2L) and Fig5 (mean x\_A, x\_B by age,
+   pre-accumulation dynamics) have no exhibit memos.
+
+**Files created**:
+
+| File | Purpose |
+|---|---|
+| `scripts/run_option1_e1_notx.sh` | E1\_2L with TAU\_SELL=TAU\_BUY=TAU\_TOKEN=0; produces `p6_option1_e1_notx.json` |
+| `scripts/run_option1_e2_notau.sh` | E2\_2L with TAU\_BUY=TAU\_TOKEN=0 (TAU\_SELL retained at 6%); produces `p6_option1_e2_notau.json` |
+| `scripts/run_option1_e0.sh` | E0 (rent-only) baseline; produces `p6_option1_e0.json`; needed for Fig4 three-regime comparison |
+| `paper/exhibit_memos/fig4_v_slice.md` | Full production spec for V(w, z\_mid, t=1, ell=A) three-regime comparison; includes Python plotting scaffold and LaTeX integration |
+| `paper/exhibit_memos/fig5_mean_x_age.md` | Full production spec for mean x\_A, x\_B by age lifecycle profiles; includes Python plotting script, Julia policy-export snippet, and H1 annotation logic |
+
+**Decomposition logic (from plot\_channel\_decomp.py)**:
+```
+CEV_tx      = CEV(E1_NOTX vs E1)       — avoided tx-cost channel
+CEV_cont_x  = CEV(E2_NOTAU vs E1_NOTX) — continuous-x rent-saving
+CEV_hedge   = CEV(E2 vs E2_NOTAU)      — pre-buying hedge (H1/H3 signal)
+CEV_cross   = total - sum              — near-zero if additive
+```
+
+**Note on E2\_NOTAU design**: TAU\_SELL is retained at 6% in the E2\_NOTAU run
+(only TAU\_BUY and TAU\_TOKEN set to 0). This isolates the *pre-buying hedge*
+benefit from tau\_buy portability while keeping E2\_NOTAU's forced-sale cost
+comparable to E1's. The tau\_sell in E2\_2L is effectively zero (tokens are portable,
+no forced sale) but the *comparison* is cleanest when E2\_NOTAU retains TAU\_SELL
+in the env (it will not be applied since E2 tokens never trigger tau\_sell).
+
+**Status after fire 25**: all run scripts complete (e0, e1, e1\_notx, e2, e2\_notau).
+All 5 exhibit memos complete (fig1–fig5). All cloud-auto-allowed Phase 2 prep done.
+Holding for server1 runs (steps 5–7) and human gate clearance (H1'–H4').
+
