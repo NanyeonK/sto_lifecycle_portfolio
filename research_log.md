@@ -991,3 +991,78 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-05-15 — v4 solver (6D state extension, Option 1) implemented
+
+**Action picked**: create `src/vfi_solver_v4.jl` — the P0 highest-priority
+action from `next_actions.md` (Option 1 full state extension). This is
+the correct implementation of the tau_buy hedge mechanism that was deferred
+from v3's initial design and never activated in Option 3.
+
+**Key design decisions:**
+
+- **State**: `(t, w, z, ell, x_A_prev, x_B_prev)` — 6D. x_prev grid is
+  coarse: N_X_PREV=3, X_PREV_MAX=1.5 (covering {0, 0.75, 1.5}), env-var
+  configurable. Compensated by N_W=15, N_Z=5 (down from 21/7 in v3).
+  Net compute factor vs v3 baseline: ~2.3x per regime (~70-120 min on
+  server1 single thread).
+
+- **Transaction cost rule (per period)**:
+  ```
+  tx_cost = tau_buy  * max(x_A_new - x_A_prev, 0)  [buy A increment]
+           + tau_buy  * max(x_B_new - x_B_prev, 0)  [buy B increment]
+           + tau_token * max(x_A_prev - x_A_new, 0) [sell A decrement]
+           + tau_token * max(x_B_prev - x_B_new, 0) [sell B decrement]
+  ```
+  Budget: `c + kappa(x_A_new, x_B_new | ell) + x_A_new + x_B_new + tx_cost + b + s = w`
+
+- **x_prev state update**:
+  - E2_2L (tokens portable): x_prev_{t+1} = x_new_t for BOTH stay and
+    relocation branches. Tokens don't get sold on relocation.
+  - E1_2L stay: x_prev_{t+1} = (x_ell_new, 0)
+  - E1_2L reloc: x_prev_{t+1} = (0, 0) — forced sale already in wealth
+    transition via sell_factor; x_prev reset avoids double-charging.
+
+- **4D interpolation**: continuation value uses `interp_4d()` —
+  bilinear in (w, z) at each corner of (x_A_prev, x_B_prev), then
+  bilinear in x_prev dimensions. Enables smooth continuation value
+  across the coarse x_prev grid.
+
+- **Housing cost rule**: unchanged from v3 fixed rule (only
+  occupied-location token reduces rent). The "kappa fix" from
+  2026-05-01 is preserved.
+
+- **Hedge mechanism** (now properly implemented): a household at ell=A
+  who pre-holds x_B_prev > 0 pays tau_buy only on the INCREMENT when
+  arriving at ell=B, not on the full position. Expected hedge premium
+  per unit: p_relocate * tau_buy ≈ 0.06 * 0.025 = 0.15% per period.
+  This is the mechanism Option 3 could not activate (Option 3 taxed
+  only at a lump-sum relocation event, providing no pre-holding
+  incentive).
+
+**Files created**:
+- `src/vfi_solver_v4.jl` (~670 LOC)
+- `scripts/run_option1_e1.sh` — E1_2L v4 run script
+- `scripts/run_option1_e2.sh` — E2_2L v4 run script
+- `scripts/run_option1_smoke.sh` — smoke test launcher
+
+**Smoke test checks** (callable without Julia in cloud env; to be run
+on server1):
+1. sigma decomposition invariant
+2. 6D array shape and memory estimate (~4 MB)
+3. shock block size and weight-sum
+4. tx_cost_v4 spot-checks (no-change=0, buy=tau_buy*delta, sell=tau_token*delta, mixed)
+5. housing_cost_v4 spot-checks
+6. Hedge mechanism check: tx_cost(x_B_prev=0.5) < tx_cost(x_B_prev=0) when buying x_B=1
+7. interp_4d constant-function check
+
+**Branch**: `auto/2026-05-15-option1-state-extension`
+
+**Next queued (server1, user)**:
+1. `bash scripts/run_option1_smoke.sh` — verify structural checks pass
+2. `bash scripts/run_option1_e1.sh` — E1_2L baseline (~70-120 min)
+3. `bash scripts/run_option1_e2.sh` — E2_2L baseline (~70-120 min)
+4. Inspect `mean_xB_t1_ellA_xprev0` in E2_2L output — if > 0, hedge
+   mechanism activated. Compare with v3's 0.000.
+5. Compute CEV decomposition per `handoff/tau_buy_option1_spec.md`
+   hypotheses H1/H2/H3.
+
