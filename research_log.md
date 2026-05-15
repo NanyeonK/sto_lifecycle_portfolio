@@ -991,3 +991,75 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-05-15 — v4 solver implemented: Option 1 full state extension
+
+**Action picked**: P0 Steps 1-4 from `next_actions.md` — implement `src/vfi_solver_v4.jl`
+with 6D state `(t, w, z, ell, x_A_prev, x_B_prev)` per the Option 1 spec in
+`handoff/tau_buy_option1_spec.md`.
+
+**Branch**: `auto/2026-05-15-option1-state-extension`
+
+**Files created**:
+- `src/vfi_solver_v4.jl` (895 LOC)
+- `scripts/run_option1_smoke.sh` — smoke test launcher
+- `scripts/run_option1_e1.sh` — E1_2L baseline run (coarse grids)
+- `scripts/run_option1_e2.sh` — E2_2L Option 1 run (coarse grids)
+
+**Key design decisions**:
+
+1. **6D state arrays** indexed `[t, iw, iz, iell, ixA_prev, ixB_prev]`. With default grids
+   (T=57, N_W=15, N_Z=5, 2 locations, N_X_PREV=3): 75,600 states. Memory ~600 KB per
+   array, ~4 MB for 6 policy arrays.
+
+2. **x_prev_grid = x_choice_grid**: choices for x_A_new, x_B_new are restricted to the
+   x_prev_grid (N_X_PREV points from 0 to X_PREV_MAX). This ensures exact index lookup
+   in the continuation value — no interpolation needed in the x_prev dimensions.
+   Default: N_X_PREV=3, X_PREV_MAX=1.0 → grid {0.0, 0.5, 1.0}.
+
+3. **tx_cost per-period on deltas** (`tx_cost_v4`):
+   - tau_buy (0.025) on max(delta, 0) — buying cost on positive x increments
+   - tau_token (0.005) on max(-delta, 0) — transfer cost on negative x increments
+   - Both A and B deltas charged simultaneously
+
+4. **E1_2L relocation**: forced sale of occupied-unit token via `sell_factor = (1 - tau_sell)` in
+   wealth transition (same mechanism as v3). Next state at new location: `ix_A_prev=1,
+   ix_B_prev=1` (= 0,0). Subsequent buy at new location incurs tau_buy via tx_cost at the
+   NEXT period's choice (genuine round-trip 6% + 2.5% = 8.5% total).
+
+5. **E2_2L relocation**: tokens portable — next-period `(ix_A_prev, ix_B_prev)` keeps the
+   chosen indices regardless of relocation. No sell_factor applied.
+
+6. **Fixed kappa rule retained**: only occupied-location token saves rent
+   (`kappa = rho - x_ell_local * delta_own`). Non-occupied x_{ell'} is purely financial.
+
+7. **Reduced grids to offset 9x state expansion**: N_W=15 (was 21), N_Z=5 (was 7).
+   Net compute factor: 9 × 0.51 ≈ 4.6× v3. Expected wall time ~2.5 hours per regime
+   on server1 single-thread.
+
+8. **Smoke test stub** (`--smoke-test` flag): 9 checks including sigma decomposition,
+   tx_cost spot-checks, housing_cost spot-checks, 6D array allocation, terminal slice,
+   shock block weight sum, x_prev_grid endpoints, E1_2L admissibility, and state
+   transition logic. VFI NOT run in smoke test.
+
+**Pre-buy hedge mechanism**: At ell=A, household can set x_B_new > 0 (paying tau_buy ×
+x_B_new). At next period if relocating to B: x_B_prev = x_B_new > 0, so the delta is
+(x_B_new_next - x_B_prev) < (x_B_new_next - 0), reducing the buying cost. Expected hedge
+premium per unit pre-held: p_relocate × tau_buy ≈ 0.06 × 0.025 = 0.15%/year. Lifetime
+CEV estimate: ~1-2% additional on top of Option 3 baseline (+4.26%).
+
+**Difference from v3 Option 3 approximation**: v3 applied tau_buy only at the relocation
+event (approximation); v4 applies it at every period on positive deltas. The Option 1
+mechanism is the proper specification: pre-holding x_B NOW (incremental tau_buy) saves
+tau_buy on a LARGER increment at relocation.
+
+**Next actions** (user runs on server1):
+1. `bash scripts/run_option1_smoke.sh` — verify all 9 smoke checks pass
+2. `bash scripts/run_option1_e1.sh` — E1_2L baseline (~2.5 hours)
+3. `bash scripts/run_option1_e2.sh` — E2_2L Option 1 baseline (~2.5 hours)
+4. Compute `CEV(E2_2L_v4 vs E1_2L_v4)` and compare to 4.255% (Option 3 baseline)
+5. Check: mean_xB > 0 at ell=A in E2_2L_v4 (hedge mechanism activation test)
+
+**Hypotheses to verify** (from spec):
+- H1: mean_xB > 0 at ellA — hedge mechanism activates with proper state
+- H2: CEV(E2_2L_v4 vs E1_2L_v4) > 4.255% (Option 3 baseline)
+- H3: Hedge channel `CEV(E2_2L_v4 vs E2_2L_v3)` ≈ 0.5-1.5%
