@@ -10,16 +10,22 @@ proper tau_buy hedge mechanism.
 
 **SPEC: `handoff/tau_buy_option1_spec.md`** — read this first.
 
+**STATUS NOTE (2026-05-16)**: Steps 1-4 have been completed by multiple
+cloud fires (auto/2026-05-03 through auto/2026-05-16-option1-state-extension).
+The recommended implementation is `auto/2026-05-16-option1-state-extension`
+(regime-dependent tx_cost; see `handoff/decisions_needed.md` for details).
+**Steps 5-7 require server1 and are blocked pending user action.**
+
 | Step | Action | Owner | Done artifact |
 |---|---|---|---|
-| 1 | Open new branch `auto/2026-05-02-option1-state-extension` | cloud agent | DONE 2026-05-16 |
-| 2 | Create `src/vfi_solver_v4.jl`: 6D state `(t, w, z, ell, x_A_prev, x_B_prev)` + tx_cost on deltas | cloud agent | DONE 2026-05-16 |
-| 3 | Use coarse `x_prev` grid: `N_X_PREV=3` ({0, 1.0, 2.0}); N_W=15, N_Z=5; all env-var configurable | cloud agent | DONE 2026-05-16 |
-| 4 | Smoke test stub `smoke_test_v4()` checking 6D allocation, tx_cost computation, interp correctness | cloud agent | DONE 2026-05-16 |
-| 4b | Run scripts: `scripts/run_option1_e1.sh`, `scripts/run_option1_e2.sh` | cloud agent | DONE 2026-05-16 |
-| 5 | Smoke test on server1: `julia src/vfi_solver_v4.jl --smoke-test` | user/me | `output/diagnostics/p6_option1_smoke.md` |
-| 6 | Run E1_2L_v4 + E2_2L_v4 baselines on server1 (scripts ready) | user/me | `p6_option1_e*.json` |
-| 7 | Compute decomposition + write up | user/me | `p6_option1_decomposition.md` |
+| 1 | Open new branch | cloud agent | DONE across multiple fires (latest: auto/2026-05-16-option1-state-extension) |
+| 2 | Create `src/vfi_solver_v4.jl`: 6D state + tx_cost on deltas | cloud agent | DONE 2026-05-16 |
+| 3 | Coarse `x_prev` grid (N_XPREV=3, XMAX=2.0); N_W=15, N_Z=5; env-var configurable | cloud agent | DONE 2026-05-16 |
+| 4 | Smoke test stub `smoke_test_v4()` | cloud agent | DONE 2026-05-16 |
+| 4b | Run + sensitivity scripts in `scripts/` | cloud agent | DONE 2026-05-16 (sweep_rhoAB, sweep_prelocate added) |
+| 5 | **[BLOCKED: need server1]** Smoke test: `julia src/vfi_solver_v4.jl --smoke-test` | user/me | `output/diagnostics/p6_option1_smoke.md` |
+| 6 | **[BLOCKED: need server1]** Run baselines: `bash scripts/run_option1_e1.sh` and `run_option1_e2.sh` | user/me | `p6_option1_e*.json` |
+| 7 | **[BLOCKED: need step 6]** Compute CEV decomposition | user/me | `p6_option1_decomposition.md` |
 
 ## Hypotheses to test (after step 6)
 
@@ -49,16 +55,18 @@ If any fails: fall back to Path D (REE/JHE) at +4.26%.
 | DONE | E1_2L with tau_buy active: CEV(E2_2L vs E1_2L_full) = +4.255% |
 | DONE | Final Path B Option 3 verdict: continuous-x 3.4% + tx-cost 0.8% = 4.26% |
 
-## P1 (after Option 1 resolves)
+## P1 (after Option 1 step 6 resolves — server1 baselines complete)
 
-| Priority | Action |
-|---|---|
-| P1 | Sensitivity sweep: rho_AB ∈ {0, 0.25, 0.5, 0.75, 0.95} on best v4 |
-| P1 | Sensitivity: p_relocate ∈ {0, 0.06, 0.12, 0.30} on best v4 |
-| P1 | Asymmetric robustness (mu_A != mu_B, p_AB != p_BA) |
-| P1 | Mortgage activation (ltv_max ∈ {0.5, 0.8}) |
-| P1 | Liu/YZ/Cocco/KMW comparison table |
-| P2 | If Option 1 successful: writing kickoff |
+Scripts for all P1 sweeps are READY in `scripts/`. Run after step 6.
+
+| Priority | Action | Script |
+|---|---|---|
+| P1 | Sensitivity sweep: rho_AB ∈ {0, 0.25, 0.50, 0.75, 0.95} on best v4 | `scripts/sweep_option1_rhoAB.sh` |
+| P1 | Sensitivity: p_relocate ∈ {0, 0.06, 0.12, 0.30} on best v4 | `scripts/sweep_option1_prelocate.sh` |
+| P1 | Asymmetric robustness (mu_A != mu_B, p_AB != p_BA) | TBD script |
+| P1 | Mortgage activation (ltv_max ∈ {0.5, 0.8}) | TBD script |
+| P1 | Liu/YZ/Cocco/KMW comparison table | cloud agent (after results) |
+| P2 | If Option 1 successful: writing kickoff | H3' gate |
 
 ## Cleanup queue (non-critical)
 

@@ -1,6 +1,6 @@
 # Decisions Needed (human gate items)
 
-Updated: 2026-05-01
+Updated: 2026-05-16
 
 ## STRATEGIC: v3 mechanism is empirically dead at symmetric calibration
 
@@ -68,6 +68,51 @@ probability. Option (C) is empirically against natural sign. Option
 hedge channel is < 1.5% lifetime CEV, fall back to (D).
 
 **Time**: (B) implementation ~2-4 weeks. Decision after run.
+
+---
+
+## URGENT (2026-05-16): Multiple v4 implementations need server1 run
+
+Multiple cloud fires (2026-05-03 through 2026-05-16) have each implemented
+`src/vfi_solver_v4.jl` independently. The implementations differ slightly
+in `tx_cost` formula:
+
+**Prior fires (auto/2026-05-03 through auto/2026-05-15)**:
+- `tau_token` for ALL sells (both E1_2L and E2_2L voluntary sells)
+- Formula from spec verbatim: `tx_cost = tau_buy*max(delta,0) + tau_token*max(-delta,0)`
+
+**This fire (auto/2026-05-16-option1-state-extension)**:
+- `tau_sell` for E1_2L sells (6%, real estate market)
+- `tau_token` for E2_2L sells (1%, liquid token market)
+- Economically more accurate; isolates liquidity channel of tokenization
+
+**Decision needed**: which tx_cost formula to use?
+
+Option A (prior fires): uniform tau_token for all sells — cleaner comparison,
+isolates the hedge pre-holding channel. CEV difference reflects only
+the hedging mechanism and NOT the sell-liquidity advantage.
+
+Option B (this fire): regime-dependent sell cost — captures BOTH hedge
+channel AND sell liquidity advantage. More realistic, but conflates
+two separate mechanisms in the CEV headline.
+
+**Recommended**: run BOTH, then decompose:
+- `CEV(E2_2L_optA vs E1_2L_optA)` = hedge channel + buy-cost avoidance
+- `CEV(E2_2L_optB vs E2_2L_optA)` = sell-liquidity channel
+
+**Immediate action needed from you (server1)**:
+1. Pick one implementation (recommend: this fire's `auto/2026-05-16`):
+   ```bash
+   git checkout auto/2026-05-16-option1-state-extension
+   julia src/vfi_solver_v4.jl --smoke-test
+   bash scripts/run_option1_e1.sh   # ~2.5h
+   bash scripts/run_option1_e2.sh   # ~2.5h
+   ```
+2. Check `mean_xB_t1_ellA_xprev0` in E2_2L output JSON
+3. Report results; cloud agent will compute CEV and write decomposition
+
+**Why blocked**: cloud agent cannot SSH to server1, cannot run Julia.
+All 10+ prior v4 implementations are inert without server1 execution.
 
 ---
 
