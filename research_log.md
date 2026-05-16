@@ -1071,3 +1071,38 @@ correctness, `housing_cost_v4` spot-checks.
 **Branch**: `auto/2026-05-02-option1-state-extension`
 **Feature**: pushed to origin (see git push in this fire).
 
+## 2026-05-16 — Follow-up fire: v4 code audit + server1 action confirmed
+
+**Action taken**: reviewed `src/vfi_solver_v4.jl` (1001 LOC, prior fire) against
+the Option 1 spec in `handoff/tau_buy_option1_spec.md`. Found the prior fire's
+implementation superior to any independent re-implementation: it uses 4D
+multilinear interpolation (`interp_4d_v4`, 16-corner) over `(w, z, x_A_prev,
+x_B_prev)` for the continuation value, rather than a snap-to-grid approximation.
+This correctly propagates the hedge incentive through the value function.
+
+**Key design difference confirmed**: the current branch uses REGIME-DEPENDENT
+sell costs in `tx_cost_v4`:
+- E1_2L: `tau_sell` (6%) for voluntary sells — correct (real estate market)
+- E2_2L: `tau_token` (1%) for voluntary sells — correct (liquid token market)
+
+This captures BOTH the hedge channel (pre-holding x_B) and the sell-liquidity
+channel (lower disposal cost for tokens vs real estate). The prior fire's
+`decisions_needed.md` already flags this and recommends running BOTH formula
+variants to decompose the two channels.
+
+**Status of Option 1 implementation**: COMPLETE. All code artifacts are on
+`auto/2026-05-16-option1-state-extension`:
+- `src/vfi_solver_v4.jl` — 6D VFI solver with 4D interpolation, regime-
+  dependent tx_cost, smoke test embedded
+- `scripts/run_option1_smoke.sh` — smoke test wrapper
+- `scripts/run_option1_e1.sh` — E1_2L baseline (~2.5h server1)
+- `scripts/run_option1_e2.sh` — E2_2L baseline (~2.5h server1)
+- `scripts/sweep_option1_rhoAB.sh` — rho_AB sensitivity sweep
+- `scripts/sweep_option1_prelocate.sh` — p_relocate sensitivity sweep
+
+**BLOCKED**: all steps 5-7 require server1 execution. No Julia in cloud env.
+The `handoff/decisions_needed.md` has the precise 3-step server1 ask.
+
+**Nothing new to implement in this fire.** The auto-allowed queue is exhausted:
+P0 (steps 1-4) is done by prior fires; P1 sweeps are scripted and ready;
+steps 5-7 are user-owned.
