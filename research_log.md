@@ -2038,3 +2038,28 @@ in the env (it will not be applied since E2 tokens never trigger tau\_sell).
 All 5 exhibit memos complete (fig1–fig5). All cloud-auto-allowed Phase 2 prep done.
 Holding for server1 runs (steps 5–7) and human gate clearance (H1'–H4').
 
+## 2026-05-16 — Fire 26: orientation scan; all cloud work confirmed done
+
+**Action picked**: orientation scan of remote branch state to find next action.
+
+**Finding**: branch `auto/2026-05-02-option1-state-extension` is at fire 25
+(commit bd2a5f5). Full audit of `next_actions.md`:
+
+| Section | Status |
+|---|---|
+| P0 steps 1-4 (solver, branch, grids, smoke stub) | DONE |
+| P0 steps 5-7 (smoke run, baselines, decomp) | **Blocked — server1 (user)** |
+| Phase 2 prep: calibration, sensitivity grid, methods | DONE |
+| Phase 2 prep: welfare decomp, outline, paper sections s1-s6 | DONE |
+| Phase 2 prep: main.tex, exhibit memos fig1-fig5 | DONE |
+| Phase 2 prep: run scripts (e0, e1, e1\_notx, e2, e2\_notau, sweeps) | DONE |
+| P1 sensitivities (rhoAB, prelocate, txcost, asymmetric, mortgage) | Awaiting baselines |
+| P2 writing kickoff | **Blocked — H3' gate** |
+
+**No auto-allowed cloud action remains.** All blocking items are server1 runs
+or human gates.
+
+**Handoff note added** to `handoff/decisions_needed.md` (server1 run queue
+and H3' framing approval).
+
+

@@ -78,3 +78,44 @@ hedge channel is < 1.5% lifetime CEV, fall back to (D).
 - (H3') Framing approval at writing kickoff
 - (H4') Submission decision
 
+---
+
+## 2026-05-16 — ALL CLOUD WORK DONE: server1 runs now the critical path
+
+All auto-allowed cloud agent actions are complete through fire 25.
+The project is now fully blocked on two gates:
+
+### Gate 1 (server1 — USER, steps 5-7)
+
+Run these on server1 in this order:
+
+```bash
+# Step 5: smoke test (< 1 min)
+julia src/vfi_solver_v4.jl --smoke-test
+
+# Step 6a: baselines (~2-3h each, single thread)
+bash scripts/run_option1_e1.sh          # -> output/diagnostics/p6_option1_e1.json
+bash scripts/run_option1_e2.sh          # -> output/diagnostics/p6_option1_e2.json
+
+# Step 6b: counterfactuals for 3-channel decomposition
+bash scripts/run_option1_e1_notx.sh    # -> p6_option1_e1_notx.json
+bash scripts/run_option1_e2_notau.sh   # -> p6_option1_e2_notau.json
+bash scripts/run_option1_e0.sh         # -> p6_option1_e0.json (for Fig4)
+
+# Step 7: commit output JSONs to branch; cloud agent computes decomp next fire.
+```
+
+Hypothesis verdict from baselines:
+- H1: mean_xB > 0 at ell=A in E2_2L? (hedge mechanism active)
+- H2: CEV(E2 vs E1) > 4.255%? (vs Option 3 baseline)
+- H3: hedge channel ~ 0.5-1.5%? (= CEV(E2 vs E2_NOTAU))
+
+If H1+H2+H3 -> Path RFS. If any fail -> Path D (REE/JHE at +4.26%).
+
+### Gate 2 (human — H3' framing approval)
+
+Required before writing kickoff (P2). Once server1 baselines confirm
+H1/H2/H3, approve v3 mobility-hedge framing for manuscript writing.
+Paper outline at `paper/outline_v4.md`; sections s1-s6 drafted and
+ready for revision once numerical headline is confirmed.
+
