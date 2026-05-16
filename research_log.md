@@ -991,3 +991,83 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-05-16 — v4 solver implemented: Option 1 full state extension
+
+**Action picked**: P0 — create `src/vfi_solver_v4.jl` implementing the 6D
+state `(t, w, z, ell, x_A_prev, x_B_prev)` with proper per-period tau_buy
+on positive position deltas. This is the correct implementation of Path B
+Option 1 as specified in `handoff/tau_buy_option1_spec.md`.
+
+**Why this action**: the previous v3 solver approximated tau_buy via a
+relocation-event deduction (`apply_tau_buy_at_reloc` flag). This does NOT
+create a forward-looking pre-holding incentive because the household is not
+charged for buying at the event level — the tax is applied on the wealth
+transition, not the budget constraint. Option 1 fixes this by tracking
+`x_A_prev` and `x_B_prev` as explicit state variables and charging `tau_buy`
+on positive deltas each period. This makes pre-holding genuinely valuable:
+a household at ell=A can acquire x_B incrementally (at tau_buy per unit),
+reducing the future cost when relocating to B. Expected hedge premium:
+`p_relocate * tau_buy ≈ 0.06 * 0.025 = 0.0015` per period per unit of x_B.
+
+**Design decisions:**
+
+1. **State**: 6D `(t, iw, iz, iell, ixa_prev, ixb_prev)`. Value and policy
+   arrays are `Float64[T, N_W, N_Z, 2, N_XPREV, N_XPREV]`.
+   Memory: T=57, N_W=15, N_Z=5, N_XPREV=3 → 76,950 points per array ≈ 600 KB.
+   Total 7 arrays ≈ 4.3 MB. Very manageable.
+
+2. **x_prev grid**: uniform from 0 to `X_PREV_MAX=2.0` (default; env-var
+   configurable). N_XPREV=3: {0.0, 1.0, 2.0}. The upper bound 2.0 covers
+   the v3 full-grid baseline mean_xA ≈ 1.748. Positions above 2.0 clamp to
+   the boundary value (flat extrapolation).
+
+3. **Transaction costs** (regime-dependent, per-period on deltas):
+   - E1_2L: `tau_buy * max(delta,0) + tau_sell * max(-delta,0)` (real estate)
+   - E2_2L: `tau_buy * max(delta,0) + tau_token * max(-delta,0)` (token)
+   - E0: 0 (no positions)
+   The forced relocation sell for E1_2L is STILL applied via the wealth
+   transition sell_factor (same as v3). The per-period tx_cost covers voluntary
+   position changes only — no double-counting.
+
+4. **State update at relocation**:
+   - E2_2L: tokens portable. `x_prev_{t+1} = x_new_t` regardless of relocation.
+   - E1_2L: forced sell resets holdings. `x_prev_{t+1} = (0, 0)` after relocation.
+     The household at ell=B next period must pay `tau_buy` to acquire any x_B
+     (delta from 0 to x_B_new). E2_2L household pre-holding x_B avoids this.
+
+5. **Interpolation**: 4D multilinear (16-corner) over `(w, z, xa_prev, xb_prev)`
+   for given `ell`. Function `interp_4d_v4` in 16 floating-point multiplications.
+   The continuation value passes `(x_A_new, x_B_new)` as the next period's
+   `x_prev` arguments, because the CHOICE made this period becomes the STATE
+   next period.
+
+6. **Housing cost rule**: identical to v3 fixed rule — only the occupied-unit
+   token reduces rent (kappa = rho - x_ell * delta_own).
+
+**Files created:**
+
+- `src/vfi_solver_v4.jl` (~620 LOC): full 6D VFI solver with smoke test.
+- `scripts/run_option1_e1.sh`: server1 E1_2L baseline run script.
+- `scripts/run_option1_e2.sh`: server1 E2_2L baseline run script.
+- `scripts/` directory created (previously absent).
+- `output/diagnostics/` directory created.
+
+**Smoke test**: `julia src/vfi_solver_v4.jl --smoke-test` (does NOT run VFI;
+Julia not available in cloud env). Checks: sigma decomposition invariant, grid
+allocation, 6D array memory, shock block, terminal slice, `tx_cost_v4` spot-checks
+(7 cases), `find_bracket` boundary cases, `interp_4d_v4` corner and midpoint
+correctness, `housing_cost_v4` spot-checks.
+
+**Next queued for user/server1:**
+
+1. Run smoke test on server1: `julia src/vfi_solver_v4.jl --smoke-test`
+   → write result to `output/diagnostics/p6_option1_smoke.md`
+2. Run E1_2L baseline: `bash scripts/run_option1_e1.sh` (~2.5h)
+3. Run E2_2L baseline: `bash scripts/run_option1_e2.sh` (~2.5h)
+4. Check H1: `mean_xB > 0` at ell=A in E2_2L (hedge activates)
+5. Compute `CEV(E2_2L_v4 vs E1_2L_v4)` and compare to 4.255% Option-3 baseline.
+6. Write `output/diagnostics/p6_option1_decomposition.md`.
+
+**Branch**: `auto/2026-05-02-option1-state-extension`
+**Feature**: pushed to origin (see git push in this fire).
+
