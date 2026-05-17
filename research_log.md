@@ -2097,3 +2097,41 @@ after server1 baselines land.
 server1 baselines or human gate clearances. Holding for user server1 runs.
 
 **Feature branch**: `auto/2026-05-02-option1-state-extension`
+
+---
+
+## 2026-05-17 — Fire 28: `scripts/plot_sensitivity_heatmap.py` (Fig 2 script)
+
+**Author**: cloud agent (fire 28)
+
+**Context**: All cloud-executable work through fire 27 was already DONE.
+The one remaining gap found during fire 28 audit: `paper/exhibit_memos/fig2_sensitivity_heatmap.md`
+explicitly flags `scripts/plot_sensitivity_heatmap.py` as "to be written after
+sweep JSONs land." This is the only missing plot script that does not require
+full `.jls` solver results — it reads only the lightweight JSON summaries
+already produced by `sweep_rhoAB.sh` / `sweep_prelocate.sh`.
+
+**Deliverable**: `scripts/plot_sensitivity_heatmap.py` (new, ~270 LOC)
+
+Produces Figure 2: two 1D cross-section panels (preferred first-submission
+format per exhibit memo):
+- Panel A: CEV vs. rho_AB (p_reloc held at baseline 0.06)
+- Panel B: CEV vs. p_reloc (rho_AB held at baseline 0.50)
+
+**Key design choices**:
+- Same `load_V()` key resolution as `plot_channel_decomp.py`:
+  `V_t1_midpoint_ellA_xprev0` → `V_t1_midpoint_ellA_xprev00` → `V_t1_midpoint_ellA`
+- Graceful degradation: missing files print a warning to stderr; panels
+  show "No data available" placeholder rather than crashing
+- Monotonicity checks printed at runtime: CEV should be decreasing in
+  rho_AB, increasing in p_reloc (pre-registered from economic theory)
+- Default paths match actual sweep script output:
+  `output/diagnostics/p7_rhoAB_v4/` and `output/diagnostics/p7_prelocate_v4/`
+  (overrideable via `--rhoAB-dir` / `--preloc-dir`)
+- Baseline points (rho_AB=0.50, p_reloc=0.06) highlighted in red
+- Saves both PDF and PNG
+
+**Validated**: smoke-tested with no-data (graceful placeholder), then with
+mock CEV data — both panels rendered, monotonicity checks PASS, exit 0.
+
+**Feature branch**: `auto/2026-05-02-option1-state-extension`
