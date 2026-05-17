@@ -2135,3 +2135,29 @@ format per exhibit memo):
 mock CEV data — both panels rendered, monotonicity checks PASS, exit 0.
 
 **Feature branch**: `auto/2026-05-02-option1-state-extension`
+
+## 2026-05-17 — Fire 29: references.bib created
+
+**Action**: Fill missing `paper/references.bib` — the only remaining
+cloud-doable gap after fires 1-28 exhausted all other prep work.
+
+**Context**: Orientation at fire 29 showed all cloud-doable tasks
+done (fires 1-28). Only missing artifact was the BibTeX file; without
+it the paper cannot compile. All 6 LaTeX sections cite ~14 external
+papers plus 2 internal memos.
+
+**File created**: `paper/references.bib` — 16 citation keys:
+- YaoZhang2005, Cocco2005, CoccoGomesMaenhout2005 (canonical lifecycle housing)
+- KraftMunk2011, KMW2018 (KMW = Kraft/Munk/Wagner 2018 Rev. Finance)
+- Liu2021 (JHE; MHS/indivisibility benchmark)
+- SinaiSouleles2005, Davidoff2006, BFN2014 (rent-risk hedge; location risk)
+- FlavinYamashita2002, Han2013, PiazzesiSchneider2016 (housing macro)
+- CongLiWang2021 (tokenomics; RFS 2021)
+- Swinkels2023 (token yield institutional facts)
+- NAR2023, CFPB2022 (transaction cost data)
+- calibrationV3, researchLogMay01 (@unpublished internal docs)
+
+**Current blocker**: server1 baselines (p6_option1_e1.json, p6_option1_e2.json)
+still pending. All cloud work is genuinely complete pending those.
+
+**Branch**: `auto/2026-05-02-option1-state-extension` (fire 29)
