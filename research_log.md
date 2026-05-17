@@ -2135,3 +2135,46 @@ format per exhibit memo):
 mock CEV data — both panels rendered, monotonicity checks PASS, exit 0.
 
 **Feature branch**: `auto/2026-05-02-option1-state-extension`
+
+## 2026-05-17 — Fire 29: fix missing `asymmetric` handler in compute_cev_sweep.jl
+
+**Context**: Reset to remote tip (fire 28, commit 60ff101). Orientation scan
+confirmed all major Phase 2 prep work is DONE. All P0 / P1 items are either
+DONE or blocked on server1 baselines / H3' gate. No new Phase 2 work remains.
+
+**Bug found**: `scripts/sweep_asymmetric.sh` closes with the instruction:
+```
+julia scripts/compute_cev_sweep.jl asymmetric $OUTDIR
+```
+but `scripts/compute_cev_sweep.jl` had no `asymmetric` case — it would throw
+`error("Unknown sweep type 'asymmetric'")` on first use after server1 runs
+the sweep.
+
+**Fix applied** to `scripts/compute_cev_sweep.jl`:
+
+1. Added `elseif sweep == "asymmetric"` handler covering both sub-sweeps from
+   `sweep_asymmetric.sh`:
+   - Sweep 1 table (delta_mu_B ∈ {-0.01, 0.00, +0.01}): reads file pairs
+     `mu_delta_<val>_E{1,2}_2L.json` from `p8_asymmetric/`.
+   - Sweep 2 table (P_AB/P_BA): reads file pairs
+     `pAB_<esc>_pBA_<esc>_E{1,2}_2L.json` (dots → underscores, matching
+     the `${TAG//./_}` transformation in sweep_asymmetric.sh).
+   - Both tables print graceful MISSING errors per the existing pattern.
+
+2. Removed duplicate `using Dates` on line 139 (already imported on line 21
+   as part of `using JSON3, Printf, Dates`).
+
+3. Updated error message to include `asymmetric` in the usage hint.
+
+**No other changes**: all scripts and solver files pass the audit performed
+in fires 26-28.
+
+**Project status** (full picture after fire 29):
+- All cloud-executable work DONE.
+- Server1 gate open: run `bash scripts/run_option1_smoke.sh` then the 5 baseline
+  scripts (e0, e1, e1_notx, e2, e2_notau), commit JSONs to branch; next cloud
+  fire will compute the channel decomposition.
+- H3' gate open: framing approval needed before writing kickoff.
+
+**Branch**: `auto/2026-05-17-fire29` (pushed to origin; PR target:
+`auto/2026-05-02-option1-state-extension`)

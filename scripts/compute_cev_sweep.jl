@@ -126,8 +126,54 @@ function main()
                         val, row.V_E1, row.V_E2, row.cev * 100, note)
             end
         end
+    elseif sweep == "asymmetric"
+        # Asymmetric robustness sweeps (output of sweep_asymmetric.sh → p8_asymmetric/)
+        # Sweep 1: Location-B return premium. Files: mu_delta_<val>_E{1,2}_2L.json
+        # Sweep 2: Directional mobility. Files: pAB_<pAB_esc>_pBA_<pBA_esc>_E{1,2}_2L.json
+        #          (dots replaced by underscores in P_AB and P_BA values)
+
+        println("## Sweep 1: Location-B return premium (mu_h_B = mu_h + delta_mu)")
+        println()
+        println("| delta_mu_B | V(E1_2L) | V(E2_2L) | CEV (%) | note |")
+        println("|------------|----------|----------|---------|------|")
+        for (val, tag_val) in [(-0.01, "-0.01"), (0.00, "0.00"), (0.01, "0.01")]
+            row, err = cev_row(outdir,
+                               "mu_delta_$(tag_val)_E1_2L.json",
+                               "mu_delta_$(tag_val)_E2_2L.json")
+            if row === nothing
+                println("| $(val) | — | — | — | $err |")
+            else
+                note = val > 0 ? "B premium→↑x_B" : val < 0 ? "B discount→↓x_B" : "symmetric baseline"
+                @printf("| %+.2f | %.2f | %.2f | %+.3f%% | %s |\n",
+                        val, row.V_E1, row.V_E2, row.cev * 100, note)
+            end
+        end
+
+        println()
+        println("## Sweep 2: Directional mobility asymmetry (P_AB, P_BA)")
+        println()
+        println("| p_AB | p_BA | V(E1_2L) | V(E2_2L) | CEV (%) | note |")
+        println("|------|------|----------|----------|---------|------|")
+        # Cases from sweep_asymmetric.sh: dots replaced by underscores in filenames
+        cases = [
+            (0.06, 0.06, "0_06", "0_06", "symmetric baseline"),
+            (0.10, 0.03, "0_10", "0_03", "urban pull A→B"),
+            (0.10, 0.10, "0_10", "0_10", "high mobility both"),
+        ]
+        for (pAB, pBA, pAB_esc, pBA_esc, label) in cases
+            row, err = cev_row(outdir,
+                               "pAB_$(pAB_esc)_pBA_$(pBA_esc)_E1_2L.json",
+                               "pAB_$(pAB_esc)_pBA_$(pBA_esc)_E2_2L.json")
+            if row === nothing
+                println("| $pAB | $pBA | — | — | — | $err |")
+            else
+                @printf("| %.2f | %.2f | %.2f | %.2f | %+.3f%% | %s |\n",
+                        pAB, pBA, row.V_E1, row.V_E2, row.cev * 100, label)
+            end
+        end
+
     else
-        error("Unknown sweep type '$sweep'. Use: rhoAB, prelocate, txcost, mortgage")
+        error("Unknown sweep type '$sweep'. Use: rhoAB, prelocate, txcost, mortgage, asymmetric")
     end
 
     println()
@@ -136,5 +182,4 @@ function main()
     println("_E2_2L: tokens portable across moves — no forced tau_sell at relocation._")
 end
 
-using Dates
 main()
