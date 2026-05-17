@@ -736,6 +736,7 @@ function summary_v4(result::SolverResult_v4, grids::Grids_v4,
                     params::ModelParams_v4, regime::Int)
     s = Dict{String,Any}()
     s["regime"]          = regime_name_v4(regime)
+    s["solver_version"]  = "v4"   # read by compute_cev_sweep.jl / plot_channel_decomp.py
     s["total_points"]    = length(result.feasible)
     s["feasible_points"] = count(result.feasible)
     s["has_nan_value"]   = any(isnan, result.value)

@@ -2063,3 +2063,37 @@ or human gates.
 and H3' framing approval).
 
 
+
+## 2026-05-17 — Fire 27: fix key mismatch in plot_channel_decomp.py
+
+**Orientation**: reset to remote tip (commit 437f28f, fire 26). All cloud
+work confirmed done through fire 26. Reviewed existing scripts for correctness
+before server1 baselines arrive.
+
+**Bug found and fixed**: `scripts/plot_channel_decomp.py` looked for JSON
+key `V_t1_midpoint_ellA_xprev00` (two trailing zeros) but
+`src/vfi_solver_v4.jl` writes `V_t1_midpoint_ellA_xprev0` (one trailing
+zero). The fallback chain only tried the v3 key `V_t1_midpoint_ellA`,
+which also does not exist in v4 output. This would have caused a `KeyError`
+crash on the first `python scripts/plot_channel_decomp.py` invocation
+after server1 baselines land.
+
+**Fix applied to `scripts/plot_channel_decomp.py`**:
+- Changed default key arg from `V_t1_midpoint_ellA_xprev00` to
+  `V_t1_midpoint_ellA_xprev0` (matches v4 solver output)
+- Extended fallback chain in `load_V()` to try all three known key
+  variants in priority order: v4-canonical → v4-typo → v3-fallback
+- Added a clear docstring explaining the resolution order
+
+**Minor fix to `src/vfi_solver_v4.jl`**:
+- Added `s["solver_version"] = "v4"` to `summary_v4()`. The
+  `compute_cev_sweep.jl` had a comment "v4 sets this field" but the
+  solver did not actually write it; it defaulted silently to "v3".
+
+**`compute_cev_sweep.jl`**: already used the correct key
+`V_t1_midpoint_ellA_xprev0` — no change needed.
+
+**All other cloud work**: confirmed still DONE through fire 25. No new
+server1 baselines or human gate clearances. Holding for user server1 runs.
+
+**Feature branch**: `auto/2026-05-02-option1-state-extension`

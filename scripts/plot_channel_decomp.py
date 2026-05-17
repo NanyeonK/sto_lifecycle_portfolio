@@ -44,16 +44,24 @@ V3_HEDGE = 0.000   # pre-buying hedge (zero under v3 Option 3 — no state exten
 V3_CROSS = 0.028   # cross-term
 
 
-def load_V(path: str, key: str = "V_t1_midpoint_ellA_xprev00") -> float:
+def load_V(path: str, key: str = "V_t1_midpoint_ellA_xprev0") -> float:
+    """Load V at the initial state (x_A_prev=0, x_B_prev=0) from a solver JSON.
+
+    Key resolution order:
+      1. ``key`` as given (default: v4 canonical "…xprev0")
+      2. "V_t1_midpoint_ellA_xprev00"  (earlier fire typo — two trailing zeros)
+      3. "V_t1_midpoint_ellA"           (v3 fallback)
+    """
     with open(path) as f:
         d = json.load(f)
-    v = d.get(key)
-    if v is None:
-        # fall back to v3-style key
-        v = d.get("V_t1_midpoint_ellA")
-    if v is None:
-        raise KeyError(f"Neither '{key}' nor 'V_t1_midpoint_ellA' found in {path}")
-    return float(v)
+    for k in (key, "V_t1_midpoint_ellA_xprev00", "V_t1_midpoint_ellA"):
+        v = d.get(k)
+        if v is not None:
+            return float(v)
+    raise KeyError(
+        f"No V key found in {path}. "
+        f"Tried: {key!r}, 'V_t1_midpoint_ellA_xprev00', 'V_t1_midpoint_ellA'"
+    )
 
 
 def cev(V_a: float, V_b: float, gamma: float = GAMMA) -> float:
