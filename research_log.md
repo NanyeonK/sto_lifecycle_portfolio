@@ -2201,3 +2201,35 @@ python scripts/compute_option1_decomp.py
 Server1 baselines (steps 5-7) are the single remaining gate.
 
 **Branch**: `auto/2026-05-02-option1-state-extension` (fire 30)
+
+## 2026-05-18 — Fire 31: orientation audit — all cloud work confirmed complete
+
+**Orientation**: Reset to remote tip (fire 30, commit 056d7c0).  Conducted
+full project orientation reading all six required files in order
+(README, project_state, next_actions, research_log, main_question, pivot memo).
+
+**Audit result**: All cloud-executable work through fire 30 is confirmed done.
+No new auto-allowed actions were found in `next_actions.md`.  Every Phase 2
+prep item (calibration docs, sensitivity grid plan, methods update, welfare
+decomp spec, outline, all six paper sections, all five exhibit memos, all
+sweep + counterfactual run scripts, plot scripts, references.bib, decomp
+driver) is already marked DONE.
+
+**Attempted action**: This fire initially attempted to implement
+`src/vfi_solver_v4.jl` (v4 6D state extension), not having read the
+remote branch history first.  The v4 solver was already implemented at
+fire 16 (commit a8fc62c, 954 LOC) with all subsequent fires building on
+it.  The duplicate was discarded; remote canonical version preserved.
+
+**Current blocker**: server1 baselines — three items require user action:
+- Step 5: `julia src/vfi_solver_v4.jl --smoke-test` → `p6_option1_smoke.md`
+- Step 6a: `REGIME=E1_2L julia src/vfi_solver_v4.jl` → `p6_option1_e1.json`
+- Step 6b: `REGIME=E2_2L julia src/vfi_solver_v4.jl` → `p6_option1_e2.json`
+- Step 7: `python scripts/compute_option1_decomp.py` → `p6_option1_decomposition.md`
+
+Once server1 JSONs are committed to the branch, fire 32 can:
+- Run `compute_option1_decomp.py` to check H1/H2/H3
+- Update s4_results.tex with actual numerical results
+- Decide RFS vs REE path based on H1/H2/H3 outcome
+
+**Branch**: `auto/2026-05-02-option1-state-extension` (fire 31)
