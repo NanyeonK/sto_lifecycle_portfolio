@@ -2233,3 +2233,47 @@ Once server1 JSONs are committed to the branch, fire 32 can:
 - Decide RFS vs REE path based on H1/H2/H3 outcome
 
 **Branch**: `auto/2026-05-02-option1-state-extension` (fire 31)
+
+## 2026-05-18 — Fire 32: orientation audit — all cloud work confirmed complete, handoff updated
+
+**Orientation**: Reset to remote tip (fire 31, commit 73844cd). Read all
+six orientation files in order. Conducted full audit of `next_actions.md`.
+
+**Audit result**: All cloud-executable work through fire 31 is confirmed done.
+No new auto-allowed actions found. Every item in `next_actions.md` Phase 2 prep
+table is marked DONE. The single remaining gate is server1 baselines.
+
+**Attempted duplicate work**: This fire initially implemented `src/vfi_solver_v4.jl`
+from scratch (6D state, tx_cost on deltas) before reading the remote branch.
+This was discarded upon discovering fires 1-31 had already done this plus 31
+additional commits of paper sections, scripts, and calibration docs. The
+canonical v4 solver at 954 LOC (fires 16-17) was accepted; this fire's
+independent re-implementation confirmed the design is internally consistent
+with the spec.
+
+**Current blocker**: server1 baselines (P0 steps 5-7). All downstream cloud
+agent work (decomp script, plot scripts, sensitivity sweeps, paper sections) is
+ready and waiting. The project cannot advance until:
+
+1. `julia src/vfi_solver_v4.jl --smoke-test` (< 1 min)
+2. `bash scripts/run_option1_e1.sh` → `output/diagnostics/p6_option1_e1.json` (~2-3h)
+3. `bash scripts/run_option1_e2.sh` → `output/diagnostics/p6_option1_e2.json` (~2-3h)
+4. `bash scripts/run_option1_e1_notx.sh` → `p6_option1_e1_notx.json` (~2-3h)
+5. `bash scripts/run_option1_e2_notau.sh` → `p6_option1_e2_notau.json` (~2-3h)
+6. `bash scripts/run_option1_e0.sh` → `p6_option1_e0.json` (optional, ~2-3h)
+7. Commit all JSONs to branch `auto/2026-05-02-option1-state-extension`
+8. `python scripts/compute_option1_decomp.py` will then auto-generate
+   `output/diagnostics/p6_option1_decomposition.md` with H1/H2/H3 verdicts
+
+**After server1 JSONs land** (next cloud agent fire can execute):
+- Fill numerical results into `paper/sections/s4_results.tex` (all [P] placeholders)
+- Update `paper/sections/s1_intro.tex` headline CEV number
+- Decide RFS vs REE based on H1/H2/H3 outcome
+- If RFS: proceed to Phase 2 writing kickoff (H3' framing approval needed)
+- If REE: revise paper framing to continuous-x + tx-cost channel story
+
+**Updated**: `handoff/decisions_needed.md` refreshed with complete current
+server1 run instructions (fires 26-32 additions incorporated).
+
+**Branch**: `auto/2026-05-02-option1-state-extension` (fire 32)
+

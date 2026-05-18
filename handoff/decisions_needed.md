@@ -80,10 +80,15 @@ hedge channel is < 1.5% lifetime CEV, fall back to (D).
 
 ---
 
-## 2026-05-16 — ALL CLOUD WORK DONE: server1 runs now the critical path
+## 2026-05-18 — ALL CLOUD WORK DONE: server1 runs now the critical path
 
-All auto-allowed cloud agent actions are complete through fire 25.
-The project is now fully blocked on two gates:
+All auto-allowed cloud agent actions are complete through fire 32.
+The project is fully blocked on two gates. 32 fires of cloud prep
+have produced: v4 solver (954 LOC), all six paper sections, five
+figure production specs, all run scripts (baselines + counterfactuals),
+sensitivity sweep scripts, plot scripts, references.bib, and the
+automated decomposition driver. Nothing remains for the cloud agent
+until server1 JSONs are committed to the branch.
 
 ### Gate 1 (server1 — USER, steps 5-7)
 
@@ -97,25 +102,38 @@ julia src/vfi_solver_v4.jl --smoke-test
 bash scripts/run_option1_e1.sh          # -> output/diagnostics/p6_option1_e1.json
 bash scripts/run_option1_e2.sh          # -> output/diagnostics/p6_option1_e2.json
 
-# Step 6b: counterfactuals for 3-channel decomposition
+# Step 6b: counterfactuals for 3-channel decomposition (~2-3h each)
 bash scripts/run_option1_e1_notx.sh    # -> p6_option1_e1_notx.json
 bash scripts/run_option1_e2_notau.sh   # -> p6_option1_e2_notau.json
-bash scripts/run_option1_e0.sh         # -> p6_option1_e0.json (for Fig4)
+bash scripts/run_option1_e0.sh         # -> p6_option1_e0.json (for Fig4; optional)
 
-# Step 7: commit output JSONs to branch; cloud agent computes decomp next fire.
+# Step 7: commit all output JSONs to branch, then run decomp driver:
+git add output/diagnostics/p6_option1_*.json
+git commit -m "server1 baselines: v4 option1 JSON results"
+git push origin auto/2026-05-02-option1-state-extension
+
+# Cloud agent will automatically run:
+python scripts/compute_option1_decomp.py
+# -> output/diagnostics/p6_option1_decomposition.md
+# -> H1/H2/H3 verdict + strategic direction
 ```
 
-Hypothesis verdict from baselines:
-- H1: mean_xB > 0 at ell=A in E2_2L? (hedge mechanism active)
-- H2: CEV(E2 vs E1) > 4.255%? (vs Option 3 baseline)
-- H3: hedge channel ~ 0.5-1.5%? (= CEV(E2 vs E2_NOTAU))
+**Hypothesis verdict from baselines**:
+- H1: `mean_xB > 0` at ell=A in E2_2L? (hedge mechanism active)
+- H2: `CEV(E2 vs E1) > 4.255%`? (vs Option 3 baseline)
+- H3: `hedge_channel (ch3) ~ 0.5-1.5%`? (= CEV(E2 vs E2_NOTAU))
 
-If H1+H2+H3 -> Path RFS. If any fail -> Path D (REE/JHE at +4.26%).
+If H1+H2+H3 → **Path RFS**: proceed to Phase 2 (calibration sweep, writing).
+If any fail → **Path D (REE/JHE)** at +4.26% (tx-cost + continuous-x only).
+
+**Compute estimate** (server1, single thread):
+- Each baseline/counterfactual: ~2-3h at N_W=15, N_Z=5, N_X_PREV=3
+- Total 5 runs (including E0): ~12-15h; can parallelize 5 sessions
 
 ### Gate 2 (human — H3' framing approval)
 
 Required before writing kickoff (P2). Once server1 baselines confirm
 H1/H2/H3, approve v3 mobility-hedge framing for manuscript writing.
 Paper outline at `paper/outline_v4.md`; sections s1-s6 drafted and
-ready for revision once numerical headline is confirmed.
+ready for numerical filling once headline CEV is confirmed.
 
