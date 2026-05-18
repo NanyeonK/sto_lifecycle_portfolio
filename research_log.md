@@ -991,3 +991,65 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-05-18 — v4 solver skeleton: 6D state extension (Option 1)
+
+**Action picked**: P0 — create `src/vfi_solver_v4.jl` implementing the
+full 6D state `(t, w, z, ell, ix_A_prev, ix_B_prev)` with per-period
+transaction costs on token deltas. This is the proper implementation
+of Path B Option 1 approved 2026-05-02.
+
+**Why this action**: `next_actions.md` P0 is the Option 1 state extension.
+All prior fires confirmed the hedge channel is dead without proper
+`tau_buy` state tracking; Option 1 is the only remaining path to
+activating the mechanism. No human gates block this implementation step.
+
+**Branch**: `auto/2026-05-02-option1-state-extension`
+
+**Files created / modified**:
+- `src/vfi_solver_v4.jl` (~560 LOC) — full 6D solver
+- `scripts/run_option1_e1.sh` — E1_2L baseline run script
+- `scripts/run_option1_e2.sh` — E2_2L baseline run script
+
+**Design summary**:
+
+State extension: adds `ix_A_prev` and `ix_B_prev` as discrete state
+dimensions, each indexing a coarse x_prev grid (N_X_PREV=3 default,
+X_PREV_MAX=2.0 → grid {0.0, 1.0, 2.0}).
+
+Per-period transaction cost:
+- E2_2L: `tau_buy * sum(max(delta, 0)) + tau_token * sum(max(-delta, 0))`
+  per location; sell_factor = 1.0 at relocation (tokens portable).
+- E1_2L: `tau_buy * max(delta_ell, 0)` for buying only; forced sell at
+  relocation handled via sell_factor = (1 - tau_sell) in wealth transition.
+
+Hedge mechanism logic: E2_2L household at ell=A pre-buys x_B incrementally
+(paying tau_buy on small deltas). On relocation to B, x_B_prev = 1.0
+already → delta_B = 0 → no buying cost. E1_2L household after relocation
+always starts at x_prev=(0,0) (forced sale zeroes the state).
+
+Key implementation correctness:
+- After E1_2L relocation from A to B: `ix_A_reloc = 1` (= 0.0) in the
+  continuation value — correctly zeroes out the sold token's x_prev state.
+- After E2_2L relocation: `ix_A_reloc = ix_A_next`, `ix_B_reloc = ix_B_next`
+  — tokens retained, x_prev unchanged.
+- x_prev grid {0.0, 1.0, 2.0}: E1_2L naturally uses indices {1, 2}
+  (covering 0.0 and 1.0); E2_2L can use all three (up to 2× leverage).
+
+Memory: ~3.7 MB for default grids (57×15×5×2×3×3 × 8 bytes × 6 arrays).
+Compute estimate: ~30–60 min per regime on server1 single thread (same
+order as v3 at comparable total inner-loop evaluation count).
+
+Smoke test stub `smoke_test_v4()` checks: sigma decomposition invariant,
+shock block size and weight sum, 6D array allocation, terminal slice,
+tx_cost spot-checks (E2_2L increase/no-change/decrease/mixed; E1_2L
+buy/stay/non-ell), housing_cost, p_relocate boundaries. VFI NOT run
+(cloud env has no Julia).
+
+**Next queued (server1 required)**:
+1. `julia src/vfi_solver_v4.jl --smoke-test` — verify struct init
+2. `bash scripts/run_option1_e1.sh` → `p6_option1_e1.json`
+3. `bash scripts/run_option1_e2.sh` → `p6_option1_e2.json`
+4. Check H1: mean_xB > 0 at ell=A in E2_2L (hedge activated?)
+5. Check H2: CEV(E2_2L_v4 vs E1_2L_v4) > 4.255%
+6. Check H3: hedge channel CEV(E2_2L_v4 vs E2_2L_v3) ≈ 0.5–1.5%
+
