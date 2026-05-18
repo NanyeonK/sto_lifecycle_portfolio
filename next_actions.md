@@ -86,6 +86,7 @@ If any fails: fall back to Path D (REE/JHE) at +4.26%.
 | bugfix | `scripts/plot_channel_decomp.py` key mismatch fixed: `load_V` now tries `V_t1_midpoint_ellA_xprev0` (v4 canonical) before falling back; `vfi_solver_v4.jl` now writes `solver_version="v4"` | **DONE** 2026-05-17 (fire 27) |
 | P1-prep | `scripts/plot_sensitivity_heatmap.py` — Fig 2 two-panel CEV sensitivity script (rho_AB + p_reloc cross-sections); reads from p7_rhoAB_v4/ + p7_prelocate_v4/ | **DONE** 2026-05-17 (fire 28) |
 | P1-prep | `paper/references.bib` — BibTeX for all 16 citation keys used in paper sections | **DONE** 2026-05-17 (fire 29) |
+| P1-prep | `scripts/compute_option1_decomp.py` — reads 4 baseline JSONs, computes 3-channel CEV decomp, checks H1/H2/H3, writes `p6_option1_decomposition.md` | **DONE** 2026-05-18 (fire 30) |
 
 ## P1 (after Option 1 resolves)
 

@@ -2161,3 +2161,43 @@ papers plus 2 internal memos.
 still pending. All cloud work is genuinely complete pending those.
 
 **Branch**: `auto/2026-05-02-option1-state-extension` (fire 29)
+
+## 2026-05-18 — Fire 30: `scripts/compute_option1_decomp.py` (step-7 driver)
+
+**Orientation**: reset to remote tip (commit 9960616, fire 29). Conducted
+full audit of all cloud-doable deliverables.
+
+**Gap found**: `next_actions.md` step 7 — "compute decomposition + write up"
+— had no dedicated script. The `plot_channel_decomp.py` produces Figure 3
+(bar chart PDF) but does not write `output/diagnostics/p6_option1_decomposition.md`.
+The `compute_cev_sweep.jl` handles sensitivity sweeps but not the baseline
+decomposition. No script existed to read the 4 counterfactual JSONs and
+produce the markdown summary that step 7 requires.
+
+**Deliverable**: `scripts/compute_option1_decomp.py` (~230 LOC, Python 3).
+
+When called after server1 baselines arrive (commit JSONs to branch), it:
+1. Reads `p6_option1_e1.json`, `p6_option1_e2.json`, `p6_option1_e1_notx.json`,
+   `p6_option1_e2_notau.json` (+ optional `p6_option1_e0.json`).
+2. Computes 3-channel CEV decomposition:
+   - ch1: tx-cost avoidance = CEV(E1_NOTX vs E1)
+   - ch2: continuous-x rent-saving = CEV(E2_NOTAU vs E1_NOTX)
+   - ch3: pre-buy hedge (v4 novel) = CEV(E2 vs E2_NOTAU)
+   - cross-term = total - ch1 - ch2 - ch3
+3. Checks pre-registered hypotheses H1/H2/H3 and prints verdict.
+4. Writes `output/diagnostics/p6_option1_decomposition.md` with full table.
+
+Graceful error on missing JSONs (prints server1 run instructions).
+Uses same `load_V()` key-resolution chain as `plot_channel_decomp.py`.
+Validated: runs and exits with useful error message when JSONs missing.
+
+**Usage after server1 runs**:
+```bash
+python scripts/compute_option1_decomp.py
+# output: output/diagnostics/p6_option1_decomposition.md
+```
+
+**No remaining auto-allowed cloud actions.** All cloud prep is complete.
+Server1 baselines (steps 5-7) are the single remaining gate.
+
+**Branch**: `auto/2026-05-02-option1-state-extension` (fire 30)
