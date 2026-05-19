@@ -2305,3 +2305,38 @@ further cloud agent progress. See `handoff/decisions_needed.md` for run
 instructions (unchanged from fire 32).
 
 **Branch**: `auto/2026-05-02-option1-state-extension` (fire 33)
+
+## 2026-05-19 — Fire 34: orientation audit — server1 gate unchanged; all cloud work confirmed complete
+
+**Orientation**: Read all project state files in canonical order
+(README → project_state → next_actions → research_log → main_question →
+pivot memo → decision_log → methods → vfi_solver_v2 → vfi_solver_v3 →
+vfi_solver_v4 → tau_buy_option1_spec). Repo state verified against
+fire-33 record.
+
+**Action picked**: P0 Steps 1–4 — attempted to implement `src/vfi_solver_v4.jl`
+(6D state, delta-based tx_cost, smoke test, run scripts). Produced a
+~740-LOC re-implementation before discovering the remote branch at fire 33
+was already at HEAD with the canonical 954-LOC solver. Reset to remote HEAD.
+
+**Findings (same as fire 33)**:
+All cloud-executable work is complete:
+- `src/vfi_solver_v4.jl` (954 LOC; 4D multilinear interpolation; asymmetric
+  robustness extension; smoke-test stub) — fires 14–17
+- Complete paper skeleton s1–s6 + main.tex + abstract + appendices A-C —
+  fires 10–19
+- All figure specs (fig1–fig5 exhibit memos) — fires 23–25
+- All run scripts (baselines + counterfactuals + sensitivity sweeps) — fires
+  20–30
+- `scripts/compute_option1_decomp.py` step-7 decomp driver — fire 30
+- `paper/references.bib` (16 keys) — fire 29
+- `scripts/plot_channel_decomp.py`, `scripts/plot_sensitivity_heatmap.py` —
+  fires 27–28
+- `handoff/decisions_needed.md` with full server1 run instructions — fires
+  26–32
+
+**Blocker unchanged**: server1 baselines (steps 5-7) remain the sole gating
+item. No new cloud work can meaningfully advance the paper until H1/H2/H3
+verdicts are available from the v4 solver runs.
+
+**Branch**: `auto/2026-05-02-option1-state-extension` (fire 34)
