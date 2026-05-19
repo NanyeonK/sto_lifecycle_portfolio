@@ -80,9 +80,30 @@ hedge channel is < 1.5% lifetime CEV, fall back to (D).
 
 ---
 
+## ⚠️ CLOUD AGENT ORIENTATION NOTE (fires 31–35 all hit this)
+
+**STOP. Before implementing anything**: the remote branch
+`auto/2026-05-02-option1-state-extension` is at fire 35. ALL of the
+following are already present and working:
+- `src/vfi_solver_v4.jl` — 954-LOC 6D-state solver (4D multilinear
+  interpolation; fire 14-17). DO NOT re-implement.
+- `paper/sections/s1_intro.tex` through `s6_conclusion.tex` — full draft.
+- `paper/main.tex`, `paper/outline_v4.md`, `paper/references.bib`
+- `scripts/run_option1_e*.sh`, `scripts/compute_option1_decomp.py`
+- `docs/calibration_v3.md`, `docs/methods_v3.md`, `docs/welfare_decomp_v4.md`
+- All sensitivity sweep scripts (rhoAB, prelocate, txcost, asymmetric, mortgage)
+
+THE ONLY THING MISSING: `output/diagnostics/p6_option1_*.json` (server1 runs).
+
+If you cannot find new cloud-executable work after reading this file,
+that is correct: **there is nothing for the cloud agent to do**. Write the
+orientation-audit log entry and commit. Do not implement vfi_solver_v4.jl.
+
+---
+
 ## 2026-05-18 — ALL CLOUD WORK DONE: server1 runs now the critical path
 
-All auto-allowed cloud agent actions are complete through fire 32.
+All auto-allowed cloud agent actions are complete through fire 35.
 The project is fully blocked on two gates. 32 fires of cloud prep
 have produced: v4 solver (954 LOC), all six paper sections, five
 figure production specs, all run scripts (baselines + counterfactuals),

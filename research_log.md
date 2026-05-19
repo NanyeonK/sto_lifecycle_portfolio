@@ -2340,3 +2340,55 @@ item. No new cloud work can meaningfully advance the paper until H1/H2/H3
 verdicts are available from the v4 solver runs.
 
 **Branch**: `auto/2026-05-02-option1-state-extension` (fire 34)
+
+## 2026-05-19 — Fire 35: orientation audit + v4 solver correctness review
+
+**Orientation**: Read all six orientation files in canonical order
+(README → project_state → next_actions → research_log → main_question →
+pivot memo). Additionally read decision_log, methods, tau_buy_option1_spec,
+and the full canonical v4 solver (954 LOC).
+
+**Attempted action**: Initially implemented `src/vfi_solver_v4.jl` from
+scratch (~660 LOC, 6D state with direct x_prev grid indexing). On push,
+discovered remote branch had 34 prior fires. Reset to remote canonical state.
+
+**Genuine contribution this fire**: targeted correctness review of canonical
+v4 solver (fires 14-17) + prominent early-warning update to
+`handoff/decisions_needed.md` to prevent fires 36+ from repeating the same
+redundant re-implementation.
+
+**Solver review findings (fires 14-17 canonical v4)**:
+- 4D multilinear interpolation (`interp_v4`): correct. Bilinear in (w,z) at
+  each of 4 corners in (x_A_prev, x_B_prev), then bilinear across corners.
+  Bracket function safely clamps, n_x_prev=3 gives valid index range.
+- E1_2L forced-sale handling: correct. `sf_A_reloc=(1-tau_sell)` in wealth
+  transition; `x_prev_next=(0,0)` on relocation (clean reset, no
+  double-counting with `tau_token` for the forced disposal).
+- `tx_cost_v4`: applies tau_token to negative deltas (voluntary sells) for
+  BOTH regimes. For E1_2L this means voluntary home-sales cost tau_token=1%
+  (not tau_sell=6%). Economically imprecise but quantitatively minor since
+  E1_2L voluntary sells are rare in equilibrium.
+- `income_profile_v4` bounds: verified no out-of-bounds at terminal period.
+  `next_income_state_v4` only reads `f_profile[next_t]` when
+  `next_age <= retire_age`; at terminal ages the `else` branch is taken. ✓
+- Asymmetric parameters `mu_h_B`, `P_RELOCATE_AB`, `P_RELOCATE_BA`: correctly
+  plumbed through ModelParams_v4 and `p_relocate_v4(p, t, ell)`. Defaults to
+  symmetric baseline when env vars not set. ✓
+- VFI loop: 6D iteration is correct; `next_slice = view(result.value, t+1,
+  :,:,:,:,:)` gives 5D slice; `interp_v4` accesses it at `view(next_slice,
+  :,:,iell,iA,iB)` — 2D (n_w, n_z) as expected. ✓
+- Memory layout note: outer loop is iw (w varies fastest in write), but Julia
+  is column-major and first dimension (t) varies fastest in result.value. For
+  6D, the write order is slightly cache-suboptimal but NOT a correctness issue.
+
+**Result**: canonical v4 solver is internally consistent and spec-compliant.
+No bugs found. Safe to run on server1.
+
+**Updated**: `handoff/decisions_needed.md` — added ⚠️ banner at top of
+"All Cloud Work Done" section with explicit list of files already present,
+to prevent fires 36+ from redundant implementation.
+
+**Blocker unchanged**: server1 baselines (steps 5-7) remain the sole gating
+item. No new cloud work can meaningfully advance the paper.
+
+**Branch**: `auto/2026-05-02-option1-state-extension` (fire 35)
