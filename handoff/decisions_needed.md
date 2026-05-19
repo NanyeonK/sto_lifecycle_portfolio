@@ -78,3 +78,83 @@ hedge channel is < 1.5% lifetime CEV, fall back to (D).
 - (H3') Framing approval at writing kickoff
 - (H4') Submission decision
 
+---
+
+## ⚠️ CLOUD AGENT ORIENTATION NOTE (fires 31–35 all hit this)
+
+**STOP. Before implementing anything**: the remote branch
+`auto/2026-05-02-option1-state-extension` is at fire 35. ALL of the
+following are already present and working:
+- `src/vfi_solver_v4.jl` — 954-LOC 6D-state solver (4D multilinear
+  interpolation; fire 14-17). DO NOT re-implement.
+- `paper/sections/s1_intro.tex` through `s6_conclusion.tex` — full draft.
+- `paper/main.tex`, `paper/outline_v4.md`, `paper/references.bib`
+- `scripts/run_option1_e*.sh`, `scripts/compute_option1_decomp.py`
+- `docs/calibration_v3.md`, `docs/methods_v3.md`, `docs/welfare_decomp_v4.md`
+- All sensitivity sweep scripts (rhoAB, prelocate, txcost, asymmetric, mortgage)
+
+THE ONLY THING MISSING: `output/diagnostics/p6_option1_*.json` (server1 runs).
+
+If you cannot find new cloud-executable work after reading this file,
+that is correct: **there is nothing for the cloud agent to do**. Write the
+orientation-audit log entry and commit. Do not implement vfi_solver_v4.jl.
+
+---
+
+## 2026-05-18 — ALL CLOUD WORK DONE: server1 runs now the critical path
+
+All auto-allowed cloud agent actions are complete through fire 35.
+The project is fully blocked on two gates. 32 fires of cloud prep
+have produced: v4 solver (954 LOC), all six paper sections, five
+figure production specs, all run scripts (baselines + counterfactuals),
+sensitivity sweep scripts, plot scripts, references.bib, and the
+automated decomposition driver. Nothing remains for the cloud agent
+until server1 JSONs are committed to the branch.
+
+### Gate 1 (server1 — USER, steps 5-7)
+
+Run these on server1 in this order:
+
+```bash
+# Step 5: smoke test (< 1 min)
+julia src/vfi_solver_v4.jl --smoke-test
+
+# Step 6a: baselines (~2-3h each, single thread)
+bash scripts/run_option1_e1.sh          # -> output/diagnostics/p6_option1_e1.json
+bash scripts/run_option1_e2.sh          # -> output/diagnostics/p6_option1_e2.json
+
+# Step 6b: counterfactuals for 3-channel decomposition (~2-3h each)
+bash scripts/run_option1_e1_notx.sh    # -> p6_option1_e1_notx.json
+bash scripts/run_option1_e2_notau.sh   # -> p6_option1_e2_notau.json
+bash scripts/run_option1_e0.sh         # -> p6_option1_e0.json (for Fig4; optional)
+
+# Step 7: commit all output JSONs to branch, then run decomp driver:
+git add output/diagnostics/p6_option1_*.json
+git commit -m "server1 baselines: v4 option1 JSON results"
+git push origin auto/2026-05-02-option1-state-extension
+
+# Cloud agent will automatically run:
+python scripts/compute_option1_decomp.py
+# -> output/diagnostics/p6_option1_decomposition.md
+# -> H1/H2/H3 verdict + strategic direction
+```
+
+**Hypothesis verdict from baselines**:
+- H1: `mean_xB > 0` at ell=A in E2_2L? (hedge mechanism active)
+- H2: `CEV(E2 vs E1) > 4.255%`? (vs Option 3 baseline)
+- H3: `hedge_channel (ch3) ~ 0.5-1.5%`? (= CEV(E2 vs E2_NOTAU))
+
+If H1+H2+H3 → **Path RFS**: proceed to Phase 2 (calibration sweep, writing).
+If any fail → **Path D (REE/JHE)** at +4.26% (tx-cost + continuous-x only).
+
+**Compute estimate** (server1, single thread):
+- Each baseline/counterfactual: ~2-3h at N_W=15, N_Z=5, N_X_PREV=3
+- Total 5 runs (including E0): ~12-15h; can parallelize 5 sessions
+
+### Gate 2 (human — H3' framing approval)
+
+Required before writing kickoff (P2). Once server1 baselines confirm
+H1/H2/H3, approve v3 mobility-hedge framing for manuscript writing.
+Paper outline at `paper/outline_v4.md`; sections s1-s6 drafted and
+ready for numerical filling once headline CEV is confirmed.
+
