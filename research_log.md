@@ -991,3 +991,76 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-05-19 — v4 solver skeleton: 6D state with proper tau_buy tracking (Option 1)
+
+**Action picked**: P0 from `next_actions.md` — create `src/vfi_solver_v4.jl`
+(Option 1 full state extension). This is the only non-DONE, non-human-gated P0
+item and was explicitly marked as the agent's task in both `next_actions.md`
+and `handoff/tau_buy_option1_spec.md`.
+
+**What changed from v3:**
+
+The v3 solver tracked `(t, w, z, ell)` as state (4D) and approximated
+tau_buy via an `apply_tau_buy_at_reloc` flag at relocation events (Option 3).
+This produced CEV(E2_2L vs E1_2L_full) = +4.255% but with mean_xB = 0 at
+ell=A — the hedge channel did not activate.
+
+v4 promotes `(x_A_prev, x_B_prev)` to explicit state dimensions → 6D:
+`(t, w, z, ell, x_A_prev, x_B_prev)`. Per-period transaction costs are
+computed from the net position change:
+
+```
+delta_A  = x_A_new - x_A_prev
+delta_B  = x_B_new - x_B_prev
+tx_cost  = tau_buy   * (max(delta_A,0) + max(delta_B,0))
+         + tau_token * (max(-delta_A,0) + max(-delta_B,0))
+```
+
+**Why this resurrects the hedge channel:** At ell=A with x_B_prev=0, buying
+x_B incrementally now (paying tau_buy * delta_B) is cheaper in expectation
+than arriving at B with x_B_prev=0 and needing to buy x_B=1 in one step.
+Expected saving per period per unit pre-held: p_relocate * tau_buy ≈
+0.06 * 0.025 = 0.0015. Option 3 could not capture this because it applied
+tau_buy as a lump deduction at relocation, not as an incremental per-period
+cost that makes pre-positioning rational.
+
+**State update design for E1_2L relocation:**
+- At t: ell=A, x_A_new=1, x_B_new=0 (binary owner)
+- Relocation fires: ell becomes B; x_A sold with sf=(1-tau_sell) in wealth
+- At t+1: state is (ell=B, x_A_prev=0, x_B_prev=0) — forced liquidation sets
+  x_prev to (0, 0) in the continuation value lookup
+- Buying x_B=1 at new location: delta_B = 1-0 = 1 → tx_cost = tau_buy * 1
+
+**State update design for E2_2L relocation:**
+- Tokens portable: x_prev_next = x_new regardless of ell outcome
+- So x_B_prev = x_B_new carried forward across relocation → full hedge value
+
+**Files created:**
+- `src/vfi_solver_v4.jl` (~620 LOC): full 6D solver with smoke test
+- `scripts/run_option1_e1.sh`: E1_2L baseline run (N_W=15, N_Z=5, N_X_PREV=3)
+- `scripts/run_option1_e2.sh`: E2_2L baseline run (same grids)
+
+**Default grids (first-cut compute budget):**
+- N_X_PREV=3, X_PREV_MAX=1.0 → x_prev ∈ {0.0, 0.5, 1.0}
+- N_W=15, N_Z=5, ASSET_GRID_SIZE=7, GH_NODES=3
+- State array: 57×15×5×2×3×3 = 76,950 state points
+- Estimated memory: ~25 MB (7 arrays)
+- E1_2L: 2 housing choices per state (x=0 or x=1.0); est. ~2-3h wall
+- E2_2L: 9 housing choices per state (3×3 grid); est. ~10-12h wall (4h with 3 threads)
+
+**Architecture notes:**
+- x_new choices constrained to x_prev grid → no interpolation in x_prev dims;
+  only bilinear in (w, z)
+- Continuation value: `view(next_slice, :, :, ell, ixA, ixB)` gives (N_W, N_Z)
+  slice for direct bilinear lookup
+- v3 solver preserved at `src/vfi_solver_v3.jl`; v2 at `src/vfi_solver_v2.jl`
+
+**Feature branch**: `auto/2026-05-02-option1-state-extension`
+
+**Next queued actions (all user / server1 required):**
+1. Run `julia src/vfi_solver_v4.jl --smoke-test` on server1 to verify struct init
+2. Run E1_2L baseline: `bash scripts/run_option1_e1.sh`
+3. Run E2_2L baseline: `bash scripts/run_option1_e2.sh --threads 4`
+4. Check H1: mean_xB > 0 at ell=A (hedge activation)
+5. Compute CEV(E2_2L_v4 vs E1_2L_v4) and compare to v3's 4.255%
+
