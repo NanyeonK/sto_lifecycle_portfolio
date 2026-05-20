@@ -1,0 +1,399 @@
+% s5_discussion.tex — Discussion
+% Paper: "Tokenized Housing and Lifecycle Portfolio Choice:
+%         A Decoupling of Location from Housing Exposure"
+%
+% Source: paper/outline_v4.md §5 (sections 5.1–5.3)
+%         docs/welfare_decomp_v4.md §5 (literature comparison table)
+%         paper/outline_v4.md Appendix C (hedge-channel sign conditions)
+%
+% Status: SKELETON — [PLACEHOLDER] marks require server1 numerical results.
+%         Structural arguments are complete; fill CEV magnitudes once
+%         output/diagnostics/p6_option1_*.json land.
+%
+% Compilation: \input{sections/s5_discussion} from main.tex
+%              Requires amsmath, booktabs, siunitx, hyperref, natbib.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Discussion}
+\label{sec:discussion}
+% ─────────────────────────────────────────────────────────────────────────────
+
+The headline welfare gain of
+$\operatorname{CEV}(\text{E2\_2L vs E1\_2L}) = \textsc{[x.xx\%]}$
+[\textsc{placeholder}]
+arises from two distinct mechanisms, each with a different structural origin
+and a different relationship to the existing lifecycle housing-portfolio
+literature.
+We discuss each mechanism in turn, then address the partial-equilibrium
+scope of the welfare estimates and the paper's policy implications.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\subsection{Relation to the Continuous-Ownership Literature}
+\label{sec:discussion:liu}
+% ─────────────────────────────────────────────────────────────────────────────
+
+The continuous-$x$ component of the E2\_2L welfare gain~---~the ability to
+hold a fractional share $x \in [0,\infty)$ of the occupied location's
+residential value, paying maintenance proportional to share held and receiving
+rent savings accordingly~---~shares its economic logic with \citet{Liu2021}.
+\citeauthor{Liu2021} analyzes a Minimum Housing Share (MHS) relaxation that
+similarly allows a household to hold a continuous fraction of housing rather
+than the binary own-or-rent choice of \citet{YaoZhang2005} and \citet{Cocco2005}.
+Within a single-location, no-relocation framework, \citeauthor{Liu2021} reports
+welfare gains of 5--10\% of lifetime consumption from this indivisibility
+relaxation.
+
+Our model confirms the continuous-$x$ channel quantitatively: in the
+v3~Option~3 baseline, $\operatorname{CEV}(\text{E2\_2L vs E1\_2L\_NOTX}) =
++3.41\%$ is attributable to the continuous-$x$ mechanism, consistent with
+the lower end of \citeauthor{Liu2021}'s range
+(the difference reflecting our more conservative grid resolution and the
+presence of a relocation shock that occasionally forces households away from
+their optimal stationary allocation).
+
+Our contribution \emph{beyond} \citeauthor{Liu2021} rests on two mechanisms
+that are absent from the single-location framework:
+\begin{enumerate}[(i)]
+\item \textbf{Round-trip transaction-cost avoidance.}
+      Under traditional binary homeownership (E1\_2L), each relocation forces
+      a sell-and-buy round-trip at approximately $\tau_{\text{sell}} +
+      \tau_{\text{buy}} = 6\% + 2.5\% = 8.5\%$ of housing value.
+      Tokenized holdings avoid the selling cost entirely (tokens are retained
+      across moves) and amortize the buying cost over multiple periods via
+      gradual pre-accumulation.
+      In the v3~Option~3 baseline, this channel contributes
+      $+0.82\%$ ($= +0.57\%$ from sell-side avoidance $+ +0.25\%$ from
+      buy-side approximation).
+      \citeauthor{Liu2021} has no relocation shock and no transaction-cost
+      block; this channel is structurally absent from that framework.
+
+\item \textbf{Pre-buying hedge via gradual accumulation.}
+      Under the 6D state (v4~Option~1), a household at location~$A$ who
+      anticipates possible relocation to~$B$ can pre-accumulate fractional
+      $B$-location tokens incrementally.
+      Each unit of $x_B$ pre-accumulated while at~$A$ avoids paying
+      $\tau_{\text{buy}} = 2.5\%$ on that unit at the moment of relocation
+      arrival.
+      The per-period expected saving from holding one unit of $x_B$ at~$A$
+      is $p_{\text{reloc}} \cdot \tau_{\text{buy}} = 0.06 \times 0.025 =
+      0.15\%$; cumulated over the working life, this can deliver a
+      lifetime CEV contribution of approximately 0.5--1.5\%.
+      [\textsc{Placeholder: fill from server1 p6\_option1\_e2.json.}]
+      This mechanism has no analog in \citeauthor{Liu2021} or in any prior
+      lifecycle housing-portfolio model known to us.
+\end{enumerate}
+
+The structural claim is therefore:
+\begin{equation}
+    \underbrace{\operatorname{CEV}(\text{E2\_2L vs E1\_2L})}_{\text{Token
+    value}} =
+    \underbrace{\operatorname{CEV}_{\text{Liu}}}_{\approx 3.4\%}
+    + \underbrace{\text{Tx-cost avoidance}}_{\approx 0.8\%}
+    + \underbrace{\text{Pre-buying hedge}}_{\approx 0.5\text{--}1.5\%}
+    + \text{cross-term}.
+    \label{eq:decomp_claim}
+\end{equation}
+The cross-term is reported directly (Section~\ref{sec:results:decomp});
+in the v3 baseline it equals $+0.02\%$, confirming near-additive separability
+of channels.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\subsection{The Pre-Buying Hedge: Conditions for Activation}
+\label{sec:discussion:hedge}
+% ─────────────────────────────────────────────────────────────────────────────
+
+The pre-buying hedge mechanism is subtle.
+A household at location~$A$ faces a per-unit opportunity cost of holding
+$x_B > 0$: the unit of wealth allocated to $x_B$ forgoes the rent saving
+that $x_A$ would provide, since only the \emph{occupied-location} token
+reduces net housing cost:
+\begin{equation}
+    \kappa(x_A, x_B \mid \ell{=}A)
+    = \rho - x_A \cdot (\rho - m).
+    \label{eq:kappa_A}
+\end{equation}
+Equation~\eqref{eq:kappa_A} implies that each unit of $x_B$ held while
+at~$A$ carries a per-period opportunity cost of $\delta_{\text{own}} = \rho - m
+= 0.04$ (the rent-saving foregone by not putting that wealth into $x_A$).
+The pre-buying benefit of holding $x_B$ is $p_{\text{reloc}} \cdot
+\tau_{\text{buy}} = 0.0015$ per period.
+
+Since $0.04 \gg 0.0015$, the naive static calculation suggests $x_B = 0$
+is always optimal---consistent with the failed v3~Option~3 mechanism
+test (Section~\ref{sec:results:falsification}).\footnote{Under the earlier
+over-generous kappa rule $\kappa = \rho - (x_A + x_B)(\rho - m)$, the
+$x_B$ opportunity cost was zero, mechanically generating $x_B > 0$
+as a spurious artifact (\citealt{research_log_2026_05_01_fix}).
+The corrected kappa rule~\eqref{eq:kappa_A} eliminates this artifact.}
+
+Two forces can restore the pre-buying hedge in equilibrium.
+First, at low wealth levels, the household cannot afford to bring $x_A$ to
+its wealth-constrained ceiling; the marginal unit of wealth invested in $x_B$
+rather than $x_A$ sacrifices rent-saving proportional to the \emph{uncovered
+fraction} of $x_A$, which may be small when $x_A$ is already near the ceiling
+for low-wealth households.
+Second, the 6D state tracks $x_{A,\text{prev}}$ and $x_{B,\text{prev}}$
+jointly; a household who has already accumulated a large $x_A$ position
+(with $x_A \approx x_{A,\text{prev}}$, so $\Delta x_A \approx 0$) pays no
+additional $\tau_{\text{buy}}$ to maintain it, making the marginal cost of
+diverting a small increment to $x_B$ much lower than the static calculation
+suggests.
+
+The pre-registered hedge diagnostic (`mean_xB_at_ellA_xprev0_t1` in the solver
+summary) tests whether this pre-buying demand is positive at the initial state
+$x_{A,\text{prev}} = x_{B,\text{prev}} = 0$.
+If $\bar{x}_B > 0$ (Hypothesis H1), the mechanism activates and channel~(ii)
+in equation~\eqref{eq:decomp_claim} is quantitatively non-negligible.
+If $\bar{x}_B = 0$ everywhere, the mechanism is dominated by the opportunity
+cost and the paper's contribution rests on channels (i) and the Liu-type
+continuous-$x$ channel only.
+[\textsc{Placeholder: fill \textbf{H1 status} once server1 JSON lands.}]
+
+% ─────────────────────────────────────────────────────────────────────────────
+\subsection{Why REITs Cannot Replicate}
+\label{sec:discussion:reit}
+% ─────────────────────────────────────────────────────────────────────────────
+
+A natural alternative for households seeking housing-market exposure after
+relocation is a diversified real estate investment trust (REIT).
+We dropped the REIT asset from the v3 model (it was present in the v2 framework)
+for a structural reason that this section makes explicit.
+
+REITs aggregate cash flows from a national or regional portfolio of properties.
+An investment in a REIT therefore provides exposure to the \emph{common factor}
+$R_{\text{div}}$ in housing returns~---~the component shared by all markets~---~but
+not to the idiosyncratic location-specific component $\iota_\ell$.
+Under our return decomposition
+$\log R_\ell = \mu_h + \eta_{\text{div}} + \iota_\ell$
+(Section~\ref{sec:model:returns}), a REIT-like diversified asset delivers
+$E[\eta_{\text{div}}]$ but $E[\iota_\ell] = 0$ in large diversified portfolios.
+
+Location-$A$ tokens, by contrast, deliver $\iota_A$~---~the idiosyncratic
+appreciation specific to the MSA the household has personal ties to.
+For a household who lived in location~$A$, built human capital there, and
+may return, the idiosyncratic component $\iota_A$ is exactly the exposure
+they wish to retain.
+No REIT can supply this:
+the location-specific fractional token is the only instrument that provides
+$\iota_A$-loading for a household currently at~$B$.
+
+This is why the 2026-05-01 pivot from the v2 four-regime (REIT-comparison)
+framework to the v3/v4 two-location framework was necessary: the
+structurally novel contribution of tokenization is not relative to REIT access
+but relative to \emph{direct ownership with forced relocation sale}.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\subsection{Relation to Other Lifecycle Housing Models}
+\label{sec:discussion:literature}
+% ─────────────────────────────────────────────────────────────────────────────
+
+Table~\ref{tab:literature} summarizes the placement of our contribution
+relative to the closest precedents.
+
+\begin{table}[t]
+\centering
+\caption{Relationship to Prior Lifecycle Housing-Portfolio Models}
+\label{tab:literature}
+\small
+\begin{tabular}{@{}lllll@{}}
+\toprule
+Paper & Relocation & Tx costs & Continuous $x$ & Token portability \\
+\midrule
+\citet{YaoZhang2005}     & No  & No  & No & No \\
+\citet{Cocco2005}         & No  & No  & No & No \\
+\citet{KraftMunk2011}     & No  & No  & No & No \\
+\citet{KMW2018}           & Yes (reduced-form) & No  & No & No \\
+\citet{Liu2021}           & No  & No  & Yes & No \\
+\textbf{This paper (E1\_2L)} & Yes & Yes & No  & No \\
+\textbf{This paper (E2\_2L)} & Yes & Yes (on $\Delta x$) & Yes & \textbf{Yes} \\
+\bottomrule
+\end{tabular}
+\begin{tablenotes}
+\footnotesize
+\item \textit{Notes.}
+``Relocation'' indicates whether the model includes a stochastic
+geographic relocation shock.
+``Tx costs'' indicates whether transaction costs (selling and/or
+buying commissions) are modelled.
+``Continuous $x$'' indicates whether fractional ownership is permitted.
+``Token portability'' indicates whether the fractional position can be
+retained across a geographic relocation without a forced sale.
+\end{tablenotes}
+\end{table}
+
+\citet{KMW2018} model relocation explicitly in a lifecycle framework with
+habit formation, but transaction costs are absent and the continuous-$x$
+channel is not modelled.
+Their focus is the housing-as-habit hedge against future consumption
+commitments, a mechanism orthogonal to our pre-buying channel.
+
+\citet{SinaiSouleles2005} study the rent-price risk hedge embedded in
+homeownership: owning provides insurance against future rent increases for
+households with long planned tenures.
+Their mechanism is complementary to ours~---~the rent-hedge motive
+encourages ownership even when the financial return to housing is below
+the equity premium, exactly as in our model~---~but they abstract from
+relocation and portability.
+
+\citet{Davidoff2006} studies the income-housing correlation (``double
+exposure'' risk) and its interaction with optimal tenure.
+This correlation is relevant to our model through the $(\iota_A, \text{income})$
+channel; we abstract from it at baseline by maintaining independent income
+and housing shocks, and defer an income-correlated location shock extension
+to future work (see Section~\ref{sec:discussion:limitations}).
+
+% ─────────────────────────────────────────────────────────────────────────────
+\subsection{Robustness of the Mechanism}
+\label{sec:discussion:robustness}
+% ─────────────────────────────────────────────────────────────────────────────
+
+The pre-registered falsification structure (Section~\ref{sec:results:falsification})
+provides the clearest evidence on the robustness of each channel.
+
+\paragraph{Test (r): Relocation disabled ($p_{\text{reloc}} = 0$).}
+With no relocation shocks, the motivation to hold $x_B$ while at~$A$
+vanishes~---~the household will never visit location~$B$, so no
+pre-buying saving accrues.
+Under v4~Option~1, the pre-buying hedge channel must therefore collapse
+to zero, while the continuous-$x$ channel persists (it does not require
+relocation).
+Concretely, the expected result is $\bar{x}_B \to 0$ and
+$\operatorname{CEV}(E2\_2L \text{ vs } E1\_2L) \to
+\operatorname{CEV}_{\text{Liu}}$ (continuous-$x$ only).
+[\textsc{Placeholder: report $\Delta\text{CEV}$ and $\bar{x}_B$ from sweep.}]
+
+\paragraph{Test (m): High location correlation ($\rho_{AB} = 0.95$).}
+As $\rho_{AB} \to 1$, the location-$B$ token delivers almost the same
+return as the location-$A$ token; the diversification value of the
+cross-location hedge diminishes.
+The pre-buying saving is unchanged in magnitude ($p_{\text{reloc}} \cdot
+\tau_{\text{buy}}$ is independent of $\rho_{AB}$), but households who
+value the idiosyncratic hedge component will demand less $x_B$ as
+$\rho_{AB}$ rises.
+We therefore expect the hedge channel to attenuate~---~but not to
+collapse completely~---~as $\rho_{AB} \to 0.95$.
+[\textsc{Placeholder: report $\bar{x}_B(\rho_{AB} = 0.95)$ from sweep.}]
+
+\paragraph{Test (q): No buying cost ($\tau_{\text{buy}} = 0$).}
+With $\tau_{\text{buy}} = 0$, pre-buying $x_B$ saves nothing; the
+pre-buying motive is eliminated.
+The expected outcome is $\bar{x}_B = 0$ (identical to v3~Option~3 under
+zero buying cost) and a CEV change equal only to the sell-side avoidance
+and continuous-$x$ channels.
+This isolates the pre-buying contribution to the total welfare gain.
+[\textsc{Placeholder: report from sweep\_txcost.sh run.}]
+
+\paragraph{Sensitivity to $p_{\text{reloc}}$ and $\rho_{AB}$ jointly.}
+Figure~\ref{fig:heatmap_cev} (placeholder) reports the sensitivity heatmap
+over $(\rho_{AB}, p_{\text{reloc}}) \in \{0, 0.25, 0.50, 0.75, 0.95\} \times
+\{0, 0.02, 0.06, 0.12\}$.
+The model predicts a weakly increasing CEV in $p_{\text{reloc}}$ (more
+mobility amplifies pre-buying value) and a weakly decreasing CEV in
+$\rho_{AB}$ (higher correlation reduces the idiosyncratic hedge value).
+If the empirical pattern deviates from these monotone predictions,
+the mechanism claim requires reassessment.
+[\textsc{Placeholder: fill from scripts/sweep\_rhoAB.sh and
+scripts/sweep\_prelocate.sh.}]
+
+% ─────────────────────────────────────────────────────────────────────────────
+\subsection{Partial-Equilibrium Scope and Limitations}
+\label{sec:discussion:limitations}
+% ─────────────────────────────────────────────────────────────────────────────
+
+All welfare estimates in this paper are partial-equilibrium in three respects.
+
+\paragraph{Exogenous house prices.}
+We take the location-specific house-price processes $(R_A, R_B)$ as
+exogenous, calibrated to observed MSA-level moments.
+Widespread adoption of token portability could affect housing demand in
+origin and destination locations, potentially altering $R_A$ and $R_B$.
+A general-equilibrium model with endogenous prices is left to future work.
+Our CEV estimates should be interpreted as the household-level welfare value
+of \emph{access} to tokenized instruments, conditional on other households'
+behavior remaining unchanged.
+
+\paragraph{Symmetric and stationary location shocks.}
+The relocation shock is i.i.d.\ Bernoulli with constant probability
+$p_{\text{reloc}}(t)$.
+In practice, relocation rates are correlated with employment shocks,
+income shocks, and housing-market conditions (\citealt{PSID}).
+An extension with income-correlated location shocks (e.g.,
+$\text{corr}(\varepsilon_t, \iota_{A,t}) > 0$) would add a second
+channel to the pre-buying demand~---~holding $x_B$ at~$A$ also hedges
+against a negative income draw at~$A$ that triggers relocation to~$B$.
+This extension is queued as a robustness check but is not included in
+the baseline results.
+
+\paragraph{Two-location, symmetric-returns simplification.}
+We model two symmetric locations with exchangeable house-price processes
+(same $\mu_h$, $\sigma_h$; differing only by idiosyncratic component).
+Empirically, households relocate across heterogeneous MSAs with different
+mean appreciation rates and rent-to-price ratios.
+Asymmetric robustness (different $\mu_A \neq \mu_B$, different
+$p_{A \to B} \neq p_{B \to A}$) is queued in Phase~2 sensitivity work
+(Table~\ref{tab:sensitivity}, rows 6--7).
+
+\paragraph{No mortgage.}
+The baseline results set $\text{LTV\_MAX} = 0$.
+Mortgages reduce the effective down payment on housing, raising the
+household's ability to reach the optimal $x_A$ at low wealth levels.
+This can attenuate the pre-buying demand for $x_B$ (see
+Section~\ref{sec:discussion:hedge}) if households who were
+wealth-constrained in $x_A$ can now fully fund their desired $x_A$
+via borrowing.
+Mortgage activation (LTV $\in \{0.5, 0.8\}$) is queued as a Phase~2
+sensitivity check.
+In the v2 baseline (\citealt{research_log_2026_05_01_mortgage}),
+mortgage reduced $\operatorname{CEV}(\text{E2\_2L vs E1\_2L})$ by
+approximately 37\% under no-relocation; the direction under the
+2-location model may differ.
+
+\paragraph{Platform and regulatory risk.}
+We abstract from platform failure, regulatory uncertainty, and
+information asymmetries between token issuers and holders.
+These factors introduce a risk premium on tokenized positions that
+is not captured in the $\tau_{\text{token}} = 1\%$ transfer cost
+alone.
+A fuller treatment of platform risk is deferred to companion work.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\subsection{Policy Implications}
+\label{sec:discussion:policy}
+% ─────────────────────────────────────────────────────────────────────────────
+
+Our findings have three direct policy implications for household finance
+and housing-market regulation.
+
+\paragraph{Mobility lock-in as a welfare cost.}
+The $+0.82\%$ transaction-cost-avoidance channel in the v3~Option~3 baseline
+quantifies the welfare cost of \emph{mobility lock-in}: households who own
+traditional homes are effectively penalized for relocating, reducing their
+geographic flexibility.
+Token portability eliminates this distortion.
+Policy interventions that reduce $\tau_{\text{sell}}$ or $\tau_{\text{buy}}$
+(e.g., real-estate transfer tax reform) would deliver similar gains without
+requiring tokenization, but would not restore the idiosyncratic hedge or the
+pre-buying channel.
+
+\paragraph{Token design and the buying-cost schedule.}
+If $\tau_{\text{buy}}$ is too high, the pre-buying hedge becomes economically
+negligible ($p_{\text{reloc}} \cdot \tau_{\text{buy}}$ too small relative to
+the $\delta_{\text{own}}$ opportunity cost).
+If $\tau_{\text{buy}}$ is too low (approaching $\tau_{\text{token}} = 1\%$),
+the pre-buying saving is small and the mechanism collapses.
+The sensitivity analysis over $\tau_{\text{buy}} \in \{0, 1\%, 2.5\%, 4\%, 6\%\}$
+identifies the buying-cost levels at which the pre-buying channel is most
+economically significant.
+This informs platform pricing: the welfare case for token portability relative
+to direct ownership is maximized at intermediate buying cost levels.
+
+\paragraph{Household heterogeneity.}
+The pre-buying mechanism is most valuable for households who are
+(i)~frequently mobile ($p_{\text{reloc}}$ high),
+(ii)~have location-specific ties to prior MSAs ($\iota_A$ relevant to their
+     welfare), and
+(iii)~are wealth-constrained in their $x_A$ position (forcing $\Delta x_A = 0$
+      and making $x_B$ investment relatively cheap).
+From a regulatory standpoint, this suggests that token portability delivers
+disproportionate welfare gains to mobile younger households with limited
+wealth~---~a population underserved by existing housing finance instruments.

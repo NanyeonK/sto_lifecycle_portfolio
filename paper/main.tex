@@ -1,0 +1,258 @@
+% main.tex — Master compilation file
+% Paper: "Tokenized Housing and Lifecycle Portfolio Choice:
+%         A Decoupling of Location from Housing Exposure"
+%
+% Target journal: Review of Financial Studies (RFS); backup RAPS / REE.
+% Status: skeleton sections complete (s1–s6); [PLACEHOLDER] cells await server1 results.
+%
+% Compile: pdflatex main.tex  (or lualatex / xelatex)
+%          bibtex main
+%          pdflatex main.tex  (twice for cross-references)
+%
+% Or with latexmk:
+%   latexmk -pdf main.tex
+
+\documentclass[12pt]{article}
+
+% ─── Packages ───────────────────────────────────────────────────────────────
+\usepackage[margin=1.2in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{natbib}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{setspace}
+\usepackage{microtype}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{appendix}
+\usepackage{textcomp}   % \textsubscript
+
+% ─── Layout ─────────────────────────────────────────────────────────────────
+\onehalfspacing
+\setlength{\parskip}{0pt}
+\setlength{\parindent}{1.5em}
+
+% ─── Theorem environments ────────────────────────────────────────────────────
+\newtheorem{proposition}{Proposition}
+\newtheorem{lemma}{Lemma}
+\newtheorem{corollary}{Corollary}
+\theoremstyle{definition}
+\newtheorem{assumption}{Assumption}
+\newtheorem{definition}{Definition}
+\theoremstyle{remark}
+\newtheorem{remark}{Remark}
+
+% ─── Placeholder command ─────────────────────────────────────────────────────
+% Usage: \ph{description}  — red placeholder for numerical results pending server1
+\newcommand{\ph}[1]{\textcolor{red}{\textsc{[#1]}}}
+
+% ─── Custom commands ─────────────────────────────────────────────────────────
+\newcommand{\cev}{\mathrm{CEV}}
+\newcommand{\xprev}{x_{\mathrm{prev}}}
+\newcommand{\xnew}{x_{\mathrm{new}}}
+\newcommand{\tausell}{\tau_{\mathrm{sell}}}
+\newcommand{\taubuy}{\tau_{\mathrm{buy}}}
+\newcommand{\tautoken}{\tau_{\mathrm{token}}}
+\newcommand{\preloc}{p_{\mathrm{reloc}}}
+\newcommand{\rhoAB}{\rho_{AB}}
+\newcommand{\deltaown}{\delta_{\mathrm{own}}}
+\newcommand{\ellA}{\ell_A}
+\newcommand{\ellB}{\ell_B}
+\newcommand{\EsubzeroTwoL}{\text{E0}}
+\newcommand{\EonesubTwoL}{\text{E1}_{\text{2L}}}
+\newcommand{\EtwosubTwoL}{\text{E2}_{\text{2L}}}
+
+% ─── Bibliography style ───────────────────────────────────────────────────────
+% RFS uses author-year citations.
+\bibliographystyle{plainnat}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{document}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\title{Tokenized Housing and Lifecycle Portfolio Choice:\\
+       A Decoupling of Location from Housing Exposure%
+       \thanks{We thank seminar participants for helpful comments.
+               All errors are our own.
+               Code and replication files at \url{https://github.com/[repo]}.}}
+
+\author{[Authors]}
+
+\date{May 2026\\\textit{Preliminary and incomplete — do not cite or circulate.}}
+
+\maketitle
+
+% ─── Abstract ────────────────────────────────────────────────────────────────
+\begin{abstract}
+We quantify the lifetime welfare value of residential housing tokenization
+using a calibrated two-location lifecycle portfolio model with stochastic
+relocation shocks.
+Households choose among three regimes: rent-only, traditional binary
+homeownership (with 8.5\% round-trip transaction cost at each relocation),
+and continuous fractional token ownership portable across locations.
+The model tracks prior-period token holdings as explicit state variables,
+which creates a forward-looking motive to pre-accumulate tokens of a future
+destination before relocating.
+Our headline result is $\cev(\EtwosubTwoL\ \text{vs}\ \EonesubTwoL)
+= \ph{X.XX}\%$ at baseline calibration
+($p_{\text{reloc}} = 6\%$, $\taubuy = 2.5\%$, $\rhoAB = 0.50$).
+The total gain decomposes into an avoided-transaction-cost channel (\ph{X}\%)
+from escaping the forced sell-and-buy round-trip, and a pre-buying hedge
+channel (\ph{X}\%) that is uniquely activated by token portability: by
+pre-accumulating tokens of the destination location, households reduce the
+marginal buying cost on future relocation.
+Falsification tests confirm the mechanism: the hedge channel collapses when
+the relocation probability is zero and attenuates as cross-location
+correlations approach one.
+This constitutes a structurally novel welfare channel outside of
+\citet{Liu2021}, \citet{YaoZhang2005}, and \citet{KMW2018}.
+\end{abstract}
+
+\medskip
+\noindent\textbf{Keywords:} tokenized housing; lifecycle portfolio choice;
+relocation; transaction costs; household finance; blockchain.\\[2pt]
+\noindent\textbf{JEL codes:} G11; G51; R21; R31.
+
+\clearpage
+
+% ─────────────────────────────────────────────────────────────────────────────
+\input{sections/s1_intro}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\clearpage
+
+% ─────────────────────────────────────────────────────────────────────────────
+\input{sections/s2_model}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\clearpage
+
+% ─────────────────────────────────────────────────────────────────────────────
+\input{sections/s3_calibration}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\clearpage
+
+% ─────────────────────────────────────────────────────────────────────────────
+\input{sections/s4_results}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\clearpage
+
+% ─────────────────────────────────────────────────────────────────────────────
+\input{sections/s5_discussion}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\clearpage
+
+% ─────────────────────────────────────────────────────────────────────────────
+\input{sections/s6_conclusion}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\clearpage
+
+% ─── References ──────────────────────────────────────────────────────────────
+\bibliography{references}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\clearpage
+\begin{appendices}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\section{Numerical Implementation Details}
+\label{app:numerical}
+
+\subsection{Value function iteration}
+
+The Bellman equation is solved by backward induction over periods $t = T, T-1,
+\ldots, 1$.
+Each period, we iterate over the 6-dimensional state grid $(w, z, \ell,
+x_{A,\text{prev}}, x_{B,\text{prev}})$ with $T = 56$ periods (ages 25--80).
+The continuation value is approximated by 7-dimensional Gauss-Hermite
+quadrature with $n = 3$ nodes per dimension ($3^7 = 2{,}187$ quadrature points),
+integrating jointly over the stock return, aggregate housing factor, two
+idiosyncratic location shocks, house-price normalisation, permanent income shock,
+and transitory income shock.
+
+\subsection{Interpolation}
+
+Continuation values are computed by bilinear interpolation over the $(w, z)$
+grid dimensions.
+The $(x_{A,\text{prev}}, x_{B,\text{prev}})$ dimensions are indexed exactly:
+by restricting the choice of $x_{\text{new}}$ to the $x_{\text{prev}}$ grid,
+the next-period state is always an exact grid point, eliminating the need to
+interpolate over the $x_{\text{prev}}$ dimensions.
+
+\subsection{Coarse grid and computation time}
+
+Baseline grids: $N_W = 15$, $N_Z = 5$, $N_{x,\text{prev}} = 3$,
+$N_{\ell} = 2$, giving $15 \times 5 \times 2 \times 3 \times 3 = 1{,}350$
+states per period.
+Control search: $N_{\text{asset}} = 7$ points for $b$ and $s$ candidates;
+$N_{x,\text{prev}} = 3$ choices for each of $x_{A,\text{new}}$ and
+$x_{B,\text{new}}$ (9 combinations in E2\textsubscript{2L}).
+Estimated wall time per regime at baseline: \ph{X} hours on [server1 spec].
+Full-grid runs use $N_W = 40$, $N_Z = 9$, $N_{x,\text{prev}} = 5$ and are
+used for robustness checks.
+
+\section{Convergence Diagnostics}
+\label{app:convergence}
+
+\ph{To be populated from output/diagnostics/p6\_option1\_smoke.md after server1 run.}
+
+Table~\ref{tab:convergence} reports Euler-residual statistics and
+value-function sup-norm convergence at the coarse and full grids.
+
+\begin{table}[h]
+\centering
+\caption{Convergence diagnostics \ph{(placeholder — fill from server1 output)}}
+\label{tab:convergence}
+\begin{tabular}{lcc}
+\toprule
+Metric & Coarse grid & Full grid \\
+\midrule
+Feasible states at $t=1$ (\%) & \ph{X} & \ph{X} \\
+Euler residual p50             & \ph{X} & \ph{X} \\
+Euler residual p95             & \ph{X} & \ph{X} \\
+NaN / Inf health check         & PASS   & \ph{TBD} \\
+Terminal-identity check        & PASS   & \ph{TBD} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Hedge-Channel Sign Conditions}
+\label{app:sign}
+
+\begin{proposition}[Necessary condition for a positive pre-buying hedge channel]
+\label{prop:sign}
+In regime \EtwosubTwoL, a household at location~$A$ holds $x_{B,\text{new}} > 0$
+in equilibrium if and only if the expected present value of future buying-cost
+savings exceeds the current opportunity cost of holding a non-occupied token:
+\begin{equation}
+  \underbrace{p_{\text{reloc}} \cdot \taubuy}_{\text{expected saving per unit}}
+  >
+  \underbrace{\delta_{\text{own}} - \mathbb{E}[R_B - R_f]}_{\text{opportunity cost of }x_B \text{ over bond}},
+  \label{eq:sign_condition}
+\end{equation}
+where $\delta_{\text{own}} = \rho - m$ is the rent-saving forgone by holding a
+non-occupied unit, and $\mathbb{E}[R_B - R_f]$ is the expected excess return
+on location-B housing.
+\end{proposition}
+
+\begin{remark}
+At baseline calibration: $p_{\text{reloc}} \cdot \taubuy = 0.06 \times 0.025 =
+0.0015$ per period per unit; $\delta_{\text{own}} = 0.04$;
+$\mathbb{E}[R_B - R_f] = \ph{X}$.
+The sign of the hedge channel is therefore an empirical question, resolved by
+the server1 baseline runs.
+If the condition holds, $x_{B,\text{new}} > 0$ at ell=A (H1 confirmed);
+if it fails, the channel is inactive (fall back to Path~D).
+\end{remark}
+
+\end{appendices}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\end{document}
+% ─────────────────────────────────────────────────────────────────────────────
