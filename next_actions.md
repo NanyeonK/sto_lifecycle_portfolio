@@ -1,7 +1,7 @@
 # Next Actions (Path B Option 1 in flight, ASAP-tempered to 6h cron)
 
 Project: sto_lifecycle_portfolio
-Updated: 2026-05-02
+Updated: 2026-05-20
 
 ## ⭐ P0 — Option 1 full state extension (USER CHOSE B, OPTION 1)
 
@@ -12,13 +12,17 @@ proper tau_buy hedge mechanism.
 
 | Step | Action | Owner | Done artifact |
 |---|---|---|---|
-| 1 | Open new branch `auto/2026-05-02-option1-state-extension` | cloud agent | branch on origin |
-| 2 | Create `src/vfi_solver_v4.jl`: 6D state `(t, w, z, ell, x_A_prev, x_B_prev)` + tx_cost on deltas | cloud agent | file pushed |
-| 3 | Use coarse `x_prev` grid: `N_X_PREV=3` (e.g., {0, 0.5, 1.0}); reduce N_W=15, N_Z=5 to compensate | cloud agent | env-var configurable |
-| 4 | Smoke test stub `smoke_test_v4()` checking 6D allocation, tx_cost computation, state update consistency | cloud agent | callable via `--smoke-test` |
-| 5 | Smoke test on server1 (USER) | user/me | `output/diagnostics/p6_option1_smoke.md` |
-| 6 | Run E1_2L_v4 + E2_2L_v4 baselines (USER) | user/me | `p6_option1_e*.json` |
-| 7 | Compute decomposition + write up | user/me | `p6_option1_decomposition.md` |
+| Step | Action | Owner | Status |
+|---|---|---|---|
+| 1 | Open new branch `auto/2026-05-20-option1-v4-solver` | cloud agent | **DONE** (2026-05-20) |
+| 2 | Create `src/vfi_solver_v4.jl`: 6D state + tx_cost on deltas + smoke test | cloud agent | **DONE** (2026-05-20, 887 LOC) |
+| 3 | N_X_PREV=3, X_PREV_MAX=1.0, N_W=15, N_Z=5 (all env-var configurable) | cloud agent | **DONE** (embedded in v4 defaults) |
+| 4 | Smoke test stub `smoke_test_v4()`: 6D alloc + tx_cost + portability checks | cloud agent | **DONE** (callable via `--smoke-test`) |
+| 5 | Smoke test on server1: `julia src/vfi_solver_v4.jl --smoke-test` | **USER** | pending |
+| 6 | Run E1_2L_v4 baseline: `bash scripts/run_option1_e1.sh` (~2.5h) | **USER** | pending |
+| 7 | Run E2_2L_v4 baseline: `bash scripts/run_option1_e2.sh` (~2.5h) | **USER** | pending |
+| 8 | Check `p6_option1_e*.json`: H1 mean_xB>0? H2 CEV>4.255%? | **USER** | pending |
+| 9 | Compute CEV decomposition + write `p6_option1_decomposition.md` | **USER** | pending |
 
 ## Hypotheses to test (after step 6)
 

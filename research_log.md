@@ -991,3 +991,77 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-05-20 — Phase 1 v4 solver: 6D state extension (Path B Option 1)
+
+**Action picked**: P0 — implement `src/vfi_solver_v4.jl`, the full
+state-extension solver that adds `(x_A_prev, x_B_prev)` as discrete
+state variables and charges `tau_buy` on positive position deltas
+per period. This is the proper implementation of the hedge mechanism
+that was empirically dead in v3 due to the absent state (cross-location
+holding gave no buying-cost saving without tracking previous positions).
+
+**Why this action**: `next_actions.md` P0 chain (user-approved
+2026-05-02); all prerequisite human gates resolved; no blocked rows
+above it.
+
+**Files created on branch `auto/2026-05-20-option1-v4-solver`**:
+
+- `src/vfi_solver_v4.jl` (887 LOC) — complete 6D solver
+- `scripts/run_option1_e1.sh` — server1 run script for E1_2L baseline
+- `scripts/run_option1_e2.sh` — server1 run script for E2_2L baseline
+
+**Design summary (v3 → v4 changes)**:
+
+1. **6D state**: `(t, w, z, ell, ix_A_prev, ix_B_prev)` where
+   `ix_A_prev, ix_B_prev` are 1-based indices into `x_prev_grid`.
+   Default: `N_X_PREV=3`, `X_PREV_MAX=1.0` → grid `{0.0, 0.5, 1.0}`.
+
+2. **Coarse x choice grid**: in E2_2L, `(x_A_new, x_B_new)` are both
+   drawn from `x_prev_grid × x_prev_grid` (9 combos at N_X_PREV=3).
+   Constraining choices to the state grid eliminates snapping error.
+
+3. **Per-period tx_cost on deltas**:
+   ```
+   tx_cost = tau_buy   * (max(x_A_new-x_A_prev,0) + max(x_B_new-x_B_prev,0))
+           + tau_token * (max(x_A_prev-x_A_new,0) + max(x_B_prev-x_B_new,0))
+   ```
+   Budget: `c + kappa(x_ell_new) + x_A_new + x_B_new + tx_cost + b + s = w`.
+
+4. **Portability rule (key)**: E2_2L → `(ix_A_prev, ix_B_prev)` carry
+   over across relocation unchanged (tokens portable). E1_2L → forced
+   sale → next-period `ix_A_prev = ix_B_prev = 1` (zero holdings).
+
+5. **Hedge mechanism logic**: household at ell=A can pre-buy `x_B > 0`
+   (paying `tau_buy * x_B_new` now from `x_B_prev=0`). On relocation to B,
+   `x_B_prev = x_B_new > 0` → delta_B = 0 → no tau_buy at B. Expected
+   saving: `p_reloc * tau_buy ≈ 0.06 * 0.025 = 0.0015/yr` per unit x_B.
+   Lifetime: ~1-2% additional CEV predicted (vs v3 Option 3 at +4.255%).
+
+6. **Smoke test** `smoke_test_v4()`: structural checks only (no VFI).
+   Verifies: 6D array shape, terminal slice, tx_cost computation (4
+   exact-value checks), shock-block weight sum, x_prev grid structure,
+   housing-cost fixed-kappa rule, p_relocate boundary. All non-VFI
+   checks are Julia-independent (structural).
+
+**Reduced grids to compensate 9x state factor**: `N_W=15` (was 21),
+`N_Z=5` (was 7). Net additional compute factor: ~4.6x per regime
+(spec estimate). Estimated wall time per regime: ~2.5h single thread
+on server1.
+
+**Next queued (server1 required)**:
+
+1. Run `julia src/vfi_solver_v4.jl --smoke-test` (smoke, fast)
+2. Run `bash scripts/run_option1_e1.sh` → E1_2L baseline (~2.5h)
+3. Run `bash scripts/run_option1_e2.sh` → E2_2L baseline (~2.5h)
+4. Check `output/diagnostics/p6_option1_e*.json` for:
+   - `mean_xB_t1_ellA_x00 > 0` (hedge activates? this is H1)
+   - `V_t1_midpoint_ellA_x00` values for CEV computation
+5. Compute `CEV(E2_2L_v4 vs E1_2L_v4)` using `scripts/compute_cev_sweep.jl`
+6. Write `output/diagnostics/p6_option1_decomposition.md` with results
+7. If H1+H2+H3 hypotheses hold: writing kickoff; else: Path D (REE)
+
+**Human-gate status**: H1'/H2'/H3'/H4' all deferred (calibration
+anchors, framing approval, title, submission — see `next_actions.md`).
+No new human gates opened this fire.
+
+**Feature branch**: `auto/2026-05-20-option1-v4-solver`.
