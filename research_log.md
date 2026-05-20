@@ -991,3 +991,84 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-05-20 — v4 solver skeleton: 6D state extension (Option 1)
+
+**Action picked**: Step 2 of `next_actions.md` P0 queue — create
+`src/vfi_solver_v4.jl` implementing the full Option 1 state
+extension with `(t, w, z, ell, x_A_prev, x_B_prev)` 6D state.
+
+**Why this action**: Option 1 is marked P0 in `next_actions.md` with
+user confirmation on 2026-05-02. No human gates are active (H1'–H4'
+all deferred). Cloud agent fire per 6h cron schedule.
+
+**Implementation summary** (`src/vfi_solver_v4.jl`, 950 LOC):
+
+1. **6D state** `(t, iw, iz, iell, ixA_prev, ixB_prev)`: all policy
+   and value arrays are 6D. At N_W=15, N_Z=5, N_X_PREV=3,
+   T=57: ~77k points per array × 8 bytes = ~616 KB per array.
+   Total memory (7 arrays): ~4.3 MB — well within server1 budget.
+
+2. **Transaction-cost block** applied EVERY period on portfolio deltas:
+   ```
+   tx_cost = tau_buy   * (max(dA,0) + max(dB,0))
+           + tau_token * (max(-dA,0) + max(-dB,0))
+   ```
+   Budget: `c + kappa + b + s + x_A_new + x_B_new + tx_cost = w`.
+
+3. **x_prev grid**: `range(0.0, X_PREV_MAX; length=N_X_PREV)`. Default
+   N_X_PREV=3, X_PREV_MAX=1.0 → `{0.0, 0.5, 1.0}`. Env-var configurable.
+
+4. **4D interpolation** `interp_4d_v4`: multilinear over
+   `(w, z, x_A_prev, x_B_prev)` per ell-slice. Uses `find_bracket`
+   helper for safe bracket lookup (handles degenerate n=1 grid).
+
+5. **Continuation value** `continuation_value_v4`: x_A_new and x_B_new
+   chosen this period become x_prev for next period in BOTH stay and
+   relocate branches. E1_2L retains sell_factor for physical relocation
+   (tau_sell via return discount); separate from token tx_cost block.
+
+6. **Choice loop for E2_2L**: iterates (x_A_new, x_B_new) on 2D grid
+   with x_prev values INCLUDED in candidates (guarantees "no rebalance"
+   option, zero tx_cost, is always evaluated).
+
+7. **Choice loop for E1_2L**: two binary cases (rent / own) with
+   delta-based tx_cost for both position entry and exit.
+
+8. **Smoke test stub** `smoke_test_v4()`: 8 checks (6D allocation,
+   tx_cost four-case, no-rebalance identity, terminal slice, shock block,
+   interp_4d corner + linear, housing_cost spot-checks). Run with
+   `julia src/vfi_solver_v4.jl --smoke-test`.
+
+9. **Run scripts**: `scripts/run_option1_e1.sh` (E1_2L baseline) and
+   `scripts/run_option1_e2.sh` (E2_2L Option 1) with Round-4 confirmed
+   calibration. Both write JSON to `output/diagnostics/`.
+
+**Hedge motive design**: at ell=A, pre-buying x_B_new > x_B_prev costs
+`tau_buy * (x_B_new - x_B_prev)` each period. Expected per-period hedge
+premium: `p_relocate * tau_buy ≈ 0.06 * 0.025 = 0.0015/unit`. When the
+household relocates to B, x_B_prev is already nonzero, so the lump-sum
+buying cost at relocation is reduced by `tau_buy * x_B_prev_at_relocation`.
+This is what Option 1 spec identifies as the proper hedge mechanism that
+Option 3 (approximation) could not deliver.
+
+**Key diagnostic to check on server1**: `mean_xB_t1_xprev00_ellA > 0`.
+This is the direct test of whether the hedge channel activates:
+household at ell=A with zero prior holdings chooses to pre-buy x_B.
+
+**Branch**: `auto/2026-05-02-option1-state-extension` (pushed to origin).
+**Files created**:
+- `src/vfi_solver_v4.jl` (950 LOC; self-contained; no VFI run in cloud)
+- `scripts/run_option1_e1.sh`
+- `scripts/run_option1_e2.sh`
+- Updated `research_log.md`, `next_actions.md`
+
+**Next P0 step (user on server1)**:
+1. `julia src/vfi_solver_v4.jl --smoke-test` → should print PASS for all 8 checks
+2. `bash scripts/run_option1_e1.sh` → E1_2L baseline (est. ~2h wall)
+3. `bash scripts/run_option1_e2.sh` → E2_2L Option 1 (est. ~2h wall)
+4. Compare `V_t1_midpoint_ellA_xprev00` across regimes → compute CEV
+5. Check `mean_xB_t1_xprev00_ellA` in E2_2L → hedge channel test
+
+**VFI not run in cloud env** (per constraint 3: cloud env may lack Julia;
+heavy simulations run on server1). Drafting code is this fire's deliverable.
+
