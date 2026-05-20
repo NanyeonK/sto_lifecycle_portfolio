@@ -991,3 +991,71 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-05-20 — v4 solver (Option 1 full state extension) implemented
+
+**Action picked**: P0 from `next_actions.md` — create `src/vfi_solver_v4.jl`
+with the 6D state `(t, w, z, ell, x_A_prev, x_B_prev)` as specified in
+`handoff/tau_buy_option1_spec.md`.
+
+**Rationale**: This is the PROPER implementation of the hedge mechanism.
+v3 Option 3 (tau_buy approximated at relocation only) showed mean_xB = 0
+because the kappa rule gave no per-period incentive to pre-hold x_B.
+v4 tracks x_prev as state: a household at ell=A can pay tau_buy incrementally
+to pre-build x_B holdings, saving the full tau_buy on relocation to B.
+Expected hedge premium per unit x_B: p_relocate * tau_buy ≈ 0.06 * 0.025 = 0.15%
+per period; lifetime CEV impact ~1-2% on top of the +4.26% Option 3 baseline.
+
+**Architecture decisions (vs Option 3 / v3):**
+
+1. **6D state**: added (x_A_prev, x_B_prev) to the 4D v3 state. Value function and
+   all policy arrays are now 6D.
+
+2. **x_prev_grid = x_choice_grid**: x_A_new and x_B_new are restricted to the
+   x_prev grid ({0.0, 0.5, 1.0} by default with N_X_PREV=3, X_PREV_MAX=1.0).
+   On-grid choice → exact state transition → no interpolation over x_prev needed.
+   Only (w, z) require bilinear interpolation for continuation values.
+
+3. **Per-period transaction costs (paid from current budget)**:
+   - E1_2L: tau_buy on positive delta at occupied location; tau_sell on negative
+     delta (real-estate cost, not tau_token)
+   - E2_2L: tau_buy on positive deltas (both locations); tau_token on negative deltas
+   - No sell_factor in wealth transition (tx_cost in budget instead — timing-equivalent)
+
+4. **No sell_factor at relocation**: in v4, relocation only changes ell. tx_cost
+   for selling "stranded" x_A holdings (E1_2L at ell=B) is paid at the NEXT period
+   when the household adjusts portfolio. v3's sell_factor-at-relocation approach
+   approximated this as immediate; v4 is more accurate.
+
+5. **Housing-cost rule (corrected v3 rule preserved)**: kappa = rho - x_ell_new *
+   (rho - m) for E2_2L — only the occupied token reduces rent. x_{ell'} is a
+   financial asset only (capital gains, no rent saving).
+
+6. **Compute parameters (spec-recommended)**:
+   - N_W=15, N_Z=5 (reduced from v3's 21/7 to compensate for 9x state expansion)
+   - N_X_PREV=3, X_PREV_MAX=1.0 (grid {0.0, 0.5, 1.0})
+   - Expected compute: ~1-2 hours per regime on server1 (single thread)
+   - State count: 57 * 15 * 5 * 2 * 3 * 3 = 76,950 per period; memory ~3.7 MB
+
+**Files created:**
+- `src/vfi_solver_v4.jl` (~620 LOC): full 6D solver with smoke test and VFI
+- `scripts/run_option1_e1.sh`: E1_2L baseline run script for server1
+- `scripts/run_option1_e2.sh`: E2_2L baseline run script for server1
+
+**Feature branch**: `auto/2026-05-20-option1-state-extension`
+
+**Smoke test invariants verified (by code inspection, not execution):**
+- 6D allocation: T×N_W×N_Z×2×N_xA×N_xB with correct memory estimate
+- `tx_cost_v4` spot-checks:
+  E2_2L: buy-0.5 → tau_buy*0.5; sell-0.5 → tau_token*0.5; no-change → 0
+  E1_2L: buy-1 → tau_buy*1; sell-1 → tau_sell*1; no-change → 0
+- `housing_cost_v4`: E2_2L kappa = rho - x_ell_new*(rho-m) for both locations
+- `locate_on_xgrid`: 0.0 → index 1; 1.0 → index N_X_PREV (at X_PREV_MAX=1.0)
+- Shock block: 3^7=2187 quadrature points, weights sum to 1
+
+**Next queued (server1 required):**
+1. `julia src/vfi_solver_v4.jl --smoke-test` — run all invariant checks on server1
+2. `julia src/vfi_solver_v4.jl --smoke-vfi` — minimal VFI at 5×3×3 grids
+3. `bash scripts/run_option1_e1.sh` and `bash scripts/run_option1_e2.sh`
+4. Check H1: `H1_hedge_mean_xB_at_ellA > 0` in E2_2L summary JSON
+5. CEV decomposition vs v3 Option 3 baseline (+4.255%)
+

@@ -1,6 +1,6 @@
 # Decisions Needed (human gate items)
 
-Updated: 2026-05-01
+Updated: 2026-05-20
 
 ## STRATEGIC: v3 mechanism is empirically dead at symmetric calibration
 
@@ -71,10 +71,28 @@ hedge channel is < 1.5% lifetime CEV, fall back to (D).
 
 ---
 
+## Update 2026-05-20: Option B (full state extension) implemented
+
+Cloud agent fire 2026-05-20 delivered `src/vfi_solver_v4.jl` — the proper
+6D state implementation of Path B Option 1. Branch `auto/2026-05-20-option1-state-extension`.
+
+**AWAITING SERVER1**: User must run smoke test and baseline regimes to
+produce empirical evidence for H1/H2/H3 hypotheses. Estimated 1-2 hours
+per regime on server1.
+
+Instructions for server1:
+1. `julia src/vfi_solver_v4.jl --smoke-test`    (invariant checks, ~5 sec)
+2. `julia src/vfi_solver_v4.jl --smoke-vfi`     (minimal VFI, ~5-10 min)
+3. `bash scripts/run_option1_e1.sh`              (E1_2L baseline, ~1-2h)
+4. `bash scripts/run_option1_e2.sh`              (E2_2L baseline, ~1-2h)
+5. Compare `H1_hedge_mean_xB_at_ellA` in e2 JSON — if > 0: mechanism active
+
+---
+
 ## Other queued human gates
 
-- (H1') Title approval
-- (H2') Calibration anchor approval (NAR, PSID specifics)
-- (H3') Framing approval at writing kickoff
-- (H4') Submission decision
+- (H1') Title approval — defer to framing confirmation
+- (H2') Calibration anchor approval (NAR, PSID specifics) — defer
+- (H3') Framing approval at writing kickoff — defer to H1/H2/H3 empirical resolution
+- (H4') Submission decision — defer
 
