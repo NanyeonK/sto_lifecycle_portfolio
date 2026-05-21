@@ -2448,3 +2448,42 @@ banner — fire 37 reached the same conclusion independently.
 E1_2L + E2_2L baselines, decomposition). CEV result determines RFS vs REE.
 
 **Branch**: `auto/2026-05-02-option1-state-extension` (fire 37)
+
+## 2026-05-21 — Fire 38: orientation audit — all cloud work confirmed complete; server1 gate
+
+Oriented on full branch history (fires 1–37) per standard procedure.
+
+**Finding**: This fire again independently drafted `src/vfi_solver_v4.jl`
+(~720 LOC, bilinear+direct-index approach) before reading the remote branch
+and discovering that fires 1–37 had already produced the canonical 954-LOC
+solver with 4D multilinear interpolation, full paper sections s1–s6, all
+sweep scripts, and decomposition driver.
+
+**Merge outcome**: Remote canonical solver accepted. Key differences noted:
+- Remote uses `(X_total, alpha)` parameterization for E2_2L with 4D
+  multilinear interpolation over x_prev — more general than fire 38's
+  bilinear + exact-index approach.
+- Remote has `X_PREV_MAX=2.0` (wider range for E2_2L leveraged positions);
+  fire 38 draft used `X_PREV_MAX=1.0`.
+- Remote includes asymmetric extension: `mu_h_B`, `P_RELOCATE_AB/BA`.
+
+**Edge case note (fire 37 + 38 independent observation)**: The canonical
+E2_2L grid `(X_total, alpha)` may not always include the exact "no rebalance"
+option `(x_A_new = x_A_prev, x_B_new = x_B_prev)` for intermediate x_prev
+grid values. Fire 35 correctness audit accepted this as a minor numerical
+approximation (not a structural bug). Effect: slight overstatement of tx_cost
+in some states, conservative towards finding the hedge channel. Acceptable.
+
+**Confirmed state** (fires 1–37, unchanged):
+- `src/vfi_solver_v4.jl` (954 LOC, fire 32; reviewed fire 35): no bugs
+- Paper sections s1–s6, main.tex, references.bib: complete drafts
+- All sweep scripts (rhoAB, prelocate, txcost, asymmetric, mortgage): done
+- Decomposition driver `scripts/compute_option1_decomp.py`: done
+- `handoff/decisions_needed.md` "All Cloud Work Done" banner: fire 35
+
+**Sole remaining blocker**: server1 steps 5–7 (smoke test + E1/E2 baselines +
+decomposition). To run: see `handoff/decisions_needed.md` Gate 1 instructions.
+
+**Next cloud fire**: write orientation log and stop. Nothing new to implement.
+
+**Branch**: `auto/2026-05-02-option1-state-extension` (fire 38)

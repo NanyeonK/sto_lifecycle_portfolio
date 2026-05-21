@@ -80,10 +80,10 @@ hedge channel is < 1.5% lifetime CEV, fall back to (D).
 
 ---
 
-## ⚠️ CLOUD AGENT ORIENTATION NOTE (fires 31–35 all hit this)
+## ⚠️ CLOUD AGENT ORIENTATION NOTE (fires 31–38 all hit this)
 
 **STOP. Before implementing anything**: the remote branch
-`auto/2026-05-02-option1-state-extension` is at fire 35. ALL of the
+`auto/2026-05-02-option1-state-extension` is at fire 38. ALL of the
 following are already present and working:
 - `src/vfi_solver_v4.jl` — 954-LOC 6D-state solver (4D multilinear
   interpolation; fire 14-17). DO NOT re-implement.
