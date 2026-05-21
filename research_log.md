@@ -991,3 +991,87 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-05-21 — v4 solver (Option 1 full state extension) implemented
+
+**Action picked**: P0 from `next_actions.md` — create `src/vfi_solver_v4.jl`
+implementing the 6D state extension with proper per-period tau_buy on x deltas.
+This is the cleanest test of whether the cross-location hedge mechanism is real.
+
+**What was implemented** (`src/vfi_solver_v4.jl`, ~690 LOC):
+
+1. **6D state `(t, w, z, ell, x_A_prev, x_B_prev)`**: value and policy arrays
+   are 6D. At default grids (T=57, N_W=15, N_Z=5, n_ell=2, N_X_PREV=3, N_X_PREV=3)
+   total array size is 76,950 entries per array — about 0.6 MB per array, 7 arrays
+   total ~4 MB. Well within memory budget.
+
+2. **Transaction costs on per-period deltas**:
+   ```
+   delta_A  = x_A_new - x_A_prev
+   delta_B  = x_B_new - x_B_prev
+   tx_cost  = tau_buy   * (max(delta_A,0) + max(delta_B,0))
+            + tau_token * (max(-delta_A,0) + max(-delta_B,0))
+   budget:  c + kappa + b + s + x_A_new + x_B_new + tx_cost = w
+   ```
+   `x_A_prev` and `x_B_prev` are the period-opening positions (known state);
+   `x_A_new` and `x_B_new` are the chosen new positions. Holding steady
+   (`x_new = x_prev`) incurs zero cost. Incrementing incurs `tau_buy` per unit.
+
+3. **x_new restricted to x_prev_grid**: choices for x_A_new and x_B_new are
+   restricted to the x_prev grid points (default: `{0.0, 0.5, 1.0}`). This
+   ensures the state update is an exact grid lookup, avoiding interpolation
+   over the x_prev dimension. With N_X_PREV=3, E2_2L has 9 (x_A, x_B)
+   combinations per state.
+
+4. **State update on relocation**:
+   - E2_2L: tokens portable → x_prev_next = (x_A_new, x_B_new) regardless of
+     ell change.
+   - E1_2L: forced sale on relocation → x_prev_next = (0, 0); sell proceeds
+     absorbed into w_reloc via `sell_factor_A = (1 - tau_sell)`.
+
+5. **Continuation value** (`continuation_value_v4`): integrates over 7D GH
+   quadrature AND relocation Bernoulli, with exact 6D lookup of next-period
+   value function for both stay/relocate branches.
+
+6. **Summary diagnostics** include new hedge-activation field:
+   `mean_xB_given_xBprev0_ellA` — mean x_B chosen by household at ell=A
+   starting from x_B_prev=0. Non-zero would confirm hedge activation.
+
+7. **Smoke test** (`--smoke-test` flag):
+   - sigma decomposition, shock block, tx_cost computation, xprev_index,
+     housing_cost, 6D array allocation, terminal slice, p_relocate.
+   - Optional `--write-md` flag writes `output/diagnostics/p6_option1_smoke.md`.
+   - Does NOT run VFI (cloud env may lack Julia; server1 runs queued).
+
+**Run scripts added**:
+- `scripts/run_option1_e1.sh` — E1_2L v4 baseline at spec settings
+- `scripts/run_option1_e2.sh` — E2_2L v4 baseline at spec settings
+
+**Hedge mechanism rationale**:
+Pre-holding x_B at ell=A now has a concrete per-period payoff:
+`p_relocate_working * tau_buy = 0.06 * 0.025 = 0.0015` per unit x_B per period
+in expected cost savings. Over 40 working years this accumulates to ~6% of one
+year's housing value. The VFI should now find it optimal to carry some x_B even
+at ell=A — unlike v3 where x_B carried no period-by-period benefit.
+
+**Key design choices**:
+- x_prev grid `{0.0, 0.5, 1.0}` is coarse (N_X_PREV=3) but preserves the
+  binary-vs-intermediate choice. N_X_PREV=5 would add `{0.25, 0.75}` and is
+  configurable via env var.
+- E1_2L uses only the boundary grid values `{0.0, x_prev_max}` for x_ell_new
+  (admissibility: binary tenure). x_prev grid is still tracked for consistency.
+- v3 solver preserved at `src/vfi_solver_v3.jl` for baseline CEV comparison.
+
+**Feature branch**: `auto/2026-05-21-option1-state-extension`
+
+**Next queued actions** (server1, user):
+1. `julia src/vfi_solver_v4.jl --smoke-test --write-md`  (confirms structure)
+2. `bash scripts/run_option1_e1.sh` (E1_2L v4 baseline)
+3. `bash scripts/run_option1_e2.sh` (E2_2L v4 baseline)
+4. Check `mean_xB_given_xBprev0_ellA` in E2_2L output — if > 0, hedge is alive.
+5. Compute `CEV(E2_2L_v4 vs E1_2L_v4)` and compare to v3 baseline 4.255%.
+
+**Hypotheses** (from Option 1 spec):
+- H1: `mean_xB_given_xBprev0_ellA > 0` at ell=A (hedge mechanism activates)
+- H2: `CEV(E2_2L_v4 vs E1_2L_v4) > 4.255%` (exceeds Option 3 baseline)
+- H3: hedge channel `CEV(v4 vs v3 E2_2L) ≈ 0.5-1.5%` (RFS-marginal contribution)
+
