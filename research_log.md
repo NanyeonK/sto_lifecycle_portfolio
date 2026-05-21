@@ -991,3 +991,97 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-05-21 — v4 solver (Option 1 state extension) implemented
+
+**Action picked**: P0 Step 2-4 from `next_actions.md` — create `src/vfi_solver_v4.jl`
+with the full 6D state extension, proper tau_buy delta mechanism, and smoke-test stub.
+
+**Branch**: `auto/2026-05-02-option1-state-extension`.
+
+### What was implemented
+
+**vfi_solver_v4.jl** (~1019 LOC). Key changes over v3:
+
+1. **6D state** `(t, w, z, ell, x_A_prev, x_B_prev)`:
+   - `x_A_prev` and `x_B_prev` are discrete states on a coarse grid
+     `linspace(0, X_PREV_MAX, N_X_PREV)`. Default: {0.0, 0.5, 1.0} (N_X_PREV=3,
+     X_PREV_MAX=1.0). E1_2L choices {0, 1} land exactly on-grid.
+   - Value function and policy arrays are 6D:
+     `[T, n_w, n_z, 2, n_xprev, n_xprev]`. Memory ~0.6 MB per array at
+     N_W=15, N_Z=5, N_xprev=3 (total ~4-5 MB for all arrays).
+
+2. **Per-period delta tx_cost for E2_2L**:
+   ```
+   delta_A = x_A_new - x_A_prev
+   delta_B = x_B_new - x_B_prev
+   tx_cost = tau_buy   * (max(delta_A,0) + max(delta_B,0))
+           + tau_token * (max(-delta_A,0) + max(-delta_B,0))
+   ```
+   This is the mechanism that resurrects the hedge channel: pre-holding x_B while
+   at ell=A reduces future tau_buy cost on relocation-to-B by `p_reloc * tau_buy`
+   per period (~0.0015/yr at baseline). E1_2L uses sell_factor as before, plus
+   tau_buy on fresh purchases (renting-to-owning transition).
+
+3. **E2_2L choice space constrained to x_prev grid**: x_A_new and x_B_new must be
+   chosen from the x_prev grid ({0.0, 0.5, 1.0} at N_X_PREV=3). Gives 9 discrete
+   (x_A_new, x_B_new) pairs per state. Avoids 4D interpolation in x_prev dimension.
+   Full off-grid choice with 4D interpolation deferred to Phase 2 refinement.
+
+4. **Continuation value** `continuation_value_v4()`:
+   Takes additional args `(ixA_new, ixB_new)` — grid indices of the chosen x values.
+   Since x_new is on-grid, the next-period x_prev state is exactly (ixA_new, ixB_new);
+   looks up a 2D slice `V[t+1, :, :, ell_next, ixA_new, ixB_new]` and applies
+   standard bilinear interpolation in (w, z). No new interpolation over x_prev needed.
+
+5. **Smoke test** `smoke_test_v4()` (callable via `--smoke-test` flag):
+   - Sigma decomposition invariant
+   - 6D array allocation and size (confirms ~0.6 MB value array at default grids)
+   - Terminal slice correctness (all feasible, no NaN)
+   - tx_cost formula: four spot-checks (no-change=0, buy, sell, mixed)
+   - x_prev=x_new identity → tx_cost=0 (no-rebalance check)
+   - xprev_index correctness for x=0 and x=1
+   - Shock block: size, weights sum, R_A ≠ R_B
+   - housing_cost_v4: four spot-checks
+   - p_relocate_v4: boundary checks at ages 25, 65, 66
+   - Hedge premium estimate printed (informational)
+
+6. **Run scripts** added:
+   - `scripts/run_option1_e1.sh` — E1_2L v4 baseline
+   - `scripts/run_option1_e2.sh` — E2_2L v4 baseline (key test: `mean_xB_t1_init_ellA > 0`)
+
+### Design choices and rationale
+
+- **x_prev grid**: N_X_PREV=3 (default) gives 9 (x_A, x_B) pairs for E2_2L, sufficient
+  for proof-of-concept hedge detection. N_W=15, N_Z=5 compensates for the 9x state
+  expansion (net compute: ~4.6x v3, ~2-3 hours per regime on server1).
+- **E1_2L handling**: sell_factor mechanism preserved from v3 for relocation sell cost
+  (avoids double-counting with delta mechanism). tau_buy added at renting-to-owning
+  transitions. E1_2L's x_prev state is tracked for completeness but doesn't change
+  the core comparison.
+- **kappa rule**: same corrected v3 rule — only occupied-location token reduces rent.
+- **tau_token default**: 0.005 (0.5%) — lower than tau_buy=2.5% (token transfer is
+  cheap relative to property purchase). From `handoff/tau_buy_option1_spec.md`.
+
+### Hypothesis to verify on server1
+
+H1: `mean_xB_t1_init_ellA > 0` in E2_2L v4 (hedge mechanism activated)
+H2: `CEV(E2_2L_v4 vs E1_2L_v4) > 4.255%` (the Option 3 baseline)
+H3: `CEV(E2_2L_v4 vs E2_2L_v3) ≈ 0.5-1.5%` (incremental hedge channel value)
+
+### Next server1 steps (USER)
+
+```
+# 1. Smoke test (fast, no VFI):
+julia src/vfi_solver_v4.jl --smoke-test
+
+# 2. Write smoke output:
+julia src/vfi_solver_v4.jl --smoke-test > output/diagnostics/p6_option1_smoke.md 2>&1
+
+# 3. Baseline runs:
+bash scripts/run_option1_e1.sh   # ~2-3 h
+bash scripts/run_option1_e2.sh   # ~2-3 h
+```
+
+After runs: check `mean_xB_t1_init_ellA` in `p6_option1_e2.json`. If > 0: hedge
+channel confirmed. Proceed to CEV decomposition (step 7 in next_actions.md).
+
