@@ -991,3 +991,68 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-05-21 — v4 solver skeleton: 6D state + delta-based tau_buy (Option 1)
+
+**Action picked**: P0 Steps 1-4 from `next_actions.md` — Option 1 full state extension.
+These steps are interdependent (6D state requires the x_prev grid; tx_cost requires deltas;
+smoke test requires all components), so all four were completed in one fire.
+
+**What was implemented**:
+
+`src/vfi_solver_v4.jl` (~720 LOC) — self-contained solver extending v3 to 6D state.
+
+**State extension** (v3 → v4):
+- Old: `(t, w, z, ell)` — 4D
+- New: `(t, w, z, ell, ix_A_prev, ix_B_prev)` — 6D
+- `ix_A_prev, ix_B_prev`: Julia 1-based indices into `grids.x_prev`
+- Default grid: `N_X_PREV=3`, `X_PREV_MAX=1.0` → `x_prev = {0.0, 0.5, 1.0}`
+
+**Transaction cost block** (per-period delta-based):
+```julia
+tx_cost = tau_buy   * (max(x_A_new - x_A_prev, 0) + max(x_B_new - x_B_prev, 0))
+        + tau_token * (max(x_A_prev - x_A_new, 0) + max(x_B_prev - x_B_new, 0))
+```
+Applied in the budget constraint every period.  Relocation-forced E1_2L sale still uses
+`sell_factor = (1 - tau_sell)` in the wealth transition (unchanged from v3).
+
+**Portability design** (the key hedge mechanism):
+- E2_2L relocation: `x_prev_next = x_new` (same indices for stay AND reloc — tokens portable)
+- E1_2L relocation: `x_prev_next = (1, 1)` = `(0.0, 0.0)` (forced sale, holdings reset)
+- This means an E2_2L household at A that pre-holds `x_B = 0.5` arrives at B
+  with `x_B_prev = 0.5`, paying zero tau_buy on those units next period.
+
+**x_new choices**:
+- Restricted to `grids.x_prev` for exact state transitions (no interpolation needed over x_prev)
+- E1_2L: binary `{0.0, x_prev_grid[end]}` at occupied location; `0.0` at other location
+- E2_2L: full Cartesian `x_prev_grid × x_prev_grid` (9 choices at N_X_PREV=3)
+
+**Reduced grid defaults** (compensate 9x state factor):
+- N_W=15 (from 21), N_Z=5 (from 7), ASSET_GRID_SIZE=7 (from 9)
+- Net compute factor: 9 × (15×5)/(21×7) = 9 × 0.51 ≈ 4.6×
+- Expected wall time per regime: ~2-3h on server1 (single thread)
+
+**Smoke test** (`--smoke-test` flag; 7 assertion groups):
+1. sigma decomposition invariant
+2. grid dimensions
+3. 6D array shape + terminal slice
+4. shock block size and weight sum
+5. `tx_cost_v4` spot-checks (buy, sell, no-change)
+6. `housing_cost_v4` corrected rule checks
+7. State transition logic (E2_2L portability vs E1_2L forced-sale reset)
+
+**Run scripts**:
+- `scripts/run_option1_e1.sh` — E1_2L baseline at v4 settings
+- `scripts/run_option1_e2.sh` — E2_2L Option 1
+
+**Files created**:
+- `src/vfi_solver_v4.jl`
+- `scripts/run_option1_e1.sh`
+- `scripts/run_option1_e2.sh`
+
+**Feature branch**: `auto/2026-05-02-option1-state-extension`
+
+**Next queued actions** (Steps 5-7, USER):
+- Step 5: Run `julia src/vfi_solver_v4.jl --smoke-test` on server1; log in `p6_option1_smoke.md`
+- Step 6: Run `bash scripts/run_option1_e1.sh && bash scripts/run_option1_e2.sh`
+- Step 7: Check H1 (mean_xB > 0 at ell=A), H2 (CEV > 4.255%), H3 (hedge channel ≈ 0.5-1.5%)
+  and write decomposition doc at `output/diagnostics/p6_option1_decomposition.md`
