@@ -991,3 +991,75 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-05-22 — vfi_solver_v4.jl: Option 1 full state extension implemented
+
+**Action picked**: P0 from `next_actions.md` — create `src/vfi_solver_v4.jl`
+implementing the 6D state `(t, w, z, ell, x_A_prev, x_B_prev)` with per-period
+transaction costs on housing-position deltas.
+
+**Why this action**: Option 1 is the only remaining path to activating the
+cross-location hedge channel. Option 3 (approximation via lump-sum tau_buy at
+relocation) confirmed the hedge channel is dead (mean_xB = 0 at all tested
+calibrations). Option 1 gives the household a literal per-period incentive to
+pre-hold x_B tokens: pre-holding x_B_prev reduces delta_B = x_B_target - x_B_prev
+at the destination, saving tau_buy * x_B_prev per relocation event. Expected
+hedge premium per unit x_B_prev held ≈ p_relocate * tau_buy = 0.06 * 0.025 =
+0.0015 per period.
+
+**Files created / modified**:
+
+- `src/vfi_solver_v4.jl` (~440 LOC): full implementation
+- `scripts/run_option1_smoke.sh`: quick smoke test (no VFI; < 5s on server1)
+- `scripts/run_option1_e1.sh`: E1_2L baseline run at Option 1 grid settings
+- `scripts/run_option1_e2.sh`: E2_2L baseline run + hypothesis checklist
+
+**v4 design summary**:
+
+1. **6D state** `(t, w, z, ell, ix_A_prev, ix_B_prev)`: ix values are 1-based
+   indices into `x_prev_grid` (N_X_PREV=3 points in [0, X_PREV_MAX=1.5]).
+   Default x_prev_grid = {0.0, 0.75, 1.5}.
+
+2. **x_A_new, x_B_new restricted to x_prev_grid**: enforces exact state
+   transition (no interpolation over x_prev dimension). E2_2L: 3x3=9 housing
+   allocation combos. E1_2L: x_{ell'}=0 (admissibility), x_ell ∈ {0,1} (snapped
+   to nearest x_prev_grid point for index tracking).
+
+3. **Per-period tx_cost**:
+   `tx_cost = tau_buy * (max(delta_A,0) + max(delta_B,0)) + tau_token * (max(-delta_A,0) + max(-delta_B,0))`
+   Applied in budget: `c + kappa + b + s + x_A_new + x_B_new + tx_cost = w`.
+
+4. **Relocation state update**:
+   - E1_2L: forced sale → next (ix_A_prev, ix_B_prev) reset to (1,1) = (0,0).
+     sell_factor_ell = (1 - tau_sell) in wealth transition.
+   - E2_2L: tokens portable → next ix_prev = (ix_A_new, ix_B_new) regardless
+     of relocation. sell_factors always 1.0.
+
+5. **Grid sizing** (Option 1 spec): N_W=15, N_Z=5 (reduced from v3's 21/7);
+   N_X_PREV=3. Net compute: 9 * (15*5)/(21*7) ≈ 4.6x v3 baseline.
+
+6. **Smoke test stub**: `julia src/vfi_solver_v4.jl --smoke-test` checks 6D
+   array allocation, tx_cost spot-checks, housing cost rule, shock block,
+   terminal slice, and prints hedge-premium estimate. No VFI run.
+
+**Smoke test status**: not yet run (cloud env lacks Julia; server1 run queued
+as next step per compute discipline constraint).
+
+**Hedge premium printed by smoke test** (informational):
+- p_relocate * tau_buy = 0.06 * 0.025 = 0.0015 per period per unit x_B held
+- Gross lifetime savings ≈ 0.0015 * 40 = 6% (before discounting, before GE)
+- After discounting and equilibrium forces: spec projects +1-2% on top of
+  Option 3 baseline → total ~5-6% CEV if hypotheses hold.
+
+**Hypotheses to test on server1** (per Option 1 spec):
+- H1: mean_xB > 0 at ellA (hedge mechanism activates with proper state)
+- H2: CEV(E2_2L_v4 vs E1_2L_v4) > 4.255% (Option 3 baseline)
+- H3: CEV(E2_2L_v4 vs E2_2L_v3) ≈ 0.5-1.5% (incremental hedge channel)
+
+**Branch**: `auto/2026-05-22-option1-state-extension`
+
+**Next queued for user/server1**:
+1. `bash scripts/run_option1_smoke.sh` — verify smoke test PASS
+2. `bash scripts/run_option1_e1.sh` — E1_2L baseline (~2-3h wall)
+3. `bash scripts/run_option1_e2.sh` — E2_2L baseline (~2-3h wall)
+4. Report H1/H2/H3 verdict; path decision (RFS or REE)
+
