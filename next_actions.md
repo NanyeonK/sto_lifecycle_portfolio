@@ -55,16 +55,20 @@ If any fails: fall back to Path D (REE/JHE) at +4.26%.
 | DONE | E1_2L with tau_buy active: CEV(E2_2L vs E1_2L_full) = +4.255% |
 | DONE | Final Path B Option 3 verdict: continuous-x 3.4% + tx-cost 0.8% = 4.26% |
 
-## P1 (after Option 1 resolves)
+## P1 (after Option 1 resolves — Steps 5-7 on server1)
 
-| Priority | Action |
-|---|---|
-| P1 | Sensitivity sweep: rho_AB ∈ {0, 0.25, 0.5, 0.75, 0.95} on best v4 |
-| P1 | Sensitivity: p_relocate ∈ {0, 0.06, 0.12, 0.30} on best v4 |
-| P1 | Asymmetric robustness (mu_A != mu_B, p_AB != p_BA) |
-| P1 | Mortgage activation (ltv_max ∈ {0.5, 0.8}) |
-| P1 | Liu/YZ/Cocco/KMW comparison table |
-| P2 | If Option 1 successful: writing kickoff |
+P1 sweep scripts are written and ready; run after Step 6 baseline results
+confirm H2 (CEV > 4.255%).
+
+| Priority | Action | Script | Status |
+|---|---|---|---|
+| P1 | Baseline CEV verdict (H1/H2/H3) | `julia scripts/compute_cev_v4.jl baseline p6_option1_e1.json p6_option1_e2.json` | awaiting Step 6 |
+| P1 | Sensitivity: rho_AB ∈ {0, 0.25, 0.5, 0.75, 0.95} | `bash scripts/sweep_v4_rhoAB.sh` | **script DONE 2026-05-22** |
+| P1 | Sensitivity: p_relocate ∈ {0, 0.06, 0.12, 0.30} | `bash scripts/sweep_v4_prelocate.sh` | **script DONE 2026-05-22** |
+| P1 | Mortgage: ltv_max ∈ {0.0, 0.5, 0.8} | `bash scripts/sweep_v4_mortgage.sh` | **script DONE 2026-05-22** |
+| P1 | Asymmetric robustness (mu_A != mu_B, p_AB != p_BA) | TBD | awaiting baseline |
+| P1 | Liu/YZ/Cocco/KMW comparison table | TBD | awaiting baseline |
+| P2 | Writing kickoff | — | awaiting H2+H3 confirm |
 
 ## Cleanup queue (non-critical)
 

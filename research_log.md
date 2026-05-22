@@ -1082,3 +1082,48 @@ the P0 Steps 1-4 already completed by the prior fire. Reviewed the existing
 No code changes made. Branch is in final state awaiting server1 execution.
 Next action is entirely server1/user work (Steps 5-7 in `next_actions.md`).
 
+## 2026-05-22 — Fire 3: P1 sensitivity scripts written
+
+This fire (third on branch `auto/2026-05-22-option1-state-extension`) found
+P0 Steps 1-4 completed by Fires 1+2 and Steps 5-7 awaiting server1. With all
+P0 cloud work done, picked the highest auto-allowed P1 prep: write sensitivity
+sweep scripts and a v4-compatible CEV computation script.
+
+**Files written:**
+
+- `scripts/compute_cev_v4.jl` — v4-aware CEV computation. Handles the
+  v4 JSON key differences (`V_t1_midpoint_ellA_prevzero`, `xB_positive_frac_t1_ellA`,
+  no `apply_tau_buy_at_reloc`). Four modes: `baseline` (H1/H2/H3 verdict), `rhoAB`
+  (sweep table), `prelocate` (sweep table), `mortgage` (sweep table).
+
+- `scripts/sweep_v4_rhoAB.sh` — rho_AB ∈ {0, 0.25, 0.50, 0.75, 0.95} sweep
+  for v4 E1_2L and E2_2L. Runs after Step 6 if H2 passes. Tests whether
+  hedge channel (mean_xB) collapses as rho_AB → 1 (falsification).
+
+- `scripts/sweep_v4_prelocate.sh` — p_relocate_working ∈ {0, 0.06, 0.12, 0.30}
+  sweep for v4. Tests whether pre-buy incentive scales with relocation frequency
+  (H1 mechanism check: mean_xB should increase with p_relocate).
+
+- `scripts/sweep_v4_mortgage.sh` — ltv_max ∈ {0.0, 0.5, 0.8} sweep.
+  Tests whether mortgage availability reduces CEV (YZ/Cocco calibration check;
+  v2 showed mortgage closed ~37% of no-mortgage gap).
+
+**User workflow summary:**
+
+After Step 6 (E1_2L and E2_2L runs complete):
+```bash
+# Step 7a: verdict
+julia scripts/compute_cev_v4.jl baseline \
+      output/diagnostics/p6_option1_e1.json \
+      output/diagnostics/p6_option1_e2.json
+
+# Step 7b (if H2 passes): sweeps
+bash scripts/sweep_v4_rhoAB.sh      # ~10h wall (5 rhoAB × 2 regimes)
+bash scripts/sweep_v4_prelocate.sh  # ~8h wall (4 preloc × 2 regimes)
+bash scripts/sweep_v4_mortgage.sh   # ~6h wall (3 ltv × 2 regimes)
+```
+
+**next_actions.md** updated: P1 sweep rows now include script names and DONE
+status for the script-writing step.
+
+
