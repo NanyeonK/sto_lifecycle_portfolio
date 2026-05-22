@@ -1063,3 +1063,22 @@ as next step per compute discipline constraint).
 3. `bash scripts/run_option1_e2.sh` — E2_2L baseline (~2-3h wall)
 4. Report H1/H2/H3 verdict; path decision (RFS or REE)
 
+## 2026-05-22 — Fire 2: v4 implementation verified, branch ready for server1
+
+This fire (second on branch `auto/2026-05-22-option1-state-extension`) found
+the P0 Steps 1-4 already completed by the prior fire. Reviewed the existing
+`src/vfi_solver_v4.jl` (1034 LOC) and confirmed:
+
+- Index-based x_prev approach (choices restricted to x_prev_grid) is correct
+  and efficient: 2-D bilinear interpolation per quadrature point (vs 4-D)
+  with exact state-transition tracking — no approximation error in x_prev.
+- Hedge mechanism is properly modelled: E2_2L at ell=A choosing x_B_new=0.75
+  (grid point 2 of 3) pays `tau_buy * 0.75` now; at relocation, x_B_prev=0.75
+  reduces delta_B = x_B_target - 0.75, saving `tau_buy * 0.75` on future buy.
+- E1_2L relocation correctly resets ix_prev to (1,1) (forced sale → zero holdings).
+- Run scripts (`run_option1_smoke.sh`, `run_option1_e1.sh`, `run_option1_e2.sh`)
+  already present and parameterised with spec-compliant env vars.
+
+No code changes made. Branch is in final state awaiting server1 execution.
+Next action is entirely server1/user work (Steps 5-7 in `next_actions.md`).
+
