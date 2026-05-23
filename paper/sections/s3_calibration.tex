@@ -1,0 +1,284 @@
+% s3_calibration.tex — Calibration section
+% Paper: "Tokenized Housing and Lifecycle Portfolio Choice:
+%         A Decoupling of Location from Housing Exposure"
+%
+% Source: docs/calibration_v3.md (cloud agent fire 5)
+%         docs/welfare_decomp_v4.md (channel decomposition plan)
+%         paper/outline_v4.md (section structure)
+%
+% Status: complete draft; one parameter (rho_AB sensitivity) awaits
+%         server1 baseline results before final anchor confirmation (H2' gate).
+%
+% Compilation: included from main.tex via \input{sections/s3_calibration}
+%              Requires amsmath, booktabs, multirow, siunitx (for tabular).
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Calibration}
+\label{sec:calibration}
+% ─────────────────────────────────────────────────────────────────────────────
+
+Table~\ref{tab:parameters} summarises the baseline parameter values.
+The calibration follows the household-finance lifecycle tradition
+(Cocco, Gomes, and Maenhout, 2005; Yao and Zhang, 2005), extended
+with three v4-specific objects: the relocation probability $p_{\text{work}}$,
+the round-trip transaction-cost pair $(\tau_{\text{sell}}, \tau_{\text{buy}})$,
+and the cross-location idiosyncratic correlation $\rho_{AB}$.
+We discuss each group in turn.
+
+% ── Table 1: Parameter summary ───────────────────────────────────────────────
+\begin{table}[t]
+\centering
+\caption{Baseline Parameters}
+\label{tab:parameters}
+\small
+\begin{tabular}{llcl}
+\toprule
+Parameter & Symbol & Value & Source \\
+\midrule
+\multicolumn{4}{l}{\textit{Preferences and lifecycle}} \\
+Risk aversion         & $\gamma$         & 5.0  & CGM (2005) \\
+Time discount         & $\beta$          & 0.96 & CGM (2005) \\
+Entry age / retire / terminal & --- & 25 / 65 / 80 & Standard \\
+\addlinespace
+\multicolumn{4}{l}{\textit{Financial assets}} \\
+Risk-free gross return     & $R_f$           & 1.02  & CGM (2005) \\
+Equity risk premium        & $\mu_S - r_f$   & 4\%   & CGM (2005) \\
+Stock return volatility    & $\sigma_S$      & 15.7\% & CGM (2005) \\
+\addlinespace
+\multicolumn{4}{l}{\textit{Income process (CGM 2005)}} \\
+Permanent shock variance   & $\sigma_u^2$    & 0.0106 & CGM Table~I \\
+Transitory shock variance  & $\sigma_\varepsilon^2$ & 0.0738 & CGM Table~I \\
+Retirement replacement     & $\lambda$       & 0.65  & CGM (2005) \\
+\addlinespace
+\multicolumn{4}{l}{\textit{Housing return (Cocco 2005; Yao-Zhang 2005)}} \\
+Expected log price growth  & $g_h$           & 1.6\%  & Cocco (2005) \\
+Total housing return std   & $\sigma_h$      & 11.5\% & Cocco (2005) \\
+Aggregate factor std       & $\sigma_{\text{div}}$ & 10.0\% & Case-Shiller / NAREIT \\
+Idiosyncratic std (derived) & $\sigma_\iota$ & 5.7\%  & $\sqrt{\sigma_h^2 - \sigma_{\text{div}}^2}$ \\
+Rent-to-price ratio        & $\varrho$       & 5.0\%  & Yao and Zhang (2005) \\
+Maintenance-to-price ratio & $m$             & 1.0\%  & Cocco (2005) \\
+Rent-saving wedge (derived) & $\delta_{\text{own}} = \varrho - m$ & 4.0\% & --- \\
+\addlinespace
+\multicolumn{4}{l}{\textit{Mobility (PSID-anchored)}} \\
+Relocation prob, working age & $p_{\text{work}}$ & 6.0\% & PSID inter-MSA \\
+Relocation prob, retired     & $p_{\text{ret}}$  & 2.0\% & PSID retired \\
+\addlinespace
+\multicolumn{4}{l}{\textit{Transaction costs}} \\
+Traditional sell cost  & $\tau_{\text{sell}}$ & 6.0\% & NAR (2023) \\
+Traditional buy cost   & $\tau_{\text{buy}}$  & 2.5\% & CFPB / ALTA \\
+Token transfer cost    & $\tau_{\text{token}}$& 1.0\% & RealT / Lofty surveys \\
+\addlinespace
+\multicolumn{4}{l}{\textit{Cross-location correlation}} \\
+Idiosyncratic corr., MSA pair & $\rho_{AB}$ & 0.50 & Case-Shiller (2000--2023) \\
+\addlinespace
+\multicolumn{4}{l}{\textit{Mortgage (baseline off)}} \\
+LTV constraint & $\overline{\text{ltv}}$ & 0.0 & Baseline no-mortgage \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Preferences and Income Process}
+\label{sec:calibration:prefs}
+
+Preferences and the income process are taken directly from
+Cocco, Gomes, and Maenhout (2005, CGM hereafter).
+Risk aversion $\gamma = 5$ and the discount factor $\beta = 0.96$ are
+their baseline values.
+The labor income age profile follows the CGM cubic polynomial fit
+to PSID data:
+\begin{equation}
+    f(\text{age}) \;=\;
+    -2.170 + 0.168\,(\text{age}/10)
+    - 0.032\,(\text{age}/10)^2
+    + 0.002\,(\text{age}/10)^3.
+    \label{eq:income_profile}
+\end{equation}
+Permanent and transitory income shocks have variances $\sigma_u^2 = 0.0106$
+and $\sigma_\varepsilon^2 = 0.0738$ (CGM Table~I).
+The retirement replacement rate $\lambda = 0.65$ matches the median
+Social Security replacement rate at median lifetime earnings.
+
+Financial asset parameters follow the same source:
+the equity premium is $4\%$, stock return volatility $15.7\%$,
+and the risk-free rate $2\%$ real.
+
+\subsection{Housing Return Decomposition}
+\label{sec:calibration:housing}
+
+Single-location housing return volatility $\sigma_h = 11.5\%$ is from
+Cocco (2005).
+We decompose the single-location log return into a shared aggregate factor
+$\eta_{\text{div}}$ and an idiosyncratic component $\iota_\ell$:
+\begin{equation}
+    \log R_\ell \;=\; \mu_h + \eta_{\text{div}} + \iota_\ell,
+    \qquad
+    \eta_{\text{div}} \sim \mathcal{N}(0,\sigma_{\text{div}}^2),
+    \quad
+    \iota_\ell \sim \mathcal{N}(0,\sigma_\iota^2),
+    \label{eq:return_decomp}
+\end{equation}
+with $\sigma_h^2 = \sigma_{\text{div}}^2 + \sigma_\iota^2$.
+We set $\sigma_{\text{div}} = 10\%$ so that the aggregate factor accounts
+for approximately $75\%$ of total single-location housing variance
+($\sigma_{\text{div}}^2 / \sigma_h^2 \approx 0.756$), consistent with
+the common factor dominating MSA-level variance in Case-Shiller data
+and with Piazzesi and Schneider~(2016).
+The idiosyncratic component $\sigma_\iota = \sqrt{0.115^2 - 0.10^2} \approx 5.7\%$
+is calibrated residually.
+
+The idiosyncratic components at the two locations follow a bivariate normal
+with correlation $\rho_{AB}$ (Section~\ref{sec:calibration:rhoAB}).
+The Cholesky factorisation is:
+\begin{align}
+    \iota_A &= \sigma_\iota\,\xi_A, \label{eq:chol_A} \\
+    \iota_B &= \rho_{AB}\,\iota_A + \sqrt{1 - \rho_{AB}^2}\,\sigma_\iota\,\xi_B,
+    \label{eq:chol_B}
+\end{align}
+with $\xi_A, \xi_B \sim \mathcal{N}(0,1)$ independent.
+
+The rent-to-price ratio $\varrho = 5\%$ follows Yao and Zhang~(2005).
+Maintenance costs $m = 1\%$ follow Cocco~(2005).
+The rent-saving wedge $\delta_{\text{own}} = \varrho - m = 4\%$ governs
+the per-period benefit of occupying a fractional token position
+($\kappa$ rule, equation~(\ref{eq:kappa}) in Section~\ref{sec:model:kappa}).
+
+\subsection{Mobility Rate}
+\label{sec:calibration:mobility}
+
+We anchor the relocation probability to PSID inter-MSA mobility data.
+Total annual relocation rates in the PSID average $7$--$12\%$ for
+working-age households but include short-distance, within-MSA moves that
+do not change the relevant housing market.
+Long-distance, inter-MSA moves account for approximately $40$--$50\%$
+of total PSID mobility, yielding an inter-MSA rate of $5$--$7\%$ annually
+for prime-age workers.
+We set $p_{\text{work}} = 6\%$ (PSID midpoint) for working ages
+$25$--$64$ and $p_{\text{ret}} = 2\%$ for ages $65$--$80$.
+
+This choice is consistent with Bagliano, Fugazza, and Nicodano~(2014, RFS),
+who calibrate career-driven mobility shocks at $5$--$8\%$ annually, and
+broadly in the range of Yao and Zhang~(2005) ($4\%$) and Saks and
+Wozniak~(2011, JLE) ($2$--$4\%$ inter-state, implying $4$--$8\%$ inter-MSA).
+
+The sensitivity grid (Table~\ref{tab:sensitivity_grid} below)
+spans $p_{\text{work}} \in \{0, 0.02, 0.06, 0.12\}$.
+At $p_{\text{work}} = 0$, the cross-location hedge channel must vanish by
+construction (no relocation, no cost-saving motive); this is a pre-registered
+falsification test (Referee Round~4, test~r).
+
+\subsection{Transaction Costs}
+\label{sec:calibration:txcost}
+
+\paragraph{Traditional housing ($E1\_2L$).}
+We set the seller commission and closing costs at $\tau_{\text{sell}} = 6\%$,
+consistent with the NAR~(2023) aggregate for a typical single-family
+home sale ($5$--$6\%$ agent commission plus $0.5$--$1\%$ closing costs).
+The buyer cost is $\tau_{\text{buy}} = 2.5\%$,
+covering origination fees ($0.75\%$), title insurance and escrow
+($0.75\%$), appraisal and inspection ($0.25\%$), and prepaid items
+($0.25\%$), consistent with CFPB and ALTA surveys.
+The implied round-trip cost for an $E1\_2L$ relocation is
+$\tau_{\text{sell}} + \tau_{\text{buy}} = 8.5\%$,
+within the $5$--$10\%$ range used in the structural housing literature
+(Diaz and Luengo-Prado, 2008; Head, Lloyd-Ellis, and Sun, 2014).
+
+\paragraph{Tokenized housing ($E2\_2L$).}
+Platform surveys of RealT, Lofty, and DigiShares~(2024) report trading
+fees in the range $0.1$--$0.5\%$ plus blockchain gas and settlement
+of $0.05$--$0.3\%$ on Layer-2 networks.
+We set $\tau_{\text{token}} = 1\%$ to include a regulatory-compliance
+margin of $0.5\%$ (reflecting SEC Regulation~D and AML overhead).
+The structural distinction from $E1\_2L$ is that $\tau_{\text{token}} \ll \tau_{\text{sell}} + \tau_{\text{buy}}$:
+tokens are portable across relocations, so the $8.5\%$ round-trip is avoided
+for every unit of cross-location position retained.
+
+\paragraph{Expected hedge premium.}
+The per-period value of pre-positioning one unit of $x_B$ while at
+location $A$ is
+\begin{equation}
+    \text{hedge premium per unit}
+    \;=\;
+    p_{\text{work}} \times \tau_{\text{buy}}
+    \;\approx\;
+    0.06 \times 0.025
+    \;=\; 0.15\%\ \text{per period}.
+    \label{eq:hedge_premium}
+\end{equation}
+This is the incremental saving on buying costs that accrues when the
+household has pre-positioned $x_B > 0$ prior to relocation.
+Accumulated over a working-life horizon, equation~(\ref{eq:hedge_premium})
+implies a lifetime CEV contribution of $1$--$2\%$ from the hedge
+channel alone, with the continuous-$x$ rent-saving channel adding a further
+$3$--$4\%$ (see Section~\ref{sec:results:decomp}).
+
+\subsection{Cross-Location House-Price Correlation}
+\label{sec:calibration:rhoAB}
+
+The parameter $\rho_{AB}$ governs the idiosyncratic correlation between
+location $A$ and location $B$ returns.
+Using the decomposition~(\ref{eq:return_decomp}),
+the observed return correlation between two MSAs is:
+\begin{equation}
+    \operatorname{Corr}(R_A, R_B)
+    \;\approx\;
+    \frac{\sigma_{\text{div}}^2}{\sigma_h^2}
+    \;+\;
+    \frac{\sigma_\iota^2}{\sigma_h^2}\,\rho_{AB}
+    \;\approx\; 0.756 + 0.244\,\rho_{AB}.
+    \label{eq:rhoAB_mapping}
+\end{equation}
+We set $\rho_{AB} = 0.50$, which maps to an observed return correlation of
+$\approx 0.88$, consistent with pairs of geographically proximate
+US metros in the Case-Shiller 20-city panel (2000--2023).
+This is the midpoint of the $0.30$--$0.70$ range that covers inter-regional
+moves (different metro areas): at one extreme, Chicago--Phoenix
+($\hat{\rho}_{AB} \approx 0.35$) and at the other,
+NY--Boston ($\hat{\rho}_{AB} \approx 0.60$).
+
+Equation~(\ref{eq:rhoAB_mapping}) implies that the hedge value of
+$x_B$ at location $A$ derives from bearing the idiosyncratic component
+$\iota_B$ independently of $\iota_A$.
+As $\rho_{AB} \to 1$, locations $A$ and $B$ become nearly identical
+markets and $x_B$ is a near-substitute for $x_A$; the hedge channel
+collapses.
+The Round-4 referee pre-registered test~(m) requires $\operatorname{CEV}(E2\_2L \text{ vs } E1\_2L)$
+to decrease significantly at $\rho_{AB} = 0.95$.
+
+\subsection{Sensitivity Grid}
+\label{sec:calibration:sensitivity}
+
+Table~\ref{tab:sensitivity_grid} lists the pre-registered sensitivity
+sweeps queued for execution after the v4 baseline results are available.
+The three P1-priority sweeps cover the three parameters most directly
+linked to the welfare decomposition channels.
+
+\begin{table}[t]
+\centering
+\caption{Pre-Registered Sensitivity Sweeps}
+\label{tab:sensitivity_grid}
+\small
+\begin{tabular}{llll}
+\toprule
+Parameter & Sweep values & Channel & Script \\
+\midrule
+$\rho_{AB}$          & $\{0,\, 0.25,\, 0.50,\, 0.75,\, 0.95\}$  & Hedge (maintained) & \texttt{sweep\_rhoAB.sh} \\
+$p_{\text{work}}$    & $\{0,\, 0.02,\, 0.06,\, 0.12\}$           & Hedge (frequency)  & \texttt{sweep\_prelocate.sh} \\
+$\tau_{\text{buy}}$  & $\{0,\, 0.025,\, 0.04,\, 0.06\}$          & Avoided tx-cost    & \texttt{sweep\_txcost.sh} \\
+\midrule
+\multicolumn{4}{l}{\textit{Phase 2 sweeps (after H2' approval)}} \\
+$\gamma$             & $\{3,\, 5,\, 8\}$                         & Risk channel       & --- \\
+$\delta_{\text{own}}$& $\{0.02,\, 0.04,\, 0.06\}$               & Rent-saving        & --- \\
+$\sigma_{\text{div}}$& $\{0.08,\, 0.10,\, 0.12\}$               & Idio.\ risk share  & --- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+At $p_{\text{work}} = 0$ and at $\tau_{\text{buy}} = 0$,
+the hedge premium~(\ref{eq:hedge_premium}) is exactly zero; any
+remaining welfare gap between $E2\_2L$ and $E1\_2L$ in these cells
+reflects the continuous-$x$ rent-saving channel only and serves
+as a falsification bound.
+At $\rho_{AB} = 0.95$, the maintained-hedge channel must also collapse
+because $x_B$ and $x_A$ are near-substitutes.
+These three boundary conditions define sharp predictions that distinguish
+the two decomposed channels (Section~\ref{sec:results:decomp}).
