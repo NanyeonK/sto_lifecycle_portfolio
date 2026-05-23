@@ -991,3 +991,83 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-05-23 — v4 solver (Option 1 full state extension) implemented
+
+**Action picked**: P0 Step 2 from `next_actions.md` — implement
+`src/vfi_solver_v4.jl` with 6D state `(t, w, z, ell, x_A_prev, x_B_prev)`
+and per-period transaction costs via delta tracking.
+
+**Rationale for pick**: Option 1 is the highest-priority auto-allowed
+action (user chose B-Option-1 on 2026-05-02; cloud agent P0). The spec
+is fully written at `handoff/tau_buy_option1_spec.md`. Steps 1 (branch)
+and 2-4 (solver + smoke test + scripts) are all cloud-executable without
+server1.
+
+**Branch**: `auto/2026-05-02-option1-state-extension`
+
+**Files created/modified**:
+- `src/vfi_solver_v4.jl` (~570 LOC): full 6D solver
+- `scripts/run_option1_e1.sh`: E1_2L baseline run script for server1
+- `scripts/run_option1_e2.sh`: E2_2L baseline run script for server1
+- `research_log.md`, `next_actions.md` (this update)
+
+**Key design decisions**:
+
+1. **6D arrays `(t, iw, iz, iell, ixA_prev, ixB_prev)`**: SolverResult_v4
+   holds value + 5 policy arrays, all 6D. At N_W=15, N_Z=5, N_ell=2,
+   N_X_PREV=3: 900 states per period × 57 periods ≈ 51k cells, ~3 MB
+   total for all arrays — well within memory.
+
+2. **Transaction cost formula (per-period, per spec)**:
+   ```
+   delta_A  = x_A_new - x_A_prev
+   delta_B  = x_B_new - x_B_prev
+   tx_cost  = tau_buy   * (max(delta_A,0) + max(delta_B,0))
+            + tau_token * (max(-delta_A,0) + max(-delta_B,0))
+   ```
+   tau_sell for E1_2L forced sale on relocation is separate (wealth
+   transition sell_factor, same as v3).
+
+3. **E1_2L x_prev clearing on relocation**: when E1_2L household
+   relocates, the forced sale clears the old location's holding. The
+   continuation value on the relocation branch uses `(x_A_prev=0, x_B_prev=0)`
+   as next period's state (not `x_A_new, x_B_new`). This means at t+1 the
+   E1_2L household buys from zero, paying full tau_buy.
+
+4. **E2_2L tokens portable on relocation**: continuation value on the
+   relocation branch uses `(x_A_new, x_B_new)` — tokens carry over.
+   A household at ell=A who pre-holds x_B > 0 arrives at ell=B with
+   x_B_prev = x_B_chosen (already paid tau_buy). On relocation at t+1,
+   delta_B ≈ 0 → near-zero tx_cost for x_B. This IS the hedge mechanism.
+
+5. **4D interpolation** (`interp_4d_v4`): quadrilinear over
+   `(w, z, x_A_prev, x_B_prev)` using 16-corner product formula.
+   Required because x_A_new (chosen) is continuous and becomes x_prev
+   at t+1, so lookup must interpolate in the x_prev dimensions.
+
+6. **Grid calibrated to spec**: N_W=15, N_Z=5, N_X_PREV=3 (default small
+   mode). Net compute relative to v3: 9× state factor × 0.51 grid
+   reduction ≈ 4.6× per regime. Expected ~2-3h wall per regime on server1.
+
+7. **x_grid for E2_2L choices**: independent nx×nx grid for (x_A_new,
+   x_B_new) rather than v3's (X_total, alpha) parameterization. This is
+   necessary to properly compute deltas against x_prev.
+
+**Smoke test checks implemented** (no VFI run — cloud env lacks Julia):
+- sigma decomposition invariant
+- 7D shock block size and weight sum
+- 6D array allocation + memory estimate
+- Terminal slice: no NaN
+- `tx_cost_v4` formula: buy/sell/mixed cases
+- No-rebalance tx_cost = 0
+- `housing_cost_v4` (fixed kappa rule from v3 bug fix)
+- `interp_4d_v4` corner exactness
+- Hedge incentive structure: pre-holding x_B saves tau_buy on relocation
+
+**Next queued** (all require server1):
+- Run `julia src/vfi_solver_v4.jl --smoke-test` on server1 (Step 4)
+- Run `scripts/run_option1_e1.sh` → `output/diagnostics/p6_option1_e1.json`
+- Run `scripts/run_option1_e2.sh` → `output/diagnostics/p6_option1_e2.json`
+- Compute `CEV(E2_2L_v4 vs E1_2L_v4)` and check H1 (mean_xB > 0 at ellA)
+- Write `output/diagnostics/p6_option1_decomposition.md`
+
