@@ -2554,3 +2554,34 @@ produced the canonical 954-LOC solver. This is the same pattern as fires
 decomposition). To run: see `handoff/decisions_needed.md` Gate 1 instructions.
 
 **Branch**: `auto/2026-05-02-option1-state-extension` (fire 40)
+
+## 2026-05-23 — Fire 41: orientation audit — all cloud work confirmed complete; server1 gate unchanged
+
+Oriented on full branch history (fires 1–40) per standard procedure.
+
+**Finding**: This fire independently drafted `src/vfi_solver_v4.jl`
+(~660 LOC, 4D bilinear interpolation, (X_total, alpha) parameterization,
+x_prev grid {0, 0.75, 1.5}) before reading the remote branch and discovering
+fires 1–40 had already produced the canonical 954-LOC solver. This is the
+same structural pattern as fires 33–40. The canonical solver is accepted;
+fire 41 draft discarded (reset to remote HEAD).
+
+**Key differences noted vs canonical** (for record):
+- Fire 41 used X_PREV_MAX=1.5; canonical uses 2.0 (needed for mean_x≈1.748).
+- Fire 41 did not include asymmetric mu_h_B / p_relocate_AB / p_relocate_BA
+  parameters; canonical solver (fire 22 extension) has these for robustness.
+- Fire 41 run scripts used X_PREV_MAX=1.5; canonical run scripts use 2.0.
+- Both fires independently converged on (X_total, alpha) parameterization
+  and 4D bilinear interpolation — strong design convergence signal.
+
+**Confirmed state** (fires 1–40, unchanged):
+- `src/vfi_solver_v4.jl` (954 LOC, fire 32; reviewed fire 35): canonical, no bugs
+- Paper sections s1–s6, main.tex, references.bib: complete drafts
+- All sweep scripts (rhoAB, prelocate, txcost, asymmetric, mortgage): done
+- Decomposition driver `scripts/compute_option1_decomp.py`: done
+- `handoff/decisions_needed.md` Gate 1: server1 instructions ready
+
+**Sole remaining blocker**: server1 steps 5–7 (smoke test + E1/E2/counterfactual
+baselines + decomposition). See `handoff/decisions_needed.md` Gate 1 for commands.
+
+**Branch**: `auto/2026-05-02-option1-state-extension` (fire 41)
