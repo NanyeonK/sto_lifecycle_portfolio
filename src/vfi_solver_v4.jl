@@ -541,7 +541,6 @@ function solve_state_v4(
             resources = w - kappa - x_ell_new - tx
             resources <= 0.0 && continue
 
-            x_ell_cur = ell == LOC_A ? x_A_prev : x_B_prev
             b_lo = -p.ltv_max * x_ell_new
             b_cands = if p.ltv_max > 0.0 && x_ell_new > 0.0
                 collect(range(b_lo, max(resources, b_lo + 1e-6); length=na))
