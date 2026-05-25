@@ -4,18 +4,21 @@
 # Usage:
 #   julia scripts/compute_cev_sweep.jl <outdir> <sweep_type>
 #
-# sweep_type in {rhoAB, prelocate, txcost}
+# sweep_type in {rhoAB, prelocate, txcost, mortgage}
 #
 # Reads pairs of E1_2L and E2_2L summary JSONs from <outdir>,
 # computes CEV at the midpoint state (iw_mid, iz_mid, ell=A),
 # and writes a Markdown table to stdout.
+#
+# Compatible with both v3 JSON (V_t1_midpoint_ellA) and v4 JSON
+# (V_t1_midpoint_ellA_xprev0 at initial state x_prev=0).
 #
 # CEV formula: (V_E2 / V_E1)^(1/(1-γ)) − 1
 # For γ=5:      (V_E2 / V_E1)^(−1/4) − 1
 # Both V values are negative (CRRA with γ>1); V_E2 > V_E1 (less negative) implies ratio < 1,
 # giving CEV > 0 after the negative exponent flips the inequality.
 
-using JSON3, Printf
+using JSON3, Printf, Dates
 
 function compute_cev(V_E2::Float64, V_E1::Float64, gamma::Float64)::Float64
     ratio = V_E2 / V_E1
@@ -25,14 +28,21 @@ end
 
 function read_summary(path::String)
     d = JSON3.read(read(path, String))
-    V  = Float64(d["V_t1_midpoint_ellA"])
-    gm = Float64(d["params"]["gamma"])
-    ts = Float64(d["params"]["tau_sell"])
-    tb = Float64(d["params"]["tau_buy"])
-    ap = Bool(d["params"]["apply_tau_buy_at_reloc"])
+    # v4 uses V_t1_midpoint_ellA_xprev0; v3 uses V_t1_midpoint_ellA
+    V = if haskey(d, "V_t1_midpoint_ellA_xprev0")
+        Float64(d["V_t1_midpoint_ellA_xprev0"])
+    else
+        Float64(d["V_t1_midpoint_ellA"])
+    end
+    gm    = Float64(d["params"]["gamma"])
+    ts    = Float64(d["params"]["tau_sell"])
+    tb    = Float64(d["params"]["tau_buy"])
+    # apply_tau_buy_at_reloc is v3-only; v4 always applies per-delta (native)
+    ap    = get(d["params"], "apply_tau_buy_at_reloc", false)
     rhoAB = Float64(d["params"]["rho_AB"])
     preloc = Float64(d["params"]["p_relocate_working"])
-    return (; V, gm, ts, tb, ap, rhoAB, preloc)
+    solver = get(d, "solver_version", "v3")  # v4 sets this field
+    return (; V, gm, ts, tb, ap=Bool(ap), rhoAB, preloc, solver)
 end
 
 function cev_row(dir, tag_e1, tag_e2)
@@ -43,7 +53,8 @@ function cev_row(dir, tag_e1, tag_e2)
     s1 = read_summary(f_e1)
     s2 = read_summary(f_e2)
     cev = compute_cev(s2.V, s1.V, s1.gm)
-    return (; V_E1=s1.V, V_E2=s2.V, cev, gamma=s1.gm, s1.ts, s1.tb, s1.ap, s1.rhoAB, s1.preloc), nothing
+    return (; V_E1=s1.V, V_E2=s2.V, cev, gamma=s1.gm, s1.ts, s1.tb, s1.ap,
+              s1.rhoAB, s1.preloc, s1.solver), nothing
 end
 
 function main()
@@ -57,8 +68,7 @@ function main()
 
     if sweep == "rhoAB"
         println("| rho_AB | V(E1_2L) | V(E2_2L) | CEV (%) | note |")
-        println("|--------|----------|----------|---------|------|")
-        for (val, tag) in [(0.00,"0p00"), (0.25,"0p25"), (0.50,"0p50"), (0.75,"0p75"), (0.95,"0p95")]
+        println("|--------|----------|----------|---------|------|")        for (val, tag) in [(0.00,"0p00"), (0.25,"0p25"), (0.50,"0p50"), (0.75,"0p75"), (0.95,"0p95")]
             row, err = cev_row(outdir, "E1_2L_rhoAB$(tag).json", "E2_2L_rhoAB$(tag).json")
             if row === nothing
                 println("| $(val) | — | — | — | $err |")
@@ -71,8 +81,7 @@ function main()
 
     elseif sweep == "prelocate"
         println("| p_reloc | V(E1_2L) | V(E2_2L) | CEV (%) | note |")
-        println("|---------|----------|----------|---------|------|")
-        for (val, tag) in [(0.00,"0p00"), (0.02,"0p02"), (0.06,"0p06"), (0.12,"0p12")]
+        println("|---------|----------|----------|---------|------|")        for (val, tag) in [(0.00,"0p00"), (0.02,"0p02"), (0.06,"0p06"), (0.12,"0p12")]
             row, err = cev_row(outdir, "E1_2L_preloc$(tag).json", "E2_2L_preloc$(tag).json")
             if row === nothing
                 println("| $(val) | — | — | — | $err |")
@@ -103,14 +112,28 @@ function main()
                         row.V_E1, row.V_E2, row.cev * 100)
             end
         end
+
+    elseif sweep == "mortgage"
+        println("| LTV_MAX | V(E1_2L) | V(E2_2L) | CEV (%) | note |")
+        println("|---------|----------|----------|---------|------|")        for (val, tag) in [(0.00,"0p00"), (0.50,"0p50"), (0.80,"0p80")]
+            row, err = cev_row(outdir, "E1_2L_ltv$(tag).json", "E2_2L_ltv$(tag).json")
+            if row === nothing
+                println("| $(val) | — | — | — | $err |")
+            else
+                note = val == 0.0 ? "no mortgage (baseline)" :
+                       val >= 0.75 ? "high leverage" : ""
+                @printf("| %.2f | %.2f | %.2f | %+.3f%% | %s |\n",
+                        val, row.V_E1, row.V_E2, row.cev * 100, note)
+            end
+        end
     else
-        error("Unknown sweep type '$sweep'. Use: rhoAB, prelocate, txcost")
+        error("Unknown sweep type '$sweep'. Use: rhoAB, prelocate, txcost, mortgage")
     end
 
     println()
-    println("_CEV = ((V_E2/V_E1)^(1/(1−γ)) − 1)×100.  State: midpoint (iw_mid, iz_mid, ell=A)._")
-    println("_tau_buy approximation: owner who relocates pays tau_buy deducted from relocation wealth._")
-    println("_E2_2L: tokens portable across moves — no tau_sell, no tau_buy at relocation._")
+    println("_CEV = ((V_E2/V_E1)^(1/(1−γ)) − 1)×100.  State: midpoint (iw_mid, iz_mid, ell=A, x_prev=0)._")
+    println("_v4 solver: tau_buy charged per-period on positive deltas (proper state extension)._")
+    println("_E2_2L: tokens portable across moves — no forced tau_sell at relocation._")
 end
 
 using Dates
