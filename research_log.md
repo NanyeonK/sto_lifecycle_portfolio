@@ -1060,3 +1060,25 @@ detectable in the VFI solution as mean_xB > 0 at ell=A.
 4. Compute CEV(E2_2L_v4 vs E1_2L_v4); check > 4.255% (hypothesis H2)
 5. Compute hedge channel = CEV(E2_2L_v4 vs E2_2L_v3); check ~0.5-1.5% (hypothesis H3)
 
+## 2026-05-25 — Orientation audit (fire 42): all cloud work confirmed complete
+
+**Action**: orientation audit. Picked P0 (v4 solver implementation) but
+discovered on reading `handoff/decisions_needed.md` that fires 1-41 already
+completed all cloud-executable work. This fire re-implemented `vfi_solver_v4.jl`
+(redundant) and then merged the remote's canonical 929-LOC version.
+
+**Current state confirmed:**
+- `src/vfi_solver_v4.jl` (929 LOC): 6D state, 4D multilinear interpolation,
+  correct tx_cost on deltas, smoke_test_v4() — COMPLETE.
+- `paper/sections/s1_intro.tex` through `s6_conclusion.tex` — full draft.
+- `paper/main.tex`, `paper/outline_v4.md`, `paper/references.bib` — DONE.
+- All run scripts (baselines, counterfactuals, sweeps) — DONE.
+- `scripts/compute_option1_decomp.py` — automated CEV decomp driver — DONE.
+- All Phase 2 prep docs — DONE.
+
+**Only remaining gate**: server1 baseline runs (steps 5-7 in P0 table).
+No cloud-agent-executable actions remain. See `handoff/decisions_needed.md`
+Gate 1 for exact commands.
+
+**Branch**: `auto/2026-05-02-option1-state-extension` (pushed, commit 9c88a0c).
+
