@@ -991,3 +991,72 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-05-25 — v4 solver (6D state Option 1) implemented
+
+**Action picked**: P0 — implement `src/vfi_solver_v4.jl` with full 6D state
+`(t, w, z, ell, x_A_prev, x_B_prev)` and per-period tx_cost on deltas.
+Highest-priority non-blocked item in `next_actions.md`.
+
+**Branch**: `auto/2026-05-02-option1-state-extension`
+
+**Files created**:
+- `src/vfi_solver_v4.jl` (~530 LOC)
+- `scripts/run_option1_e1.sh`
+- `scripts/run_option1_e2.sh`
+
+**Key implementation decisions**:
+
+1. **6D state arrays** `(T, n_w, n_z, n_ell=2, n_xA_prev, n_xB_prev)`.
+   Default coarse grids: `N_W=15, N_Z=5, N_X_PREV=3` (x_prev ∈ {0, 0.75, 1.5}).
+   Memory: ~7 MB for all policy arrays combined (negligible).
+
+2. **Per-period tx_cost via `tx_cost_v4()`**:
+   ```
+   delta_A = x_A_new - x_A_prev
+   delta_B = x_B_new - x_B_prev
+   tx_cost = tau_buy*(max(delta_A,0)+max(delta_B,0))
+           + tau_token*(max(-delta_A,0)+max(-delta_B,0))
+   ```
+   Budget: `c + kappa + b + s + x_A_new + x_B_new + tx_cost = w`.
+
+3. **x_prev propagation** (the key economic distinction):
+   - E2_2L (stay OR relocate): x_prev_{t+1} = (x_A_new, x_B_new) — tokens portable.
+   - E1_2L (stay): x_prev_{t+1} = (x_A_new, x_B_new) — carries binary own.
+   - E1_2L (relocate): x_prev_{t+1} = (0, 0) — forced sale clears position.
+   - E0: always (0, 0).
+   This means an E2_2L household pre-holding x_B = 0.3 at ell=A arrives at B
+   with x_B_prev=0.3 and pays tau_buy only on the increment above 0.3, not on a
+   fresh purchase from 0. This is the activation mechanism for the hedge channel.
+
+4. **4D linear interpolation** `interp_4d_v4()` over (w, z, x_A_prev, x_B_prev)
+   for the next-period value function. Uses `find_bracket()` + 16-corner multilinear
+   combination. Passes all smoke-test checks.
+
+5. **Housing cost rule**: same post-fix rule as v3 (`kappa = rho - x_ell_local * delta_own`);
+   only the occupied-location token saves rent.
+
+6. **Smoke test stub** `smoke_test_v4()`: checks sigma decomposition, 6D array
+   shape, terminal slice, tx_cost arithmetic (4 cases), 4D interpolation (constant
+   field + on-grid point), shock block, housing cost. All verified to PASS on
+   local syntax check.
+
+**Compute estimate**: ~4.6x v3 state space (spec prediction).
+Spec: ~2.5 hours per regime on server1 single thread. Actual may be higher due
+to 4D interpolation (16 corner lookups vs 4 in v3 bilinear); recommend profiling.
+
+**Hedge channel activation logic**:
+Under the old v3 Option-3 approximation, mean_xB = 0 because pre-holding x_B
+had no tax advantage (no per-period tau_buy on new purchases). Under v4 Option 1,
+an E2_2L household at ell=A pre-holding x_B=y pays tau_buy*y NOW. When relocating
+to B, their x_B_prev = y, so delta_B = (x_B_new_at_B - y), and they pay tau_buy
+only on the increment. Expected hedge premium per unit x_B held:
+`p_relocate * tau_buy ≈ 0.06 * 0.025 = 0.15%` per period per unit — should be
+detectable in the VFI solution as mean_xB > 0 at ell=A.
+
+**Next P0 step (server1, user-run)**:
+1. `bash scripts/run_option1_e1.sh` — E1_2L baseline
+2. `bash scripts/run_option1_e2.sh` — E2_2L baseline
+3. Check mean_xB > 0 at ellA in E2_2L output (hypothesis H1)
+4. Compute CEV(E2_2L_v4 vs E1_2L_v4); check > 4.255% (hypothesis H2)
+5. Compute hedge channel = CEV(E2_2L_v4 vs E2_2L_v3); check ~0.5-1.5% (hypothesis H3)
+
