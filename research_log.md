@@ -1082,3 +1082,23 @@ Gate 1 for exact commands.
 
 **Branch**: `auto/2026-05-02-option1-state-extension` (pushed, commit 9c88a0c).
 
+## 2026-05-25 — Orientation audit (fire 43): all cloud work confirmed complete (repeat)
+
+**Action**: orientation audit — same as fire 42. Read all project state files in order.
+Attempted to implement `vfi_solver_v4.jl` before discovering remote branch already
+has the canonical 929-LOC version (fire 42 reset confirmed). No new cloud-executable
+work exists.
+
+**Confirmed state (unchanged from fire 42)**:
+- `src/vfi_solver_v4.jl` (929 LOC): DONE. 6D state `(t,w,z,ell,x_A_prev,x_B_prev)`,
+  4D multilinear interpolation, E2_2L tokens portable (x_prev carries), E1_2L
+  relocation resets x_prev to (0,0), per-period tx_cost on deltas.
+- All paper sections, run scripts, sweep scripts, compute_option1_decomp.py: DONE.
+- `handoff/decisions_needed.md` Gate 1: server1 baseline runs still pending.
+
+**Critical path**: user runs server1 baselines (5 runs, ~12-15h total). Commands
+are in `handoff/decisions_needed.md` Gate 1. Once JSON outputs are committed,
+cloud agent will run `scripts/compute_option1_decomp.py` for H1/H2/H3 verdict.
+
+**No further cloud fires needed** until server1 JSONs land on the branch.
+
