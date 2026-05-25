@@ -991,3 +991,73 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-05-25 — v4 solver implemented: 6D state, proper tau_buy (Option 1)
+
+**Action picked**: create `src/vfi_solver_v4.jl` — the P0 Option 1 full
+state extension approved 2026-05-02.
+
+**Rationale**: v3's tau_buy approximation (Option 3: deduct at relocation
+event only) delivered zero cross-location hedge even with tau_buy active,
+because a household at ell=A has no incentive to pre-hold x_B when doing
+so doesn't reduce its future buying costs. Option 1 threads x_prev
+= (x_A_prev, x_B_prev) through the state so that a household paying
+tau_buy incrementally NOW for x_B avoids paying tau_buy on a large lump
+at relocation. That is the proper hedge mechanism.
+
+**Key design choices:**
+
+1. **6D state** `(t, w, z, ell, x_A_prev, x_B_prev)`. Value function
+   and all policy arrays are 6D.
+
+2. **x_prev grid** coarse as spec: `N_X_PREV=3` (default {0, 0.75, 1.5}
+   per X_PREV_MAX=1.5). x_new choices restricted to this grid so that
+   next-period x_prev lands exactly on a grid point — no interpolation
+   needed in the x_prev dimensions, only bilinear in (w, z).
+
+3. **tx_cost (E2_2L)**: `tau_buy * max(delta_A, 0) + tau_buy * max(delta_B, 0)
+   + tau_token * max(-delta_A, 0) + tau_token * max(-delta_B, 0)`. Charged
+   at choice time per period.
+
+4. **tx_cost (E1_2L)**: `tau_buy * max(delta_ell, 0)` at purchase only;
+   tau_sell on forced relocation sale retained via sell_factor in wealth
+   transition (same as v3). E1_2L admissibility: x_{ell'} = 0 always.
+
+5. **Housing cost rule**: fixed kappa (occupied unit only), same as v3
+   post-fix. Non-occupied token purely financial.
+
+6. **Continuation value**: given choice `(ix_A_new, ix_B_new)` (grid
+   indices of x_A_new, x_B_new), interpolate bilinearly over (w, z) at
+   `V[t+1, :, :, ell', ix_A_new, ix_B_new]`. No x-interpolation needed.
+
+7. **Memory**: for N_W=15, N_Z=5, N_X_PREV=3, T=57 the 6D array is
+   T*15*5*2*3*3 = 76,950 entries = ~5 MB per array. Six arrays ≈ 30 MB.
+   Compute estimate: ~4.6x v3 per run (~2-3 hours per regime on server1
+   single thread at these small grids).
+
+8. **Smoke test stub** in `smoke_test_v4()`: checks 6D allocation,
+   terminal slice, tx_cost formula at six representative cases, no-rebalance
+   identity, shock block size and weight-sum, housing cost rule. No VFI run
+   in cloud env.
+
+**Files created:**
+- `src/vfi_solver_v4.jl` (~560 LOC)
+- `scripts/run_option1_e1.sh` (E1_2L v4 baseline)
+- `scripts/run_option1_e2.sh` (E2_2L v4 baseline)
+
+**Branch**: `auto/2026-05-02-option1-state-extension`
+
+**Smoke test**: run `julia src/vfi_solver_v4.jl --smoke-test` on server1
+before launching full VFI. Expected: all PASS, no Julia errors.
+
+**Hypotheses to verify (after server1 runs):**
+
+- H1: mean_xB > 0 at ell=A under E2_2L (hedge mechanism activates)
+- H2: CEV(E2_2L_v4 vs E1_2L_v4) > 4.255% (Option 3 baseline)
+- H3: hedge channel = CEV(E2_2L_v4 vs E2_2L_v3) ≈ 0.5–1.5%
+
+**Next queued (server1, user):**
+1. `julia src/vfi_solver_v4.jl --smoke-test`
+2. `bash scripts/run_option1_e1.sh`
+3. `bash scripts/run_option1_e2.sh`
+4. Compute CEV and channel decomposition
+
