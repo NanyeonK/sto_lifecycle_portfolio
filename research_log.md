@@ -991,3 +991,76 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-05-26 — v4 solver (Option 1 state extension) implemented
+
+**Action picked**: implement `src/vfi_solver_v4.jl` — the Option 1 full
+state extension as specified in `handoff/tau_buy_option1_spec.md`.
+This is P0 in `next_actions.md` (steps 1-4), user-approved 2026-05-02.
+
+**What was implemented** (branch `auto/2026-05-26-v4-state-extension`):
+
+1. **6D state `(t, w, z, ell, x_A_prev, x_B_prev)`**: value function and
+   all policy arrays are 6D. At default small grids (N_W=15, N_Z=5,
+   N_X_PREV=3): 57 × 15 × 5 × 2 × 3 × 3 = 230,850 state points.
+   Memory per Float64 array: ~1.8 MB; total struct ~10 MB. Well within
+   server1 RAM.
+
+2. **Proper per-period tau_buy on positive deltas** (Option 1 spec):
+   ```
+   tx_cost = tau_buy   * (max(x_A_new - x_A_prev, 0) + max(x_B_new - x_B_prev, 0))
+           + tau_token * (max(x_A_prev - x_A_new, 0) + max(x_B_prev - x_B_new, 0))
+   ```
+   This is the correct specification. A household at ell=A who pre-holds
+   x_B at cost tau_buy NOW avoids paying tau_buy on a larger increment
+   at forced relocation. Expected hedge premium: p_relocate * tau_buy
+   ≈ 0.06 × 0.025 = 0.15%/yr per unit x_B held.
+
+3. **E2_2L x choices restricted to x_prev_grid**: ensures continuation-value
+   lookups in the two new state dims are exact index lookups (no
+   interpolation needed). E2_2L solver loops over N_X_PREV × N_X_PREV = 9
+   discrete (x_A_new, x_B_new) combinations at default N_X_PREV=3.
+
+4. **Portability vs forced-sale state update**:
+   - E2_2L (tokens portable): x_prev state at t+1 = (x_A_new, x_B_new)
+     regardless of relocation event.
+   - E1_2L (forced sale on relocation): x_prev resets to (0, 0) = index (1,1)
+     after relocation. tau_buy charged on fresh purchase at new location when
+     x_ell_prev < 0.5 (new buyer).
+
+5. **Smoke test `smoke_test_v4()`**: covers sigma decomposition, grid
+   construction, shock block (size + weight sum + R_A ≠ R_B), 6D array
+   allocation (with memory print), terminal slice, tx_cost_v4 spot-checks
+   (4 cases), housing_cost_v4 spot-checks, nearest_xprev_idx, E1_2L
+   x=1 → last grid index mapping. No VFI run (cloud env).
+
+6. **Run scripts**: `scripts/run_option1_e1.sh` and
+   `scripts/run_option1_e2.sh` with all env-vars wired for server1.
+
+**Design decisions logged here**:
+- `nearest_xprev_idx()` used for E1_2L x ∈ {0,1} → x_prev grid mapping.
+  At N_X_PREV=3, x_prev_max=1.0: grid = {0.0, 0.5, 1.0}; x=0 → idx 1,
+  x=1 → idx 3 (exact). No approximation error.
+- E1_2L voluntary exit (own → rent): charged tau_token (not tau_sell).
+  Forced sale on relocation is still tau_sell via sell_factor in wealth
+  transition (same as v3). This is intentional: voluntary delistings are
+  token-platform liquidations, not NAR-commission sales.
+- Mortgage (LTV_MAX) supported against occupied-unit token in E2_2L,
+  same as v3.
+
+**Files created/modified**:
+- `src/vfi_solver_v4.jl` (~480 LOC) — NEW
+- `scripts/run_option1_e1.sh` — NEW
+- `scripts/run_option1_e2.sh` — NEW
+- `next_actions.md` — steps 1-4 marked DONE
+- `research_log.md` — this entry
+
+**Next required (user on server1)**:
+1. `julia src/vfi_solver_v4.jl --smoke-test` — verify struct and logic
+2. `bash scripts/run_option1_e1.sh` — ~2-3 hr wall
+3. `bash scripts/run_option1_e2.sh` — ~2-3 hr wall
+4. Check H1: `mean_xB_t1_xprev00_ellA > 0` in e2.json (hedge activation)
+5. Compute `CEV(E2_2L_v4 vs E1_2L_v4)` from the two midpoint V values
+6. Compare to Option 3 baseline +4.255%
+
+**Feature branch**: `auto/2026-05-26-v4-state-extension`
+
