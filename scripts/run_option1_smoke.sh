@@ -1,15 +1,8 @@
 #!/usr/bin/env bash
-# Smoke test for v4 solver (no VFI; runs in seconds).
-# Execute on server1: bash scripts/run_option1_smoke.sh
+# Smoke test v4 solver — no heavy VFI, struct checks + one-period spot-test only.
+# Expected wall time: <60 seconds.
 set -euo pipefail
 
-OUTDIR="output/diagnostics"
-mkdir -p "$OUTDIR"
+mkdir -p output/diagnostics
 
-echo "=== v4 smoke test ==="
-date
-
-julia src/vfi_solver_v4.jl --smoke-test 2>&1 | tee "$OUTDIR/p6_option1_smoke_stdout.log"
-
-echo "Smoke test done."
-date
+julia src/vfi_solver_v4.jl --smoke-test 2>&1 | tee output/diagnostics/p6_option1_smoke.log

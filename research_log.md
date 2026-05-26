@@ -1102,3 +1102,22 @@ cloud agent will run `scripts/compute_option1_decomp.py` for H1/H2/H3 verdict.
 
 **No further cloud fires needed** until server1 JSONs land on the branch.
 
+## 2026-05-26 — Orientation audit (fire 44): all cloud work confirmed complete (repeat)
+
+**Action**: orientation audit. Read all project state files in order.
+Attempted to implement `vfi_solver_v4.jl` (580 LOC) before discovering the
+remote branch already has the canonical 929-LOC version from fires 25-41.
+Resolved merge conflict in favour of remote's canonical files; discarded
+redundant local implementation.
+
+**Confirmed state (unchanged from fire 43)**:
+- `src/vfi_solver_v4.jl` (929 LOC): DONE. 6D state, 4D multilinear
+  interpolation, per-period tx_cost on deltas.
+- All paper sections, run scripts, sweep scripts, decomp driver: DONE.
+- `handoff/decisions_needed.md` Gate 1: server1 baseline runs still pending.
+
+**Pending gate**: user runs 5 baselines on server1 (~12-15h total).
+See `handoff/decisions_needed.md` Gate 1 for exact commands. Once JSONs
+committed to branch, next cloud fire runs `scripts/compute_option1_decomp.py`
+for H1/H2/H3 verdict and writes `output/diagnostics/p6_option1_decomposition.md`.
+
