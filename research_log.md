@@ -991,3 +991,84 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-05-26 — v4 solver: 6D state extension (Option 1) implemented
+
+**Action picked**: P0 from `next_actions.md` — create `src/vfi_solver_v4.jl`
+with the full 6D state `(t, w, z, ell, x_A_prev, x_B_prev)` and per-period
+transaction costs on x increments. This is the Option 1 implementation
+specified in `handoff/tau_buy_option1_spec.md`.
+
+**Why this action**: steps 1-4 of the P0 table were all cloud-agent tasks
+requiring only code writing, no simulation. Steps 5-7 are user/server1
+tasks requiring Julia execution.
+
+**What was implemented** (`src/vfi_solver_v4.jl`, ~540 LOC):
+
+1. **6D value function** `(T, N_W, N_Z, 2, N_xprev, N_xprev)`. Default
+   at small grids: T=57, N_W=15, N_Z=5, N_ell=2, N_xprev=3 → ~76,950
+   elements per array, ~4.3 MB × 7 arrays. Well within server1 memory.
+
+2. **x_prev grid** `{0.0, 0.75, 1.5}` (N_X_PREV=3, X_PREV_MAX=1.5
+   env-var; 5-point large-grid option also configured). Nearest-neighbor
+   projection `nearest_idx_v4()` maps continuous x_new onto x_prev index
+   for state update.
+
+3. **Per-period tx_cost in budget**:
+   ```
+   delta_A = x_A_new - x_prev_grid[ixA_prev]
+   delta_B = x_B_new - x_prev_grid[ixB_prev]
+   tx_cost = tau_buy   * (max(delta_A,0) + max(delta_B,0))
+           + tau_token * (max(-delta_A,0) + max(-delta_B,0))
+   Budget: c + kappa + b + s + X_total + tx_cost = w
+   ```
+
+4. **E1_2L**: binary x_ell ∈ {0,1}, x_{ell'}=0. tau_buy charged on
+   purchase (delta positive); tau_token on exit. tau_sell still applies
+   via sell_factor at relocation in wealth transition (forced sale cost
+   remains structurally distinct from token cost).
+
+5. **E2_2L**: continuous (x_A_new, x_B_new). tx_cost applies every period.
+   No sell_factor at relocation (tokens portable). The hedge mechanism:
+   household at ell=A pre-holds x_B_prev > 0 by paying tau_buy
+   incrementally. On relocation to B, x_B_prev > 0 → delta_B smaller →
+   less tau_buy needed → genuine per-period saving.
+
+6. **Continuation value** bilinear-interpolates over `(w_next, z_next)`;
+   nearest-neighbor lookup on `(ixA_next, ixB_next)` from current choice.
+   Both stay and reloc branches computed; weighted by `p_relocate_v4(t)`.
+
+7. **Smoke test** `smoke_test_v4()` (run with `--smoke-test`): sigma
+   decomposition, tx_cost_v4 correctness (4 cases), nearest_idx round-trip,
+   6D array dimensions, terminal slice consistency, memory footprint check,
+   housing_cost_v4 spot-checks, hedge mechanism arithmetic preview.
+
+**Run scripts created**:
+- `scripts/run_option1_e1.sh` — E1_2L baseline, N_W=15, N_Z=5, N_X_PREV=3
+- `scripts/run_option1_e2.sh` — E2_2L baseline, same grids
+
+**Design notes**:
+- xprev_max=1.5 allows households to pre-hold up to 1.5 units (relevant
+  if leveraged via LTV_MAX > 0 in future sweeps).
+- N_X_PREV=3 with {0.0, 0.75, 1.5}: grid midpoint 0.75 is a meaningful
+  partial-hedge position. Increasing to N_X_PREV=5 gives finer resolution
+  at ~2.5x compute cost.
+- tau_token = 0.005 (0.5%) for token sales — lower than tau_sell = 6%,
+  reflecting the efficiency of tokenized transfer vs traditional real estate.
+
+**Expected magnitude of hedge channel** (analytical):
+- Pre-holding x_B_prev = 0.75 saves `tau_buy * 0.75 = 0.025 * 0.75 = 0.019`
+  per relocation event.
+- At p_relocate = 0.06 working-age: expected saving 0.06 * 0.019 = 0.0011
+  per period. Discounted over 40-year working life → ~1-2% lifetime CEV
+  (upper bound before CRRA curvature).
+
+**Feature branch**: `auto/2026-05-26-option1-state-extension`
+
+**Next steps** (server1, user):
+1. `julia src/vfi_solver_v4.jl --smoke-test` → write result to
+   `output/diagnostics/p6_option1_smoke.md`
+2. `bash scripts/run_option1_e1.sh` (E1_2L, ~2-3h)
+3. `bash scripts/run_option1_e2.sh` (E2_2L, ~2-4h)
+4. Compute `CEV(E2_2L_v4 vs E1_2L_v4)` at entry state (ixA=ixB=1, x_prev=0)
+5. Check H1 (mean_xB > 0 at ellA), H2 (CEV > 4.255%), H3 (hedge channel > 0)
+
