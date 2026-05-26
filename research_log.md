@@ -1121,3 +1121,26 @@ See `handoff/decisions_needed.md` Gate 1 for exact commands. Once JSONs
 committed to branch, next cloud fire runs `scripts/compute_option1_decomp.py`
 for H1/H2/H3 verdict and writes `output/diagnostics/p6_option1_decomposition.md`.
 
+## 2026-05-26 — Orientation audit (fire 45): confirmed blocked on server1 (no new cloud work)
+
+**Action**: orientation audit. Read all project state files.
+Found `handoff/decisions_needed.md` orientation note stating all cloud-executable
+work was complete through fire 43-44. Attempted implementation of vfi_solver_v4.jl
+(580 LOC, correct Option 1 design) but found remote branch already has the
+canonical 929-LOC version with 4D multilinear interpolation (superior design).
+Discarded local re-implementation; reset to remote canonical state.
+
+**Project state (unchanged)**:
+- `src/vfi_solver_v4.jl` (929 LOC): DONE. 6D state `(t,w,z,ell,x_A_prev,x_B_prev)`.
+  4D multilinear interpolation over `(w',z',x_A_new,x_B_new)`. E2_2L tokens portable;
+  E1_2L relocation resets x_prev→(0,0). Per-period tx_cost on deltas (tau_buy on
+  positive delta, tau_token on negative). smoke_test_v4() embedded.
+- Paper sections s1-s6, main.tex, outline, references.bib: DONE.
+- All run/sweep/plot scripts, compute_option1_decomp.py: DONE.
+- All Phase 2 prep docs (calibration_v3.md, methods_v3.md, welfare_decomp_v4.md,
+  sensitivity_grid_v4.md): DONE.
+
+**Sole blocking gate**: server1 baselines (Gate 1 in decisions_needed.md).
+5 runs ~12-15h total. Commands in `handoff/decisions_needed.md` Gate 1.
+Next cloud fire should check for output JSONs and run compute_option1_decomp.py.
+
