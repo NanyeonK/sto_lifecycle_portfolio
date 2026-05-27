@@ -991,3 +991,82 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-05-27 — v4 solver: 6D state with per-period tau_buy (Option 1)
+
+**Action picked**: P0 from `next_actions.md` — create `src/vfi_solver_v4.jl`
+implementing the full 6D-state Option 1 spec from `handoff/tau_buy_option1_spec.md`.
+
+**Rationale**: Options 3 (approximation via asymmetric tau_buy at relocation
+only) confirmed hedge channel at zero. Option 1 is the proper implementation:
+tracking `(x_A_prev, x_B_prev)` as state and charging tau_buy on every positive
+increment in x holdings, so pre-holding x_B at ell=A literally reduces future
+buying cost at relocation. Per spec, this should activate the hedge channel at
+the magnitude `p_relocate × tau_buy ≈ 0.15%/yr → ~1-2% lifetime CEV`.
+
+**v4 design vs v3:**
+
+1. **State**: 4D `(t, w, z, ell)` → 6D `(t, w, z, ell, x_A_prev, x_B_prev)`.
+   `x_prev` grid: `N_X_PREV=3` points over `[0, X_PREV_MAX=1.0]`
+   → default `{0.0, 0.5, 1.0}`. Choices for `x_A_new` and `x_B_new`
+   are restricted to this grid so next state is always on-grid
+   (bilinear interpolation only over `(w, z)`; exact index lookup
+   over x_prev dims).
+
+2. **Transaction cost** (now active, not deferred):
+   ```
+   tx_cost = tau_buy  * (max(dA,0) + max(dB,0))
+           + tau_token * (max(-dA,0) + max(-dB,0))
+   dA = x_A_new - x_A_prev, dB = x_B_new - x_B_prev
+   ```
+   Budget: `c + kappa(x_ell_new) + b + s + x_A_new + x_B_new + tx_cost = w`.
+
+3. **State transition at relocation:**
+   - E2_2L (tokens portable): `x_prev_next = x_new` regardless of relocation.
+     A household pre-holding `x_B` while at ell=A carries those tokens to ell=B
+     with zero additional buying cost. This is the hedge mechanism.
+   - E1_2L (forced sale): wealth transition applies `sell_factor = (1-tau_sell)`.
+     At t+1 after relocation, `x_prev_next = (0, 0)` (sold position zeroed).
+     If household wants to own at new location, pays `tau_buy` through tx_cost.
+
+4. **Housing cost** (corrected v3 rule retained):
+   `kappa_E2 = rho - x_ell_local * (rho - m)` — only occupied-location
+   token saves rent. x_{ell'} is purely financial.
+
+5. **Memory estimate** at default grids
+   (`T=57, N_W=15, N_Z=5, n_ell=2, N_xp=3, N_xp=3`):
+   57 × 15 × 5 × 2 × 3 × 3 = 76,950 state points × 6 arrays × 8 bytes ≈ 3.5 MB.
+   Well within memory budget.
+
+6. **Compute estimate** per Option 1 spec: ~4.6x v3 per regime ≈ 2-3 hours
+   wall at N_W=15, N_Z=5, ASSET_GRID_SIZE=9.
+
+**Files created on branch `auto/2026-05-27-v4-solver-option1`:**
+- `src/vfi_solver_v4.jl` (~420 LOC): full v4 implementation with
+  smoke-test stub callable via `julia src/vfi_solver_v4.jl --smoke-test`.
+- `scripts/run_option1_e1.sh`: E1_2L baseline run (sets env vars, logs to
+  `output/diagnostics/p6_option1_e1.json`).
+- `scripts/run_option1_e2.sh`: E2_2L Option 1 run (logs to
+  `output/diagnostics/p6_option1_e2.json`).
+- `output/diagnostics/` directory created.
+
+**Smoke test** (struct-init and logic checks, no VFI):
+```
+julia src/vfi_solver_v4.jl --smoke-test
+```
+Checks: sigma decomposition, 6D allocation + memory, terminal slice NaN-free,
+tx_cost formula (buy/sell/identity/mixed), housing_cost corrected rule,
+p_relocate boundary, shock block weight-sum.
+
+**Next actions queued for server1 (user):**
+1. Pull branch and run smoke test:
+   `julia src/vfi_solver_v4.jl --smoke-test`
+2. Run E1_2L: `bash scripts/run_option1_e1.sh`
+3. Run E2_2L: `bash scripts/run_option1_e2.sh`
+4. Compute `CEV(E2_2L_v4 vs E1_2L_v4)` and check hypotheses H1-H3 from spec.
+5. If H1 (mean_xB > 0 at ellA): hedge mechanism confirmed.
+   If H2 (CEV > 4.255%): RFS-marginal case strengthened.
+   If H3 (hedge channel 0.5-1.5%): use as decomposition.
+   Fail → fall back PATH D (REE).
+
+**No new human gates opened.** H1'–H4' remain deferred as before.
+
