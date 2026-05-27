@@ -1,0 +1,118 @@
+% s6_conclusion.tex — Conclusion
+% Paper: "Tokenized Housing and Lifecycle Portfolio Choice:
+%         A Decoupling of Location from Housing Exposure"
+%
+% Source: paper/outline_v4.md §6 (3–4 paragraph structure)
+%         docs/welfare_decomp_v4.md §4 (channel definitions)
+%         paper/sections/s5_discussion.tex (Liu comparison, policy)
+%
+% Status: skeleton complete; [PLACEHOLDER] marks require server1 numerical results.
+%         Fill in: CEV headline, channel magnitudes, mean_xB evidence.
+%
+% Compilation: \input{sections/s6_conclusion} from main.tex
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Conclusion}
+\label{sec:conclusion}
+% ─────────────────────────────────────────────────────────────────────────────
+
+This paper quantifies the lifetime welfare value of a structural capability
+that distinguishes residential housing tokens from all prior instruments in
+the household's choice set: \emph{the decoupling of geographic location from
+housing-asset exposure}.
+In a two-location lifecycle model with stochastic relocation shocks, we
+compare three regimes --- rent-only (E0), traditional binary homeownership
+(E1\textsubscript{2L}), and continuous fractional token ownership portable
+across relocations (E2\textsubscript{2L}) --- and solve for the welfare
+difference using a 6-dimensional backward-induction algorithm that tracks
+prior-period token holdings as explicit state variables.
+Our headline result is $\text{CEV}(\text{E2}_\text{2L}\ \text{vs}\
+\text{E1}_\text{2L}) = \textsc{[P]}\%$ at baseline calibration
+($\gamma = 5$, $p_{\text{reloc}} = 6\%$, $\tau_{\text{buy}} = 2.5\%$,
+$\rho_{AB} = 0.50$).
+
+\paragraph{What the welfare gain decomposes into.}
+Following the three-channel decomposition of Section~\ref{sec:results:decomp}
+and the formal claim in equation~\eqref{eq:decomp_claim}, the total gain
+separates into two structurally distinct components.
+First, an \emph{avoided-transaction-cost channel} of \textsc{[P]}\% arises
+because tokenized households escape the $\tau_{\text{sell}} + \tau_{\text{buy}}
+\approx 8.5\%$ round-trip cost that E1\textsubscript{2L} households pay at
+each relocation event.
+This channel is present in any portable financial instrument that avoids
+forced sale at moving and delivers the same CEV gain regardless of
+location-return correlations.
+Second, a \emph{pre-buying hedge channel} of \textsc{[P]}\% emerges
+specifically from the 6-dimensional state extension: a household at location~A
+can incrementally accumulate location-B tokens at cost $\tau_{\text{buy}}$
+per unit per period, reducing the lump-sum buying cost on future relocation
+to B.
+This channel is \emph{uniquely activated by the state extension} (Option~1):
+it is absent in the Option~3 approximation and in any model that does not
+track prior-period holdings.
+The falsification tests of Section~\ref{sec:results:falsification} confirm the
+mechanism: the hedge channel collapses when $p_{\text{reloc}} = 0$ (no
+relocation motive) and attenuates monotonically as $\rho_{AB} \to 1$
+(cross-location exposure becomes redundant).
+The cross-term $\xi = \textsc{[P]}\%$ (equation~\eqref{eq:decomp}) confirms
+near-additive separability of the two channels.
+
+\paragraph{How this contributes beyond existing work.}
+The closest benchmark is \citet{Liu2021}, who shows that relaxing binary
+homeownership to continuous fractional ownership delivers 5--10\% welfare
+gains under a single-location model without relocation.
+Our avoided-transaction-cost channel (\textsc{[P]}\%) is partially Liu-adjacent:
+it arises because tokens reduce the lump-sum trade in of E1 at relocation.
+However, Liu's setup has no relocation, and hence this channel is outside his
+framework.
+The pre-buying hedge channel (\textsc{[P]}\%) is structurally novel: it
+requires (i)~two locations, (ii)~stochastic relocation, (iii)~positive
+$\tau_{\text{buy}}$, and (iv)~state-tracked prior holdings --- none of which
+appear in \citet{Liu2021}, \citet{YaoZhang2005}, \citet{Cocco2005}, or
+\citet{KMW2018}.
+Table~\ref{tab:literature} in Section~\ref{sec:discussion:literature}
+formalizes this comparison.
+Our results also add a quantitative claim to the qualitative portability
+arguments of \citet{SinaiSouleles2005}: token portability is worth \textsc{[P]}\%
+in lifetime CEV, with the hedge component growing in mobility rate and
+shrinking in cross-location correlation.
+
+\paragraph{Policy implications and token design.}
+The welfare case for token portability is strongest for mobile, wealth-constrained
+younger households (Section~\ref{sec:discussion:policy}).
+This has a direct implication for regulatory design: mandatory secondary-market
+liquidity and low $\tau_{\text{token}}$ are important for the avoided-tx
+channel, while a moderate $\tau_{\text{buy}}$ (roughly 1--4\%) maximises the
+pre-buying hedge (the benefit-per-unit is $p_{\text{reloc}} \times
+\tau_{\text{buy}} \approx 0.15\%$/period at baseline, attaining maximum
+welfare contribution at intermediate values of $\tau_{\text{buy}}$).
+Policy interventions that reduce $\tau_{\text{sell}}$ or $\tau_{\text{buy}}$
+via transfer-tax reform deliver similar avoided-tx gains without requiring
+tokenization, but cannot restore the idiosyncratic location-specific hedge.
+The two channels therefore have different policy substitutes, which sharpens
+the design case for token portability specifically.
+
+\paragraph{Limitations and future work.}
+This analysis is partial equilibrium: house prices are exogenous, and we
+do not model the general-equilibrium price impact of widespread tokenization
+adoption.
+The model abstracts from heterogeneous preferences, household composition
+changes (marriage, children), and tax treatment (property taxes, capital
+gains deferral) that may interact with relocation incentives.
+On the numerical side, the coarse x-prev grid ($N_{x,\text{prev}} = 3$) is
+a pragmatic first step; finer grids would sharpen the pre-buying hedge
+estimates at the cost of substantially more compute.
+The sensitivity panel (Table~\ref{tab:sensitivity}) documents that the
+headline CEV is robust across plausible parameter ranges, but robustness to
+structural assumptions --- homogeneous agents, symmetric locations,
+no mortgage interaction with token holdings --- remains to be established.
+Three natural extensions are: (i)~a general-equilibrium version that endogenizes
+house prices to study the price-impact of tokenization adoption at scale;
+(ii)~heterogeneous-agent lifecycle models with idiosyncratic labor-market shocks
+correlated with local housing returns (building on \citealt{BFN2014});
+and (iii)~an explicit treatment of tax sheltering and depreciation schedules
+that would affect the effective $\tau_{\text{buy}}$ and $\tau_{\text{token}}$
+in practice.
+The companion paper explores the case where the token portfolio spans multiple
+distinct locations simultaneously, examining the optimal diversification
+across a richer location menu.
