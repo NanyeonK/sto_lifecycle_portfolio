@@ -991,3 +991,80 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-05-27 — Option 1 full state extension: v4 solver implemented
+
+**Action picked**: P0 — implement `src/vfi_solver_v4.jl` with 6D state
+`(t, w, z, ell, x_A_prev, x_B_prev)` per `handoff/tau_buy_option1_spec.md`.
+
+**Why**: Path B Option 3 established CEV(E2_2L vs E1_2L_full) = +4.255%
+but cross-location hedge (mean_xB at ell=A) was zero. Option 3 did not
+give the household credit for pre-buying tokens before a relocation event.
+Option 1 proper state extension enables genuine pre-buy hedge: household
+at ell=A can hold x_B_prev > 0, paying tau_buy * delta_B this period
+and avoiding a large tau_buy at relocation. E1_2L must pay tau_sell (6%)
+on forced liquidation + tau_buy (2.5%) on new purchase at relocation;
+E2_2L tokens are portable (no forced sell, cheap tau_token = 1% to sell).
+
+**v4 design summary:**
+
+1. **6D state**: `(t, w, z, ell, x_A_prev, x_B_prev)`.
+   - Value function and all policy arrays are 6D.
+   - Memory: ~1-4 MB total at default grids (T=57, N_W=15, N_Z=5, N_ell=2, N_xA=N_xB=3).
+
+2. **x_prev_grid**: Discrete coarse grid `{0.0, 0.5, 1.0}` (N_X_PREV=3, X_PREV_MAX=1.0).
+   - x_A_new and x_B_new choices restricted to this grid → next-period
+     state lands exactly on grid points → no interpolation in x_prev dims.
+   - Continuation value: 5D slice `(n_w, n_z, n_ell, n_xA, n_xB)`;
+     bilinear interpolation only over `(w, z)` for fixed `(ell, ix_A, ix_B)`.
+
+3. **Transaction costs**: Applied per period on deltas.
+   - Buying: `tau_buy * max(delta_A, 0) + tau_buy * max(delta_B, 0)`
+   - Selling (E2_2L): `tau_token * max(-delta_A, 0) + tau_token * max(-delta_B, 0)`
+   - Selling (E1_2L): `tau_sell * max(-delta_A, 0) + tau_sell * max(-delta_B, 0)`
+   - E1_2L forced liquidation of non-occupied holdings on relocation
+     is captured automatically: at ell=B with x_A_prev=1, admissibility
+     forces x_A_new=0 → tau_sell * 1 deducted from period-t budget.
+
+4. **Wealth transition**: No sell_factor. Full housing returns flow to
+   next-period wealth. All tx costs captured in period-t budget constraint.
+
+5. **Admissibility**:
+   - E1_2L: x_{ell'_new} = 0; x_ell_new ∈ {0, x_prev_grid[end]} (binary).
+   - E2_2L: all (x_A_new, x_B_new) ∈ x_prev_grid × x_prev_grid.
+   - E0: x_A_new = x_B_new = 0 always.
+
+6. **Housing cost rule**: Fixed v3 spec — only OCCUPIED location token
+   reduces rent. `kappa(E2_2L) = rho - x_ell * (rho - m)`.
+   x_{ell'} at non-occupied location is purely financial.
+
+7. **Smoke test stub**: `smoke_test_v4()` — checks 6D shape, terminal
+   slice, tx_cost spot-checks, admissibility spot-checks, housing cost
+   spot-checks. No VFI (cloud env). Run with `--smoke-test`.
+
+**Files created**:
+- `src/vfi_solver_v4.jl` (~640 LOC). v3 preserved at `src/vfi_solver_v3.jl`.
+- `scripts/run_option1_e1.sh` — E1_2L baseline run script.
+- `scripts/run_option1_e2.sh` — E2_2L baseline run script.
+
+**Feature branch**: `auto/2026-05-27-option1-state-extension`.
+
+**Hypothesis check queued for server1** (next P0 step per spec):
+- H1: mean_xB > 0 at ell=A (hedge activates)
+- H2: CEV(E2_2L_v4 vs E1_2L_v4) > 4.255% (beats v3 Option 3 baseline)
+- H3: hedge channel ≈ 0.5-1.5% (RFS-marginal contribution)
+
+**Known limitations of v4 first cut**:
+- x_prev_grid very coarse (3 points); richer grid needed for Phase 2.
+- x_prev_max = 1.0 constrains max position size; wealth-adaptive max
+  from v3 not carried over (Phase 2).
+- Terminal value ignores selling cost at T (convention from v3).
+- Selling cost applied at book value (period-t price), not realized
+  market value at relocation — slight misspecification vs v3 sell_factor
+  approach; conservative for E2_2L (slightly underestimates sell saving).
+
+**Next queued actions** (all auto-allowed, server1 required):
+- Run `julia src/vfi_solver_v4.jl --smoke-test` on server1.
+- Run `bash scripts/run_option1_e1.sh` and `run_option1_e2.sh`.
+- Check if H1 (mean_xB > 0) holds; compute CEV(E2_2L_v4 vs E1_2L_v4).
+- Write `output/diagnostics/p6_option1_decomposition.md`.
+
