@@ -1166,6 +1166,25 @@ Discarded local re-implementation; reset to remote canonical state.
 Next cloud fire should check for output JSONs and run compute_option1_decomp.py.
 
 
+## 2026-05-28 — Fire 48 orientation audit: all cloud work confirmed complete
+
+Same status as fires 43-47. Read project state files (README, project_state,
+next_actions, research_log, decisions_needed, pivot memo). Found:
+- `src/vfi_solver_v4.jl` (929 LOC, canonical, fires 14-17): 6D state with 4D
+  multilinear interpolation over (w', z', x_A_new, x_B_new). Per-period tau_buy
+  on positive deltas; tau_token on negative. E2_2L tokens portable across
+  relocation; E1_2L forced x_prev→(0,0) at new location. smoke_test_v4() embedded.
+- Paper sections s1-s6, main.tex, outline_v4.md, references.bib: DONE.
+- All run/sweep/plot/decomp scripts: DONE (including run_option1_smoke.sh).
+- Phase 2 prep docs: DONE.
+
+Attempted a fresh vfi_solver_v4.jl (~760 LOC, direct grid-index lookup rather
+than 4D multilinear interpolation). Discarded — canonical 929-LOC version is
+superior design. Reset local branch to remote at commit 1417ad2.
+
+**Sole blocking gate**: server1 baselines. Run commands in
+`handoff/decisions_needed.md` Gate 1. No cloud-executable work remains.
+
 ## 2026-05-27 — Fire 47 orientation audit: all cloud work confirmed complete
 
 Orientation read (fires 43-46 documented). Confirmed same status:
