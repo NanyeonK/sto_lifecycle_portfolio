@@ -1205,3 +1205,31 @@ Commands:
   bash scripts/run_option1_e0.sh      # ~30 min
   bash scripts/run_option1_e1_notx.sh # ~2.5h
 After JSONs land: `python scripts/compute_option1_decomp.py` writes decomposition.
+
+## 2026-05-28 — Fire 49 orientation audit: all cloud work confirmed complete
+
+Same status as fires 45-48. Read all orientation files (README, project_state,
+next_actions, research_log, decisions_needed, pivot memo, tau_buy_option1_spec).
+
+Confirmed project state (unchanged from fire 48):
+- `src/vfi_solver_v4.jl` (929 LOC, canonical, fires 14-17): 6D state
+  `(t,w,z,ell,x_A_prev,x_B_prev)` with 4D multilinear interpolation over
+  `(w', z', x_A_new, x_B_new)`. Per-period tx_cost on deltas (tau_buy on
+  positive deltas, tau_token on negative). E2_2L tokens portable across
+  relocation; E1_2L forced x_prev→(0,0) at new location. smoke_test_v4()
+  embedded, callable via `--smoke-test`.
+- Paper sections s1-s6, main.tex, outline_v4.md, references.bib: DONE.
+- All run/sweep/plot/decomp scripts: DONE.
+- Phase 2 prep docs (calibration_v3.md, methods_v3.md, welfare_decomp_v4.md,
+  sensitivity_grid_v4.md): DONE.
+
+Re-attempted vfi_solver_v4.jl implementation (939 LOC, direct grid-index lookup
+approach — different from canonical 4D interpolation). Discarded after
+orientation; canonical is superior (continuous x_new choice, more general).
+Reset local branch to origin/auto/2026-05-02-option1-state-extension.
+
+`handoff/decisions_needed.md` Gate 1 confirmed active: server1 baselines
+(steps 5-7) are the only remaining gate before cloud agent can run
+`python scripts/compute_option1_decomp.py` for H1/H2/H3 verdict.
+
+**Sole blocking gate**: server1 baselines. No cloud-executable work remains.
