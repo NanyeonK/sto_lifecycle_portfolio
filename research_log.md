@@ -991,3 +991,67 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-05-28 — v4 solver: Path B Option 1 full state extension
+
+**Action**: Implement `src/vfi_solver_v4.jl` — 6D state space with proper
+per-period tau_buy on portfolio deltas, as specified in
+`handoff/tau_buy_option1_spec.md`. Branch `auto/2026-05-28-option1-state-extension`.
+
+**Motivation**: Path B Option 3 (tau_buy at relocation event, no state
+tracking) confirmed hedge mechanism dead: mean_xB=0 at ell=A regardless
+of p_relocate. Root cause: x_B token offers no per-period rent saving and
+no pre-buy discount because the relocation cost was applied as a lump-sum
+at a single event rather than as a marginal cost on delta-accumulation.
+Option 1 is the proper implementation: track (x_A_prev, x_B_prev) as
+state variables; apply tau_buy on positive deltas each period. Pre-holding
+x_B at ell=A genuinely saves tau_buy * x_B_prev on the relocation period's
+buying increment.
+
+**Files created**:
+- `src/vfi_solver_v4.jl` (~500 LOC):
+  - State: `(t, w, z, ell, x_A_prev, x_B_prev)` — 6D arrays indexed
+    `(t, iw, iz, iell, ixA_prev, ixB_prev)`
+  - `ModelParams_v4`: extends v3 params; adds `n_x_prev`, `x_prev_max`
+  - `Grids_v4`: adds `x_prev::Vector{Float64}` (shared grid for A and B)
+  - `SolverResult_v4`: 6D arrays for value + 5 policies + feasibility mask
+  - `tx_cost_v4()`: delta-based cost;
+    `tau_buy * max(delta,0) + tau_token * max(-delta,0)` per location
+  - `solve_state_v4()`: x_A_new, x_B_new restricted to x_prev grid for
+    exact next-period state lookup (no interpolation in x_prev dimensions)
+  - `continuation_value_v4()`: takes `ixA_new_stay/reloc`, `ixB_new_stay/reloc`
+    as separate args; E2_2L uses same indices for stay and reloc (portable);
+    E1_2L uses `(1,1)` for reloc branch (forced sale → zero x_prev at new location)
+  - `terminal_slice_v4()`, `solve_v4()`, `summary_v4()`, `print_summary_v4()`
+  - `smoke_test_v4()`: 7 checks — sigma decomp, 6D allocation, terminal slice,
+    tx_cost cases (buy/sell/no-change/mixed), identity (x_prev=x_new → zero cost),
+    housing_cost spot-checks, shock block. No VFI.
+- `scripts/run_option1_smoke.sh`
+- `scripts/run_option1_e1.sh` (E1_2L at N_W=15, N_Z=5, N_X_PREV=3)
+- `scripts/run_option1_e2.sh` (E2_2L same grids)
+
+**Key design decisions**:
+- `x_prev_max=1.0`, `N_X_PREV=3` → x_prev grid: `{0.0, 0.5, 1.0}`. Aligns
+  with E1_2L binary {0,1} (index 1 and 3 of the grid). E2_2L gets intermediate
+  0.5 grid point to allow fractional pre-positioning.
+- Default N_W=15, N_Z=5 (down from v3's 21/7) to offset the 3×3=9x state
+  expansion. Net compute factor ≈ 4.6x per regime vs v3 baseline (~2-4h per
+  regime on server1).
+- ASSET_GRID_SIZE=7 (down from v3's 9) for same reason.
+- E1_2L relocation: sell_factor_ell = (1-tau_sell) on current location; next
+  x_prev = (0,0) after relocation (forced sale, no token carryover).
+- E2_2L relocation: sell_factors = 1.0; next x_prev = (ixA_new, ixB_new)
+  (tokens portable — exactly the Option 1 hedge mechanism).
+- tau_sell=0.0 in `run_option1_e2.sh` intentionally (E2_2L has no forced sale;
+  tau_buy is the relevant cost via delta accumulation).
+
+**Smoke test status**: Not run (no Julia in cloud env). Server1 run queued.
+
+**Hypotheses to verify on server1**:
+- H1: mean_xB_new > 0 at ell=A, x_prev=(0,0) in E2_2L (hedge activates)
+- H2: CEV(E2_2L_v4 vs E1_2L_v4) > 4.255% (Option 3 baseline)
+- H3: Hedge channel = CEV(E2_2L_v4 vs E2_2L_v3) ≈ 0.5-1.5%
+
+**Next action** (user, server1):
+1. `bash scripts/run_option1_smoke.sh` — verify structural checks
+2. `bash scripts/run_option1_e1.sh` and `bash scripts/run_option1_e2.sh`
+3. Compute CEV and hedge channel; record in `output/diagnostics/p6_option1_decomposition.md`
