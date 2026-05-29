@@ -1328,3 +1328,19 @@ work remains until server1 JSON outputs are committed to branch.
   bash scripts/run_option1_e1_notx.sh          # ~2.5h → p6_option1_e1_notx.json
   bash scripts/run_option1_e2_notau.sh         # ~2.5h → p6_option1_e2_notau.json
 After JSONs committed: python scripts/compute_option1_decomp.py → H1/H2/H3 verdict.
+
+## 2026-05-29 — Fire 53 orientation audit: all cloud work confirmed complete
+
+Same status as fire 52. Read all six orientation files in prescribed order.
+
+This fire initially drafted a complete vfi_solver_v4.jl re-implementation
+(~1023 LOC) and created new scripts before discovering via `git log` that the
+remote branch is at fire 52 (commit 70b34d7) with the canonical 929-LOC solver
+already in place. Reset to remote canonical via `git reset --hard origin/...`.
+
+All cloud-executable items remain DONE from previous fires. No new artifacts
+added. `handoff/decisions_needed.md` Gate 1 (server1 baselines) still active.
+
+**Sole blocking gate unchanged**: user must run the five server1 commands above
+and commit the resulting JSON files to this branch. The cloud agent has nothing
+further to contribute until those outputs arrive.
