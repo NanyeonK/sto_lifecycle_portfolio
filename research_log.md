@@ -1301,3 +1301,30 @@ work remains until server1 JSON outputs are committed to branch.
   bash scripts/run_option1_e1_notx.sh          # ~2.5h → p6_option1_e1_notx.json
   bash scripts/run_option1_e2_notau.sh         # ~2.5h → p6_option1_e2_notau.json
 After JSONs committed: python scripts/compute_option1_decomp.py → H1/H2/H3 verdict.
+
+## 2026-05-29 — Fire 52 orientation audit: all cloud work confirmed complete
+
+Same status as fires 47-51. Read orientation files in prescribed order.
+
+This fire initially attempted a fresh vfi_solver_v4.jl implementation (982 LOC)
+before discovering the remote is at fire 51 with the canonical 929-LOC solver.
+Reset to remote canonical (commit 786c78d) after reading decisions_needed.md
+stop-sign. No new cloud artifacts.
+
+Confirmed project state (unchanged from fires 47-51):
+- `src/vfi_solver_v4.jl` (929 LOC, canonical): 6D state with 4D multilinear
+  interpolation, per-period tx_cost on deltas, E2_2L portable / E1_2L reset.
+- Paper sections s1-s6, main.tex, outline_v4.md, references.bib: DONE.
+- All run/sweep/plot/decomp scripts: DONE.
+- Phase 2 prep docs: DONE.
+
+`handoff/decisions_needed.md` Gate 1 confirmed active. No cloud-executable
+work remains until server1 JSON outputs are committed to branch.
+
+**Sole blocking gate**: server1 baselines. Run:
+  julia src/vfi_solver_v4.jl --smoke-test      # ~1 min
+  bash scripts/run_option1_e1.sh               # ~2.5h → p6_option1_e1.json
+  bash scripts/run_option1_e2.sh               # ~2.5h → p6_option1_e2.json
+  bash scripts/run_option1_e1_notx.sh          # ~2.5h → p6_option1_e1_notx.json
+  bash scripts/run_option1_e2_notau.sh         # ~2.5h → p6_option1_e2_notau.json
+After JSONs committed: python scripts/compute_option1_decomp.py → H1/H2/H3 verdict.
