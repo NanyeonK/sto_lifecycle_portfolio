@@ -1268,3 +1268,36 @@ work remains until server1 JSON outputs are committed to branch.
   bash scripts/run_option1_e1_notx.sh          # ~2.5h → p6_option1_e1_notx.json
   bash scripts/run_option1_e2_notau.sh         # ~2.5h → p6_option1_e2_notau.json
 After JSONs committed: python scripts/compute_option1_decomp.py → H1/H2/H3 verdict.
+
+## 2026-05-29 — Fire 51 orientation audit: all cloud work confirmed complete
+
+Same status as fires 47-50. Read orientation files (next_actions, research_log,
+decisions_needed, run_option1_e1.sh, run_option1_e2.sh).
+
+Confirmed project state (unchanged from fires 47-50):
+- `src/vfi_solver_v4.jl` (929 LOC, canonical, fires 14-17): 6D state
+  `(t,w,z,ell,x_A_prev,x_B_prev)` with 4D multilinear interpolation over
+  `(w', z', x_A_new, x_B_new)`. Per-period tx_cost on deltas (tau_buy
+  on positive deltas, tau_token on negative). E2_2L tokens portable across
+  relocation; E1_2L x_prev resets to (0,0) on forced sale. smoke_test_v4()
+  embedded, callable via `--smoke-test`.
+- Paper sections s1-s6, main.tex, outline_v4.md, references.bib: DONE.
+- All run/sweep/plot/decomp scripts: DONE.
+- Phase 2 prep docs (calibration_v3.md, methods_v3.md, welfare_decomp_v4.md,
+  sensitivity_grid_v4.md): DONE.
+
+Context resumed from prior session (fire 51 is a continuation): in prior session,
+attempted fresh implementation of vfi_solver_v4.jl (993 LOC, discrete grid-lookup
+approach). Discarded after reading decisions_needed.md warning; reset to remote
+canonical at commit 1417ad2. No new cloud artifacts introduced.
+
+`handoff/decisions_needed.md` Gate 1 confirmed active. No cloud-executable
+work remains until server1 JSON outputs are committed to branch.
+
+**Sole blocking gate**: server1 baselines. Run:
+  julia src/vfi_solver_v4.jl --smoke-test      # ~1 min
+  bash scripts/run_option1_e1.sh               # ~2.5h → p6_option1_e1.json
+  bash scripts/run_option1_e2.sh               # ~2.5h → p6_option1_e2.json
+  bash scripts/run_option1_e1_notx.sh          # ~2.5h → p6_option1_e1_notx.json
+  bash scripts/run_option1_e2_notau.sh         # ~2.5h → p6_option1_e2_notau.json
+After JSONs committed: python scripts/compute_option1_decomp.py → H1/H2/H3 verdict.
