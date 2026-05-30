@@ -1344,3 +1344,24 @@ added. `handoff/decisions_needed.md` Gate 1 (server1 baselines) still active.
 **Sole blocking gate unchanged**: user must run the five server1 commands above
 and commit the resulting JSON files to this branch. The cloud agent has nothing
 further to contribute until those outputs arrive.
+
+## 2026-05-30 — Fire 54 orientation audit: all cloud work confirmed complete
+
+Same status as fires 47-53. Read all six orientation files in prescribed order.
+This fire initially drafted a complete vfi_solver_v4.jl re-implementation (~560 LOC,
+exact-index-lookup approach) and committed it before discovering via `git log` that
+the remote is at fire 53 (commit 3ca2c9c) with the canonical 929-LOC solver in place.
+Reset to remote canonical via `git reset --hard origin/...`.
+
+Confirmed project state (unchanged from fires 47-53):
+- `src/vfi_solver_v4.jl` (929 LOC, canonical): 6D state with 4D multilinear
+  interpolation, per-period tx_cost on deltas, E2_2L portable / E1_2L reset.
+- Paper sections s1-s6, main.tex, outline_v4.md, references.bib: DONE.
+- All run/sweep/plot/decomp scripts, Phase 2 prep docs: DONE.
+
+`handoff/decisions_needed.md` Gate 1 confirmed active. No cloud-executable
+work remains until server1 JSON outputs are committed to branch.
+
+**Sole blocking gate**: run five server1 commands in `handoff/decisions_needed.md`
+Gate 1 section, commit resulting JSON files, then cloud agent will run
+`scripts/compute_option1_decomp.py` to produce the H1/H2/H3 verdict.
