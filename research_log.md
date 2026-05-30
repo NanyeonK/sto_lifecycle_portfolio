@@ -991,3 +991,76 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-05-30 — v4 solver implemented: 6D state extension (Option 1)
+
+**Action picked**: P0 Step 1-4 — implement `src/vfi_solver_v4.jl` with
+full 6D state `(t, w, z, ell, x_A_prev, x_B_prev)` plus smoke-test stub.
+This is the cloud-agent deliverable from `handoff/tau_buy_option1_spec.md`.
+
+**Why this action**: P0 Steps 1-4 are auto-allowed and unblocked. The
+Option 1 full state extension is the highest-priority item — the only
+remaining path to testing whether the cross-location hedge channel
+activates with proper per-period tau_buy on positive x deltas.
+
+**Files created / modified**:
+- `src/vfi_solver_v4.jl` (~480 LOC): 6D solver
+- `scripts/run_option1_e1.sh`: E1_2L baseline run script
+- `scripts/run_option1_e2.sh`: E2_2L baseline run script
+- `next_actions.md`: Steps 1-4 marked DONE; Steps 5-7 queued for user
+- `research_log.md`: this entry
+
+**v4 design decisions**:
+
+1. **6D state arrays** `(t, iw, iz, iell, ixA_prev, ixB_prev)`. Default
+   dims: `T=57, N_W=15, N_Z=5, N_ell=2, N_X_PREV=3, N_X_PREV=3` =
+   76,950 cells per array × 8 bytes × 7 arrays ≈ 4.3 MB total. Very
+   memory-light.
+
+2. **x_prev grid restricted choices**: `x_A_new` and `x_B_new` in E2_2L
+   are chosen from `x_prev_grid = {0.0, 0.75, 1.5}` (N_X_PREV=3). This
+   ensures next-period x_prev state indices are exact (no interpolation
+   in the x_prev dimension). 9 housing choices per E2_2L state point.
+
+3. **Transaction costs per period**:
+   - E2_2L: `tx = tau_buy * max(δ,0) + tau_token * max(-δ,0)` for each dim
+   - E1_2L: `tx = tau_buy * max(δ,0) + tau_sell * max(-δ,0)` (sell at
+     traditional sell cost, not token-transfer cost)
+   - Forced E1_2L relocation sell: still via `sell_factor = 1 - tau_sell`
+     in wealth transition (unchanged from v3)
+
+4. **Relocation x_prev transitions**:
+   - E2_2L: tokens portable — `x_prev_next = x_new` for BOTH stay and
+     reloc branches. The household carries the same token portfolio
+     regardless of whether relocation fires.
+   - E1_2L stay:  `x_prev_next = (x_ell_new, 0)`
+   - E1_2L reloc: `x_prev_next = (0, 0)` — forced sale leaves no
+     holdings. Next period at new location, buying `x_ell_new = 1`
+     incurs `tau_buy * 1` via the delta formula. THIS is the proper
+     Option 1 mechanism.
+
+5. **Hedge channel activation**: a household at ell=A who pre-holds
+   `x_B_prev > 0` (some token units of B) and then relocates to B will
+   find `x_B_prev = x_B_old` at the new location, so buying more B
+   tokens costs `tau_buy * (x_B_new - x_B_prev)` instead of
+   `tau_buy * x_B_new`. The expected hedge premium per unit pre-held:
+   `p_relocate * tau_buy = 0.06 * 0.025 = 0.0015` per period.
+
+6. **Smoke-test coverage**: 6D allocation size, terminal slice
+   correctness, sigma decomposition, shock-block weight sum, three
+   tx_cost scenarios (buy/sell/hold), housing_cost and p_relocate
+   boundary checks.
+
+**Compute estimate** (from spec): ~4.6x v3 baseline ≈ 2-3h per regime on
+server1 single thread. Two regimes = ~4-6h total. Runs queued as
+Steps 5-6 in next_actions.md.
+
+**Feature branch**: `auto/2026-05-30-option1-state-extension`
+(branch pushed; no PR until empirical results confirm direction).
+
+**Next required (user/server1)**:
+1. `julia src/vfi_solver_v4.jl --smoke-test` — verify struct and smoke
+2. `bash scripts/run_option1_e1.sh` — E1_2L v4 baseline
+3. `bash scripts/run_option1_e2.sh` — E2_2L v4 baseline
+4. Report `V_t1_midpoint_ellA_xprev00` and `mean_xB_xprev00_t1_ellA`
+   from both JSONs; compute CEV; check H1-H3 from spec.
+
