@@ -1398,3 +1398,26 @@ hedge mechanism.
 **Status**: All cloud work confirmed complete. Sole blocker = server1 runs.
 Server1 commands documented in `handoff/decisions_needed.md` Gate 1.
 
+
+## 2026-05-30 — Fire 56 orientation audit: all cloud work confirmed complete
+
+Read project files in prescribed order. Reset to remote after finding branch
+at fire 55 (67fa0eb), 55 commits ahead of my local start state.
+
+**Confirmed complete (unchanged from fires 47-55)**:
+- `src/vfi_solver_v4.jl` (988 LOC, canonical, standalone): 6D-state solver
+  with 4D multilinear interpolation, per-period tx_cost on deltas, E2_2L
+  portable / E1_2L reset. Fire 55 added pre-hold savings spot-check and
+  2-period mini-VFI to smoke test.
+- Paper sections s1-s6, main.tex, outline_v4.md, references.bib: DONE.
+- All run/counterfactual/sweep/plot/decomp scripts: DONE (15 scripts total).
+- Phase 2 prep docs (calibration_v3, methods_v3, welfare_decomp_v4): DONE.
+
+**Sole action this fire**: update `handoff/decisions_needed.md` timestamp
+and note that fire 55's smoke test now runs a brief mini-VFI (~10-20 s,
+not < 1 min as previously stated). No new code.
+
+**Sole blocking gate**: server1 runs. User needs to execute Gate 1 commands
+from `handoff/decisions_needed.md`. After JSON outputs are committed to
+branch, cloud agent will run `scripts/compute_option1_decomp.py` to produce
+H1/H2/H3 verdict and strategic direction.

@@ -1,6 +1,6 @@
 # Decisions Needed (human gate items)
 
-Updated: 2026-05-01
+Updated: 2026-05-30 (fire 56)
 
 ## STRATEGIC: v3 mechanism is empirically dead at symmetric calibration
 
@@ -116,7 +116,7 @@ until server1 JSONs are committed to the branch.
 Run these on server1 in this order:
 
 ```bash
-# Step 5: smoke test (< 1 min)
+# Step 5: smoke test (~10-20 s; fire 55 added 2-period mini-VFI so expect a brief compute phase)
 julia src/vfi_solver_v4.jl --smoke-test
 
 # Step 6a: baselines (~2-3h each, single thread)
