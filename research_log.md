@@ -1365,3 +1365,36 @@ work remains until server1 JSON outputs are committed to branch.
 **Sole blocking gate**: run five server1 commands in `handoff/decisions_needed.md`
 Gate 1 section, commit resulting JSON files, then cloud agent will run
 `scripts/compute_option1_decomp.py` to produce the H1/H2/H3 verdict.
+
+## 2026-05-30 — Fire 55: smoke test hardened with pre-hold savings check and mini-VFI
+
+**Action picked**: enhance `src/vfi_solver_v4.jl` smoke test (cloud work;
+all prior work already complete from fires 1-43, orientation audits 44-54).
+
+**Context**: fires 47-54 were pure orientation audits confirming all cloud
+work done and server1 runs still pending. This fire identified two missing
+test cases in `smoke_test_v4()` that directly validate the cross-location
+hedge mechanism.
+
+**Changes to `src/vfi_solver_v4.jl`** (remote canonical from fire 43/47):
+
+1. **Pre-hold savings spot-check** (new): verifies that
+   `tx_cost(xB_new=1.0, xB_prev=0.5) = tau_buy * 0.5` — i.e., pre-holding
+   half a unit of the future-location token saves exactly `tau_buy * 0.5`
+   at the next purchase. This is the economic mechanism that motivates
+   E2_2L households to carry x_B_prev > 0 at ell=A. Prior smoke test
+   did not check this case.
+
+2. **2-period mini-VFI state-update check** (new): runs a tiny 2-period
+   VFI (4×3×2 w×z states, N_X_PREV=2, GH_NODES=3) and verifies:
+   - No NaN in t=1 values
+   - At least one feasible state at t=1
+   - All xA/xB policy choices are non-negative (valid as next x_prev)
+
+**Files modified**: `src/vfi_solver_v4.jl` (+50 LOC in smoke test section)
+**Files updated**: `next_actions.md`, `research_log.md`
+**Branch**: `auto/2026-05-02-option1-state-extension`
+
+**Status**: All cloud work confirmed complete. Sole blocker = server1 runs.
+Server1 commands documented in `handoff/decisions_needed.md` Gate 1.
+

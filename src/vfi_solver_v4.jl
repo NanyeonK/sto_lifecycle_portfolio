@@ -877,6 +877,65 @@ function smoke_test_v4()
     # (verified by construction in continuation_value_v4; tested via intent here)
     println("  E1_2L relocation resets x_prev to (0,0): coded correctly (see continuation_value_v4)")
 
+    # Pre-hold savings: key hedge-mechanism check.
+    # Holding x_B_prev=0.5 before needing x_B_new=1.0 saves tau_buy on the 0.5 delta.
+    tc_fresh   = tx_cost_v4(0.0, 1.0, 0.0, 0.0, p.tau_buy, p.tau_token)  # buy 1.0 B cold
+    tc_prehold = tx_cost_v4(0.0, 1.0, 0.0, 0.5, p.tau_buy, p.tau_token)  # pre-held 0.5 B
+    saving     = tc_fresh - tc_prehold
+    expected_saving = p.tau_buy * 0.5
+    @assert isapprox(saving, expected_saving; atol=1e-12) "pre-hold savings check: got $saving, expected $expected_saving"
+    @printf("  pre-hold savings: tau_buy * 0.5 = %.4f  (mechanism check PASS)\n", expected_saving)
+
+    # 2-period mini-VFI: verifies state update (x_new → x_prev next period), no NaN.
+    println("  running 2-period mini VFI for state-update consistency …")
+    mini_spec = GridSpec_v4(4, 0.10, 6.0, 3, 0.40, 2.5, 2, 1.5)
+    mini_cfg  = SolveConfig_v4(4, 4, 3, true, nothing)  # asset_grid=4, x_new_grid=4, gh_nodes=3
+    mini_g    = build_grids_v4(mini_spec)
+    mini_sh   = build_shock_block_v4(p, mini_cfg)
+    f_prof    = income_profile_v4(p)
+    nxp_m     = mini_spec.n_xprev
+    T2 = 2
+    mini_val  = fill(NEG_INF, (T2, mini_spec.n_w, mini_spec.n_z, 2, nxp_m, nxp_m))
+    mini_feas = falses(T2, mini_spec.n_w, mini_spec.n_z, 2, nxp_m, nxp_m)
+    mini_xA   = zeros(T2, mini_spec.n_w, mini_spec.n_z, 2, nxp_m, nxp_m)
+    mini_xB   = zeros(T2, mini_spec.n_w, mini_spec.n_z, 2, nxp_m, nxp_m)
+
+    # terminal slice (t=2)
+    for iw in 1:mini_spec.n_w, iz in 1:mini_spec.n_z, iell in 1:2, ixA in 1:nxp_m, ixB in 1:nxp_m
+        w = mini_g.w[iw]
+        mini_val[T2, iw, iz, iell, ixA, ixB]  = utility_crra_v4(w, p.gamma)
+        mini_feas[T2, iw, iz, iell, ixA, ixB] = (w >= 0.0)
+    end
+
+    # one VFI step (t=1) using E2_2L
+    n_feasible = 0
+    for (iw, w) in enumerate(mini_g.w), (iz, z) in enumerate(mini_g.z),
+        iell in 1:2, ixA in 1:nxp_m, ixB in 1:nxp_m
+        w < p.rho && continue
+        x_Ap   = mini_g.x_prev[ixA]; x_Bp = mini_g.x_prev[ixB]
+        ialt   = iell == 1 ? 2 : 1
+        ns_ell = view(mini_val, 2, :, :, iell, :, :)
+        ns_alt = view(mini_val, 2, :, :, ialt,  :, :)
+        v, c, b, s, xA, xB, ok = solve_state_v4(
+            p, mini_g, mini_cfg, mini_sh, f_prof,
+            ns_ell, ns_alt, 1, w, z, iell, x_Ap, x_Bp, REGIME_E2_2L)
+        if ok
+            mini_val[1, iw, iz, iell, ixA, ixB]  = v
+            mini_xA[1,  iw, iz, iell, ixA, ixB]  = xA
+            mini_xB[1,  iw, iz, iell, ixA, ixB]  = xB
+            mini_feas[1, iw, iz, iell, ixA, ixB] = true
+            n_feasible += 1
+        end
+    end
+    total_m = mini_spec.n_w * mini_spec.n_z * 2 * nxp_m * nxp_m
+    @printf("  mini VFI: %d / %d states feasible\n", n_feasible, total_m)
+    @assert n_feasible > 0 "mini VFI produced no feasible states"
+    @assert !any(isnan, mini_val[1,:,:,:,:,:]) "NaN in mini VFI t=1 values"
+    # verify all xA/xB choices are non-negative (valid x_prev for next period)
+    @assert all(x -> x >= 0.0, mini_xA[1,:,:,:,:,:]) "negative xA_policy"
+    @assert all(x -> x >= 0.0, mini_xB[1,:,:,:,:,:]) "negative xB_policy"
+    println("  mini VFI state-update consistency: PASS")
+
     println("=== smoke_test_v4: PASS ===")
     return true
 end

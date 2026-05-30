@@ -1,7 +1,7 @@
 # Next Actions (Path B Option 1 in flight, ASAP-tempered to 6h cron)
 
 Project: sto_lifecycle_portfolio
-Updated: 2026-05-21 (cloud agent fire 38)
+Updated: 2026-05-30 (cloud agent fire 55)
 
 ## ⭐ P0 — Option 1 full state extension (USER CHOSE B, OPTION 1)
 
@@ -15,7 +15,7 @@ proper tau_buy hedge mechanism.
 | 1 | Open new branch `auto/2026-05-02-option1-state-extension` | cloud agent | branch on origin |
 | 2 | Create `src/vfi_solver_v4.jl`: 6D state `(t, w, z, ell, x_A_prev, x_B_prev)` + tx_cost on deltas | cloud agent | **DONE 2026-05-25** `src/vfi_solver_v4.jl` |
 | 3 | Use coarse `x_prev` grid: `N_X_PREV=3`; reduce N_W=15, N_Z=5 to compensate | cloud agent | **DONE 2026-05-25** env-var configurable |
-| 4 | Smoke test stub `smoke_test_v4()` checking 6D allocation, tx_cost computation, state update consistency | cloud agent | **DONE 2026-05-25** callable via `--smoke-test` |
+| 4 | Smoke test stub `smoke_test_v4()` checking 6D allocation, tx_cost computation, state update consistency | cloud agent | **DONE 2026-05-25**; enhanced 2026-05-30: +pre-hold savings check + 2-period mini-VFI |
 | 5 | Smoke test on server1: `julia src/vfi_solver_v4.jl --smoke-test` (USER) | user/me | `output/diagnostics/p6_option1_smoke.md` |
 | 6 | Run E1_2L_v4 + E2_2L_v4 baselines: `bash scripts/run_option1_e1.sh` + `run_option1_e2.sh` (USER) | user/me | `p6_option1_e*.json` |
 | 7 | Compute decomposition + write up | user/me | `p6_option1_decomposition.md` |
