@@ -991,3 +991,64 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-05-31 — v4 solver (Option 1 full state extension) implemented
+
+**Action picked**: P0 — create `src/vfi_solver_v4.jl` with full
+6D state `(t, w, z, ell, x_A_prev, x_B_prev)` and proper tau_buy
+on positive token deltas. This is the implementation specified in
+`handoff/tau_buy_option1_spec.md` (approved 2026-05-02).
+
+**Why this action**: Option 3 (synthetic tau_buy at relocation) was
+tested and the cross-location hedge remained empirically dead
+(mean_xB = 0 at all p_relocate). Option 1 is the proper fix: by
+tracking previous-period holdings as state, a household at ell=A
+who pre-buys x_B incrementally pays `tau_buy * delta_B` now instead
+of `tau_buy * x_B_new` at forced relocation. Expected hedge premium
+per unit pre-held: `p_relocate * tau_buy ≈ 0.0015/period` — small
+but cumulative over working life.
+
+**Files created**:
+- `src/vfi_solver_v4.jl` (~480 LOC) — full 6D VFI solver
+- `scripts/run_option1_e1.sh` — E1_2L baseline run script
+- `scripts/run_option1_e2.sh` — E2_2L baseline run script
+
+**Key implementation decisions**:
+
+1. **State array**: 6D `(T, n_w, n_z, 2, n_xp, n_xp)` at
+   `N_X_PREV=3` default gives 9x state factor vs v3. Offset by
+   reducing `N_W=15`, `N_Z=5` (v3: 21, 7). Net ~4.6x v3 compute.
+
+2. **tx_cost rule**:
+   ```
+   tx_cost = tau_buy   * max(delta_A, 0)  +  tau_buy   * max(delta_B, 0)
+           + tau_token * max(-delta_A, 0) +  tau_token * max(-delta_B, 0)
+   ```
+   Charged every period inside `solve_state_v4` before the
+   (c, b, s) budget. Budget: `c + kappa + x_A + x_B + tx_cost = w`.
+
+3. **x_prev state update**: `nearest_xprev_idx(x_new, x_prev_grid)`
+   maps the chosen continuous x_new to the nearest coarse grid point
+   for the t+1 state. Step-function approximation acceptable at
+   N_X_PREV=3 for first smoke run; finer grid deferred.
+
+4. **Relocation and x_prev transition**:
+   - E1_2L (stay): `x_prev → nearest(x_new)`, same as choice
+   - E1_2L (relocate): forced sell → `x_prev_t+1 = 0` at new ell
+   - E2_2L: tokens portable, `x_prev_t+1 = nearest(x_new)` at both
+     stay and relocation
+
+5. **Housing cost rule**: fixed kappa from post-Round-4 fix — only
+   occupied-location token saves rent (x_ell_local only; not x_{ell'}).
+
+6. **Smoke test** `smoke_test_v4()`: covers 6D allocation, memory
+   estimate, terminal slice, tx_cost arithmetic (4 cases), nearest-
+   index mapping, housing_cost spot-checks, shock block weight sum.
+
+**Branch**: `auto/2026-05-31-option1-state-extension`
+
+**Next required (server1, user)**:
+1. `julia src/vfi_solver_v4.jl --smoke-test`
+2. `bash scripts/run_option1_e1.sh`  (E1_2L ~2.5 h)
+3. `bash scripts/run_option1_e2.sh`  (E2_2L ~2.5 h)
+4. CEV decomposition: compare V at x_prev=0 slice between regimes
+5. Test hypothesis H1: `mean_xB > 0` at ell=A in E2_2L_v4
