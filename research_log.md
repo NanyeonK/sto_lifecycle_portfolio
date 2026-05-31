@@ -1399,6 +1399,30 @@ hedge mechanism.
 Server1 commands documented in `handoff/decisions_needed.md` Gate 1.
 
 
+## 2026-05-31 — Fire 57 orientation audit: all cloud work confirmed complete
+
+Read project files in prescribed order. Reset to remote after finding branch
+at fire 56 (933e7bb), same pattern as fires 47-56.
+
+**Confirmed complete (unchanged from fires 47-56)**:
+- `src/vfi_solver_v4.jl` (988 LOC, canonical): 6D state with 4D multilinear
+  interpolation, per-period tx_cost on deltas, E2_2L portable / E1_2L reset.
+  Fire 55 added pre-hold savings spot-check and 2-period mini-VFI to smoke test.
+- Paper sections s1-s6, `main.tex`, `outline_v4.md`, `references.bib`: DONE.
+- All run/counterfactual/sweep/plot/decomp scripts: DONE (15 scripts total).
+- Phase 2 prep docs (`calibration_v3`, `methods_v3`, `welfare_decomp_v4`): DONE.
+
+**Note**: this fire initially drafted a fresh v4 solver implementation
+(~590 LOC, exact-index-lookup approach) before discovering the remote's
+canonical 988-LOC version via `git log`. Reset to remote; draft discarded.
+Same pattern as fire 54.
+
+**Sole blocking gate**: Gate 1 (server1 runs). User must execute the five
+commands in `handoff/decisions_needed.md` Gate 1 section. After JSON outputs
+are committed, cloud agent will run `scripts/compute_option1_decomp.py` to
+produce the H1/H2/H3 verdict. Gate 2 (H3' framing approval) follows once
+H1+H2+H3 confirmed.
+
 ## 2026-05-30 — Fire 56 orientation audit: all cloud work confirmed complete
 
 Read project files in prescribed order. Reset to remote after finding branch
