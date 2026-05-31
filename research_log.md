@@ -991,3 +991,72 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-05-31 — v4 solver (6D state extension) implemented: Path B Option 1
+
+**Action picked**: implement `src/vfi_solver_v4.jl` — the Option 1 full
+state extension approved on 2026-05-02. This is the P0 item in
+`next_actions.md` and was the next unblocked auto-allowed action.
+
+**Rationale**: Option 3 (tau_buy approximation) left mean_xB=0 at
+ell=A because it only penalized E1_2L at relocation events but gave
+E2_2L households no incentive to pre-hold x_B. Option 1 tracks
+`(x_A_prev, x_B_prev)` as state and charges per-period tx_cost on
+deltas, giving households a genuine motive to pre-buy x_B before
+relocating: paying `tau_buy * x_B_new` now saves `tau_buy * x_B_prev`
+at the next relocation event.
+
+**Key structural changes vs v3:**
+
+1. **6D state**: `(t, w, z, ell, x_A_prev, x_B_prev)` — 4D becomes 6D.
+   Value/policy arrays are 6D. Default grid: N_W=15, N_Z=5, N_X_PREV=3
+   (x_prev ∈ {0, 0.5, 1.0}), giving 76,950 state points per regime.
+
+2. **tx_cost block in budget** (replaces v3 sell_factor approximation):
+   - `delta_A = x_A_new - x_A_prev`, `delta_B = x_B_new - x_B_prev`
+   - Buy: `tau_buy * (max(dA,0) + max(dB,0))` — same for both regimes
+   - Sell E1_2L: `tau_sell * (max(-dA,0) + max(-dB,0))` — traditional 6%
+   - Sell E2_2L: `tau_token * (max(-dA,0) + max(-dB,0))` — token 1%
+   - This exposes two channels: (i) token-liquidity channel (E2_2L sells
+     at tau_token << tau_sell); (ii) pre-buy hedge (x_B_prev reduces
+     future tau_buy cost on relocation).
+
+3. **No sell_factor in wealth transition**: the forced-sale cost for
+   E1_2L now appears in the NEXT period's budget (when x_{old_ell}
+   must be set to 0) rather than as a multiplicative deduction on
+   housing returns. Correct mechanism: at t+1, ell=B, x_A_prev=1 →
+   must choose x_A_new=0 → pay tau_sell=6% in budget.
+
+4. **Choice grid = x_prev grid**: x_A_new and x_B_new are chosen FROM
+   x_prev_grid, so the next-period x_prev state is always an exact
+   grid point (no x_prev interpolation error). This is the key
+   tractability simplification for the first-cut test.
+
+5. **Housing cost kappa**: unchanged from v3 post-fix — only
+   occupied-unit x_ell saves rent.
+
+**Files created on branch `auto/2026-05-31-v4-option1-state-extension`:**
+- `src/vfi_solver_v4.jl` (~600 LOC): complete 6D VFI solver
+- `scripts/run_option1_smoke.sh`: smoke test (no VFI)
+- `scripts/run_option1_e1.sh`: E1_2L baseline run
+- `scripts/run_option1_e2.sh`: E2_2L baseline run
+- `scripts/run_option1_falsification.sh`: p_relocate=0 and rho_AB=0.95 tests
+
+**Hypotheses to test (user runs on server1):**
+- H1: `mean_xB_t1_xprev0_ellA > 0` at E2_2L baseline — hedge activates
+- H2: `CEV(E2_2L_v4 vs E1_2L_v4) > 4.255%` (Option 3 baseline)
+- H3: `CEV(E2_2L_v4 vs E2_2L_v3) ≈ 0.5-1.5%` (hedge channel marginal)
+- Falsification (r): mean_xB = 0 when p_relocate=0 (no mobility → no hedge)
+- Falsification (m): mean_xB weakens at rho_AB=0.95 (corr. ↑ → hedge ↓)
+
+**Compute note**: v4 at default grids (N_W=15, N_Z=5, N_X_PREV=3) has
+76,950 state points vs v3's 16,758. With 9 x-choices (3×3 grid) per
+state and 2,187 quadrature points, estimated runtime ~30-60 min per
+regime single-threaded. Cloud env does not run VFI; server1 runs queued.
+
+**Next actions (server1, user-executed):**
+1. `bash scripts/run_option1_smoke.sh` — verify struct + tx_cost logic
+2. `bash scripts/run_option1_e1.sh` — E1_2L baseline
+3. `bash scripts/run_option1_e2.sh` — E2_2L baseline
+4. Compute CEV from JSON outputs; check H1-H3
+5. `bash scripts/run_option1_falsification.sh` — verify falsification (r)+(m)
+
