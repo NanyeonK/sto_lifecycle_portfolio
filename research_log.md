@@ -991,3 +991,74 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-06-01 — v4 solver (Option 1 full state extension) implemented
+
+**Action picked**: create `src/vfi_solver_v4.jl` — the 6D state extension
+`(t, w, z, ell, x_A_prev, x_B_prev)` that implements proper per-period
+tau_buy charges and thus gives households a genuine incentive to pre-hold
+cross-location tokens before relocation.
+
+**Why this action**: P0 in `next_actions.md` (user confirmed Option 1 on
+2026-05-02). Previous fires all delivered the v3-era Option 3 approximation
+(tau_buy charged only at relocation events, not per-period increments). The
+genuine hedge channel cannot activate without tracking x_prev as state,
+because otherwise there is no per-period cost asymmetry between building
+x_B gradually vs buying all at once on relocation.
+
+**Files created**:
+- `src/vfi_solver_v4.jl` (~700 LOC) — full 6D solver with:
+  - 6D state `(t, w, z, ell, x_A_prev, x_B_prev)`
+  - `ModelParams_v4` struct (removes v3's `apply_tau_buy_at_reloc` flag —
+    superseded by proper state tracking)
+  - `SolveConfig_v4` adds `n_x_prev` (default 3), `x_prev_max` (default 2.0)
+  - `Grids_v4` adds `x_prev::Vector{Float64}` grid
+  - `SolverResult_v4` — 6D arrays for V and all policies
+  - `compute_tx_cost_v4()`: tau_buy × max(Δ,0) + tau_token × max(−Δ,0)
+  - `continuation_value_v4()`: 4D interpolation — bilinear(w,z) × bilinear(x_A_prev,x_B_prev)
+    Pre-computes x_prev interpolation indices/weights once per choice; inner
+    quadrature loop calls 4 bilinear(w,z) per ell per shock draw.
+  - E2_2L portability: x_prev persists through relocation (tokens survive moves)
+  - E1_2L forced-sale: x_prev resets to (0,0) at relocation (via dedicated code path)
+  - `smoke_test_v4()`: checks 6D allocation, tx_cost formula, kappa rule,
+    interp1d, shock block, terminal slice
+- `scripts/run_option1_e1.sh` — E1_2L baseline run (server1, ~2.5h wall)
+- `scripts/run_option1_e2.sh` — E2_2L Option 1 run (server1, ~2.5h wall)
+- `output/diagnostics/p6_option1_smoke.md` — smoke test placeholder
+
+**Design decisions**:
+
+1. `housing_cost_v4` uses the FIXED kappa rule from 2026-05-01:
+   `κ = ρ − x_ell_local × (ρ − m)`. Only the occupied-location token
+   saves rent; x_{ell'} is a pure financial asset. This prevents the
+   rental-income artifact that contaminated the original v3 headline.
+
+2. For E1_2L, tau_buy is charged when buying the current-location unit
+   (delta_ell_current > 0). The forced-sale cost at relocation remains
+   tau_sell via the sell_factor mechanism (wealth transition), not via
+   the tx_cost term. This avoids double-counting.
+
+3. For E2_2L, full tx_cost formula as in the Option 1 spec:
+   tau_buy on any positive delta; tau_token on any negative delta.
+   Tokens are portable — x_prev persists through relocation events.
+
+4. x_prev interpolation is bilinear (not nearest-neighbour) to avoid
+   artificially incentivising choices exactly on grid points. The
+   4-corner evaluation adds ~4× bilinear calls per quadrature point vs v3
+   but is offset by the reduced N_W × N_Z grid.
+
+5. Default x_prev_max = 2.0 covers the v3 full-grid mean_xA ≈ 1.75.
+   With N_X_PREV=3 this gives x_prev ∈ {0, 1.0, 2.0}. User can increase
+   to 5 or 7 grid points for a finer resolution sweep.
+
+**Estimated compute** (from spec): ~4.6× v3 baseline (~30 min) ≈ 2.5h
+per regime single thread. Total for E1_2L + E2_2L: ~5h on server1.
+
+**Next queued actions** (all USER on server1):
+1. `julia src/vfi_solver_v4.jl --smoke-test` → fill in `p6_option1_smoke.md`
+2. `bash scripts/run_option1_e1.sh` → `p6_option1_e1.json`
+3. `bash scripts/run_option1_e2.sh` → `p6_option1_e2.json`
+4. Compute `CEV(E2_2L_v4 vs E1_2L_v4)` and check Hypotheses H1/H2/H3
+
+**Human gates**: none blocking this fire. H1'–H4' all deferred.
+
+**Feature branch**: `auto/2026-06-01-option1-state-extension`
