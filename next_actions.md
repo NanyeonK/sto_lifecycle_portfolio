@@ -12,13 +12,12 @@ proper tau_buy hedge mechanism.
 
 | Step | Action | Owner | Done artifact |
 |---|---|---|---|
-| 1 | Open new branch `auto/2026-06-01-option1-state-extension` | cloud agent | branch on origin ✓ |
-| 2 | Create `src/vfi_solver_v4.jl`: 6D state `(t, w, z, ell, x_A_prev, x_B_prev)` + tx_cost on deltas | cloud agent | **DONE 2026-06-01** `src/vfi_solver_v4.jl` |
-| 3 | Coarse `x_prev` grid: N_X_PREV=3, X_PREV_MAX=2.0; N_W=15, N_Z=5; env-var configurable | cloud agent | **DONE 2026-06-01** embedded in v4 |
-| 4 | Smoke test stub `smoke_test_v4()` — 6D alloc, tx_cost, interp1d, kappa rule checks | cloud agent | **DONE 2026-06-01** callable via `--smoke-test` |
-| 5 | Smoke test on server1 (USER) | user/me | `output/diagnostics/p6_option1_smoke.md` |
-| 6 | Run E1_2L_v4 + E2_2L_v4 baselines (USER) | user/me | `p6_option1_e1.json`, `p6_option1_e2.json` |
-| 7 | Compute decomposition + write up | user/me | `p6_option1_decomposition.md` |
+| 1 | Open new branch `auto/2026-06-01-option1-state-extension` | cloud agent | branch on origin |
+| 2 | **DONE 2026-06-01** Create `src/vfi_solver_v4.jl`: 6D state `(t, w, z, ell, i_xA_prev, i_xB_prev)` + tx_cost on deltas | cloud agent | `src/vfi_solver_v4.jl` pushed |
+| 3 | **DONE 2026-06-01** Coarse `x_prev` grid: `N_X_PREV=3` env-var; reduce N_W=15, N_Z=5; smoke_test_v4() stub embedded | cloud agent | `--smoke-test` callable |
+| 4 | Smoke test on server1 (USER): `julia src/vfi_solver_v4.jl --smoke-test` | user/me | `output/diagnostics/p6_option1_smoke.md` |
+| 5 | Run E1_2L_v4 + E2_2L_v4 baselines (USER): `bash scripts/run_option1_e1.sh && bash scripts/run_option1_e2.sh` | user/me | `p6_option1_e*.json` |
+| 6 | Compute CEV(E2_2L_v4 vs E1_2L_v4), check H1/H2/H3, write decomposition | user/me | `p6_option1_decomposition.md` |
 
 ## Hypotheses to test (after step 6)
 

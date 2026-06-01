@@ -991,74 +991,68 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
-## 2026-06-01 — v4 solver (Option 1 full state extension) implemented
+## 2026-06-01 — v4 solver (Option 1 state extension) implemented
 
-**Action picked**: create `src/vfi_solver_v4.jl` — the 6D state extension
-`(t, w, z, ell, x_A_prev, x_B_prev)` that implements proper per-period
-tau_buy charges and thus gives households a genuine incentive to pre-hold
-cross-location tokens before relocation.
+**Action picked**: create `src/vfi_solver_v4.jl` — 6D state `(t, w, z, ell, i_xA_prev, i_xB_prev)` with proper `tau_buy` on x-deltas every period. This is the P0 item from `next_actions.md` (Step 2 of the Option 1 chain).
 
-**Why this action**: P0 in `next_actions.md` (user confirmed Option 1 on
-2026-05-02). Previous fires all delivered the v3-era Option 3 approximation
-(tau_buy charged only at relocation events, not per-period increments). The
-genuine hedge channel cannot activate without tracking x_prev as state,
-because otherwise there is no per-period cost asymmetry between building
-x_B gradually vs buying all at once on relocation.
+**Rationale**: Option 3 tau_buy (v3) confirmed the cross-location hedge mechanism
+is dead under the approximation (`apply_tau_buy_at_reloc` flag), because E2_2L
+households still set `mean_xB=0` at ell=A. The correct mechanism requires
+tracking `x_prev` as a state: only when the household can pre-accumulate x_B
+cheaply (incrementally) does the hedge premium (`p_relocate * tau_buy ≈ 0.15%`
+per period) become payable. v4 implements this properly.
 
-**Files created**:
-- `src/vfi_solver_v4.jl` (~700 LOC) — full 6D solver with:
-  - 6D state `(t, w, z, ell, x_A_prev, x_B_prev)`
-  - `ModelParams_v4` struct (removes v3's `apply_tau_buy_at_reloc` flag —
-    superseded by proper state tracking)
-  - `SolveConfig_v4` adds `n_x_prev` (default 3), `x_prev_max` (default 2.0)
-  - `Grids_v4` adds `x_prev::Vector{Float64}` grid
-  - `SolverResult_v4` — 6D arrays for V and all policies
-  - `compute_tx_cost_v4()`: tau_buy × max(Δ,0) + tau_token × max(−Δ,0)
-  - `continuation_value_v4()`: 4D interpolation — bilinear(w,z) × bilinear(x_A_prev,x_B_prev)
-    Pre-computes x_prev interpolation indices/weights once per choice; inner
-    quadrature loop calls 4 bilinear(w,z) per ell per shock draw.
-  - E2_2L portability: x_prev persists through relocation (tokens survive moves)
-  - E1_2L forced-sale: x_prev resets to (0,0) at relocation (via dedicated code path)
-  - `smoke_test_v4()`: checks 6D allocation, tx_cost formula, kappa rule,
-    interp1d, shock block, terminal slice
-- `scripts/run_option1_e1.sh` — E1_2L baseline run (server1, ~2.5h wall)
-- `scripts/run_option1_e2.sh` — E2_2L Option 1 run (server1, ~2.5h wall)
-- `output/diagnostics/p6_option1_smoke.md` — smoke test placeholder
+**Key design decisions**:
 
-**Design decisions**:
+1. **State extension 4D→6D**: `(t, w, z, ell, i_xA_prev, i_xB_prev)`.
+   `i_xA_prev` and `i_xB_prev` are indices into a coarse grid (default
+   `N_X_PREV=3`, e.g. {0, 0.75, 1.5}). Nearest-grid snap at end of each
+   period (no interpolation in x_prev dimension).
 
-1. `housing_cost_v4` uses the FIXED kappa rule from 2026-05-01:
-   `κ = ρ − x_ell_local × (ρ − m)`. Only the occupied-location token
-   saves rent; x_{ell'} is a pure financial asset. This prevents the
-   rental-income artifact that contaminated the original v3 headline.
+2. **tx_cost in period budget** (no sell_factor in returns):
+   - E2_2L: `tau_buy * Σmax(delta_x, 0) + tau_token * Σmax(-delta_x, 0)`
+   - E1_2L: `tau_buy * Σmax(delta_x, 0) + tau_sell  * Σmax(-delta_x, 0)`
+   - Forced sale after relocation: when E1_2L household arrives at ell=B
+     with `x_A_prev > 0` (held A last period), they set `x_A_new=0` and
+     pay `tau_sell * x_A_prev` in the current budget. This is the proper
+     timing: all round-trip costs priced in the period they occur.
 
-2. For E1_2L, tau_buy is charged when buying the current-location unit
-   (delta_ell_current > 0). The forced-sale cost at relocation remains
-   tau_sell via the sell_factor mechanism (wealth transition), not via
-   the tx_cost term. This avoids double-counting.
+3. **x_prev portable across relocation**: both stay and relocate paths carry
+   `(x_A_new, x_B_new)` forward as next-period x_prev. Tokens are portable;
+   admissibility is enforced at the CHOICE node (E1_2L must set x_{ell'}=0),
+   not at the state transition.
 
-3. For E2_2L, full tx_cost formula as in the Option 1 spec:
-   tau_buy on any positive delta; tau_token on any negative delta.
-   Tokens are portable — x_prev persists through relocation events.
+4. **Continuation value**: bilinear interp in (w, z); discrete lookup in
+   (ell, i_xA_next, i_xB_next). Single `w_next` for both stay and reloc
+   (no sell_factor needed; costs already in budget).
 
-4. x_prev interpolation is bilinear (not nearest-neighbour) to avoid
-   artificially incentivising choices exactly on grid points. The
-   4-corner evaluation adds ~4× bilinear calls per quadrature point vs v3
-   but is offset by the reduced N_W × N_Z grid.
+5. **Hedge diagnostic in summary**: `xB_policy_by_xBprev_ellA_t1` reports
+   mean x_B_new at ell=A for each `x_B_prev` slice. If hedge motive is
+   active, we expect mean_xB_new to increase with x_B_prev (holding is
+   self-reinforcing because low tx_cost at x_prev=x_new).
 
-5. Default x_prev_max = 2.0 covers the v3 full-grid mean_xA ≈ 1.75.
-   With N_X_PREV=3 this gives x_prev ∈ {0, 1.0, 2.0}. User can increase
-   to 5 or 7 grid points for a finer resolution sweep.
+**Memory estimate at default grids** (N_W=15, N_Z=5, N_X_PREV=3):
+State per period = 15 × 5 × 2 × 3 × 3 = 1350.
+Total value array = 57 × 1350 ≈ 77k Float64 ≈ 0.6 MB per array.
+7 arrays ≈ 4 MB. Well within server1 RAM.
 
-**Estimated compute** (from spec): ~4.6× v3 baseline (~30 min) ≈ 2.5h
-per regime single thread. Total for E1_2L + E2_2L: ~5h on server1.
+**Compute estimate**: ~4.6× v3 baseline per regime (~2-3h at coarse grids
+per regime). Full E1+E2 run ≈ 5-6h on server1 single thread.
 
-**Next queued actions** (all USER on server1):
-1. `julia src/vfi_solver_v4.jl --smoke-test` → fill in `p6_option1_smoke.md`
-2. `bash scripts/run_option1_e1.sh` → `p6_option1_e1.json`
-3. `bash scripts/run_option1_e2.sh` → `p6_option1_e2.json`
-4. Compute `CEV(E2_2L_v4 vs E1_2L_v4)` and check Hypotheses H1/H2/H3
+**Files created/modified**:
+- `src/vfi_solver_v4.jl` (~560 LOC) — 6D solver with Option 1 tx_cost
+- `scripts/run_option1_e1.sh` — E1_2L baseline run script
+- `scripts/run_option1_e2.sh` — E2_2L baseline run script
+- `research_log.md` (this entry)
+- `next_actions.md` (Step 2 DONE; Step 3 queued)
 
-**Human gates**: none blocking this fire. H1'–H4' all deferred.
+**Branch**: `auto/2026-06-01-option1-state-extension`
 
-**Feature branch**: `auto/2026-06-01-option1-state-extension`
+**Next step** (server1, user): run smoke test then E1+E2 baselines.
+```
+julia src/vfi_solver_v4.jl --smoke-test
+bash scripts/run_option1_e1.sh
+bash scripts/run_option1_e2.sh
+```
+Then compute `CEV(E2_2L_v4 vs E1_2L_v4)` and compare to 4.255% (v3 Option 3).
+Hypothesis H1: mean_xB > 0 at ell=A. H2: CEV > 4.255%. H3: hedge channel ≈ 0.5-1.5%.
