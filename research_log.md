@@ -1445,3 +1445,36 @@ not < 1 min as previously stated). No new code.
 from `handoff/decisions_needed.md`. After JSON outputs are committed to
 branch, cloud agent will run `scripts/compute_option1_decomp.py` to produce
 H1/H2/H3 verdict and strategic direction.
+
+## 2026-06-01 — Fire 58 orientation audit: all cloud work confirmed complete
+
+Read project files in prescribed order. Reset to remote after finding branch
+at fire 57 (b687c6b), same pattern as fires 47-57.
+
+**Confirmed complete (unchanged from fires 47-57)**:
+- `src/vfi_solver_v4.jl` (988 LOC, canonical): 6D state with 4D multilinear
+  interpolation, per-period tx_cost on deltas, E2_2L portable / E1_2L reset.
+  Fire 55 added pre-hold savings spot-check and 2-period mini-VFI to smoke test.
+- Paper sections s1-s6, `main.tex`, `outline_v4.md`, `references.bib`: DONE.
+- All run/counterfactual/sweep/plot/decomp scripts: DONE (15 scripts total).
+- Phase 2 prep docs (`calibration_v3`, `methods_v3`, `welfare_decomp_v4`): DONE.
+
+**Note**: this fire initially drafted a fresh v4 solver implementation
+(~838 LOC, exact-index-lookup approach with regime-specific tau_sell/tau_token
+distinction for E1_2L vs E2_2L selling costs) before discovering the remote's
+canonical 988-LOC version via `git log`. Reset to remote; draft discarded.
+Same pattern as fires 54 and 57.
+
+Design difference noted (not implemented due to canonical solver precedence):
+the draft used tau_sell (6%) for E1_2L voluntary decrements and tau_token (1%)
+for E2_2L decrements; the canonical solver uses tau_token for ALL decrements
+but separately applies tau_sell via sell_factor in the wealth transition at
+relocation. The two approaches are equivalent for E1_2L (binary choices mean
+voluntary sell = 0 → 0 transition doesn't occur; sell always happens at
+relocation). No regression in the canonical design.
+
+**Sole blocking gate**: Gate 1 (server1 runs). User must execute the five
+commands in `handoff/decisions_needed.md` Gate 1 section. After JSON outputs
+are committed, cloud agent will run `scripts/compute_option1_decomp.py` to
+produce the H1/H2/H3 verdict. Gate 2 (H3' framing approval) follows once
+H1+H2+H3 confirmed.
