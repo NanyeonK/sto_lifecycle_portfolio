@@ -991,3 +991,77 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-06-01 — v4 solver implemented (Path B Option 1)
+
+**Action picked**: implement `src/vfi_solver_v4.jl` — the full 6D state
+extension (Option 1) specified in `handoff/tau_buy_option1_spec.md`.
+This is the P0 item in `next_actions.md` (user confirmed 2026-05-02).
+
+**Why this action**: Option 1 is the only remaining path to test whether
+the cross-location hedge mechanism delivers measurable welfare. The v3
+solver showed mean_xB=0 at any p_relocate under the fixed kappa rule,
+because x_A strictly dominates x_B at ell=A (x_A saves rent; x_B does
+not). Option 1 adds a per-period tau_buy cost on INCREASES in token
+holdings, making pre-holding x_B while at A genuinely economical: paying
+tau_buy incrementally now avoids a lump-sum tau_buy payment at relocation.
+Expected hedge premium ≈ p_relocate * tau_buy ≈ 0.06 * 0.025 = 0.15% per
+year; expected lifetime CEV ~1-2% on top of the v3 +4.26% baseline.
+
+**Implementation summary (`src/vfi_solver_v4.jl`, ~480 LOC)**:
+
+**State extension**:
+- Old (v3): `(t, w, z, ell)` — 4D
+- New (v4): `(t, w, z, ell, x_A_prev, x_B_prev)` — 6D
+- Default grid: N_W=15, N_Z=5, N_ell=2, N_X_PREV=3 (each dim), x_prev in {0, 0.5, 1.0}
+- Memory: 57 * 15 * 5 * 2 * 3 * 3 = 76,950 entries; ~4.9 MB for 7 arrays total
+
+**Transaction cost block** (key addition):
+```
+delta_A   = x_A_new - x_A_prev
+delta_B   = x_B_new - x_B_prev
+tx_cost  = tau_buy   * (max(delta_A,0) + max(delta_B,0))
+         + tau_token  * (max(-delta_A,0) + max(-delta_B,0))
+Budget: c + kappa + x_A_new + x_B_new + tx_cost + b + s = w
+```
+Default: tau_buy=0.025, tau_token=0.005.
+
+**Regime-specific state transitions on relocation** (the key asymmetry):
+- E1_2L: forced sale on relocation → x_prev_next = (0, 0) at new location.
+  After arriving at ell', household must pay tau_buy to re-acquire tokens.
+- E2_2L: tokens portable → x_prev_next = (x_A_new, x_B_new) regardless of
+  move. Pre-held x_B saves tau_buy at destination B.
+
+**Housing cost**: FIXED rule from v3 fix commit (`rho - x_ell_local * delta_own`);
+only occupied-unit token reduces rent. Non-occupied token is purely financial.
+
+**Design choices**:
+- x_A_new and x_B_new constrained to x_prev_grid (N_X_PREV^2 = 9 pairs for E2_2L).
+  Eliminates need for interpolation in x_prev dimensions; next-period state is
+  exact grid index. Trades off continuous optimization for tractable 6D state.
+- N_W=15, N_Z=5 (reduced from v3's 21/7) to compensate ~9x state factor.
+  Net compute ≈ 4.6x v3. Expected run time: ~2-3h per regime on server1.
+- E1_2L: binary {0, 1} choices; requires x_prev_grid to contain 1.0
+  (ensured by X_PREV_MAX=1.0 default with linear grid).
+
+**Smoke test stub** (`julia src/vfi_solver_v4.jl --smoke-test`):
+Tests sigma decomposition, shock block (size + weight-sum), 6D array
+allocation + memory, terminal slice, tx_cost spot-checks, housing_cost
+FIXED rule, p_relocate boundaries, x_prev_grid contains 0 and 1. No VFI.
+
+**Run scripts**:
+- `scripts/run_option1_e1.sh` — E1_2L_v4 baseline (server1)
+- `scripts/run_option1_e2.sh` — E2_2L_v4 baseline (server1)
+
+**Feature branch**: `auto/2026-06-01-option1-v4-solver`
+
+**Next queued** (USER — server1 required):
+1. `julia src/vfi_solver_v4.jl --smoke-test` (verify struct + tx_cost logic)
+2. `bash scripts/run_option1_e1.sh` (E1_2L baseline, ~2-3h)
+3. `bash scripts/run_option1_e2.sh` (E2_2L baseline, ~2-3h)
+4. Check mean_xB at ell=A: if > 0, hedge mechanism activates. Compare
+   CEV(E2_2L_v4 vs E1_2L_v4) vs v3 baseline of +4.255%.
+
+If mean_xB=0 still: mechanism dead even with proper tau_buy. Fall back
+to Path D (REE/JHE with +4.26% and two channels). Cloud agent next fire
+should pick up the next non-blocked action from P1 queue.
+
