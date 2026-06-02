@@ -991,3 +991,65 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-06-02 — v4 solver (6D state + delta tx_cost) implemented
+
+**Action picked**: P0 Step 2-4 — create `src/vfi_solver_v4.jl` with full
+6D state extension per `handoff/tau_buy_option1_spec.md`.
+
+**Files created**:
+- `src/vfi_solver_v4.jl` (~570 LOC) — 6D VFI solver
+- `scripts/run_option1_e1.sh` — E1_2L server1 run script
+- `scripts/run_option1_e2.sh` — E2_2L server1 run script
+
+**Feature branch**: `auto/2026-06-02-v4-state-extension`
+
+**Design highlights**:
+
+1. **6D state `(t, w, z, ell, x_A_prev, x_B_prev)`**: `x_A_prev` and
+   `x_B_prev` are explicit discrete state dimensions. Default grid:
+   `N_X_PREV=3` points in `[0, 1.0]` → `{0.0, 0.5, 1.0}`. Env-var
+   configurable (`N_X_PREV`, `X_PREV_MAX`).
+
+2. **Per-period tx_cost on deltas**: `tx_cost = tau_buy * max(delta_A,0)
+   + tau_buy * max(delta_B,0) + tau_token * max(-delta_A,0) + tau_token
+   * max(-delta_B,0)`. Charged in the budget constraint each period.
+   Pre-holding x_B_prev > 0 reduces future delta_B on relocation →
+   smaller tau_buy liability.
+
+3. **Exact 6D VFI lookup**: `x_new` choices restricted to `x_prev_grid`
+   points. Continuation value looks up `V[t+1, :, :, ell_next, ix_A_new,
+   ix_B_new]` exactly; bilinear interpolation only in `(w, z)`. No
+   interpolation in x_prev dimensions.
+
+4. **E1_2L relocation state reset**: on forced sell from A to B, next
+   period's `x_A_prev = 0` (sold), `x_B_prev = 0` (haven't bought yet).
+   For E2_2L, `x_prev` carries through unchanged (tokens portable).
+
+5. **Sell factor preserved**: E1_2L relocation applies `sf_reloc = 1 -
+   tau_sell` to the sold location in `next_wealth_v4`, consistent with v3.
+
+6. **smoke_test_v4()**: no VFI; checks tx_cost formula (buy, sell, hold,
+   hedge-savings), housing_cost rule, 6D array allocation + shape,
+   terminal slice, shock block, p_relocate boundary. All assertions.
+   Key check: `tx_cost(0,0.5→1.0) vs tx_cost(0,0→1.0)` confirms hedge
+   saving = `tau_buy * 0.5 = 0.0125`.
+
+**Hedge mechanism analysis**: with proper delta-based tx_cost, a household
+at ell=A with `x_B_prev=0.5` faces `tau_buy * 0.5` on the increment to
+`x_B=1.0` at relocation, vs `tau_buy * 1.0` for E1_2L (which always
+resets to `x_B_prev=0`). Expected hedge premium per unit pre-held:
+`p_relocate * tau_buy ≈ 0.06 * 0.025 = 0.0015` per period. Whether this
+incentivizes meaningful pre-holding of x_B is the key empirical question
+— confirmed only after server1 runs.
+
+**Compute estimate** (from spec): ~2.5 hours wall per regime at N_W=15,
+N_Z=5, N_X_PREV=3 single thread. Run scripts ready at
+`scripts/run_option1_e1.sh` and `scripts/run_option1_e2.sh`.
+
+**Next queued for user (server1)**:
+- `julia src/vfi_solver_v4.jl --smoke-test` → confirm PASS
+- `bash scripts/run_option1_e1.sh` (E1_2L baseline)
+- `bash scripts/run_option1_e2.sh` (E2_2L baseline)
+- Compare `mean_xB_t1_feasible_ellA` in E2_2L > 0 (H1 check)
+- Compute `CEV(E2_2L_v4 vs E1_2L_v4)` (H2 check: > 4.255%)
+
