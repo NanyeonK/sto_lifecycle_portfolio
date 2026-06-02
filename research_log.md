@@ -991,3 +991,90 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-06-02 — v4 solver (6D state, Option 1 tau_buy) implemented
+
+**Action picked**: P0 / Step 1-4 from `next_actions.md` — open
+`auto/2026-05-02-option1-state-extension` branch and create
+`src/vfi_solver_v4.jl` with proper tau_buy state extension.
+
+**Rationale**: This is the top P0 action. Steps 1-4 are all cloud-agent
+work; they are closely coupled (the branch, the file, the grid sizing,
+and the smoke test stub cannot be done independently). Executed all four
+in one fire.
+
+**What was implemented** (`src/vfi_solver_v4.jl`, ~640 LOC):
+
+1. **6D state** `(t, w, z, ell, x_A_prev, x_B_prev)` — two additional
+   dimensions tracking prior-period token holdings. `SolverResult_v4`
+   holds 6D arrays indexed `[t, iw, iz, iell, ixA_prev, ixB_prev]`.
+
+2. **Per-period transaction cost on deltas**:
+   ```
+   delta_A  = x_A_new - x_A_prev
+   delta_B  = x_B_new - x_B_prev
+   tx_cost  = tau_buy   * (max(delta_A, 0) + max(delta_B, 0))
+            + tau_token * (max(-delta_A, 0) + max(-delta_B, 0))
+   ```
+   Applied inside the budget constraint every period. E1_2L households
+   must hold x_{ell'} = 0 (admissibility), so x_{ell'_prev} = 0 on
+   arrival at new location — they pay full tau_buy on any purchase.
+   E2_2L households can pre-hold x_B while at A, reducing the delta
+   (and thus the tau_buy) at relocation. This is the proper hedge
+   mechanism that Option 3 (synthetic approximation) could not deliver.
+
+3. **Coarse x_prev grid**: N_X_PREV=3 (default {0.0, 0.75, 1.5}) via
+   linspace(0, X_PREV_MAX=1.5). Compensated by N_W=15, N_Z=5.
+   Net state factor vs v3 default: (3^2 × 15 × 5) / (21 × 7) ≈ 4.6x.
+
+4. **4D interpolation** `interp_4d_v4`: quadrilinear on
+   (w, z, x_A_prev, x_B_prev). Continuation value interpolates V at
+   (w_next, z_next, x_A_new, x_B_new) — the choices at t become the
+   x_prev state at t+1. Uses factored nested bilinear (16 corner values).
+
+5. **Relocation cost redesign**: In v4, there is no separate sell_factor
+   at relocation. E1_2L forced sale is implicit: on next period at ell'
+   the household must choose x_{ell_old} = 0 (admissibility), paying
+   tau_token on the negative delta. This is consistent and avoids the
+   v3 approximation.
+
+6. **Smoke test stub** `smoke_test_v4()` (callable via `--smoke-test`):
+   - 6D array allocation + memory estimate
+   - `tx_cost_v4` spot-checks (buy, sell, no-change, mixed)
+   - `housing_cost_v4` spot-checks (E0, E1_2L, E2_2L)
+   - `interp_4d_v4` trivial constant-array check
+   - Shock block size + weight-sum check
+   - Terminal slice check
+
+7. **Run scripts**: `scripts/run_option1_e1.sh` and `scripts/run_option1_e2.sh`.
+
+**Files created/modified**:
+- `src/vfi_solver_v4.jl` (new, ~640 LOC)
+- `scripts/run_option1_e1.sh` (new)
+- `scripts/run_option1_e2.sh` (new)
+- `next_actions.md` (steps 1-4 DONE)
+- `research_log.md` (this entry)
+
+**Branch**: `auto/2026-05-02-option1-state-extension`
+
+**Design notes**:
+- `tau_sell` is retained in `ModelParams_v4` for backwards compatibility
+  but is NOT applied in the v4 main VFI loop. The tau_token cost on
+  negative deltas serves the same economic role (cost of liquidating
+  token holdings) and is more consistent with the proper delta-based
+  tx_cost rule.
+- Mortgage (LTV) applied against x_ell (occupied-unit token) as in v3.
+- v3 solver preserved unchanged at `src/vfi_solver_v3.jl` for baseline
+  comparison. CEV will be computed as `CEV(E2_2L_v4 vs E1_2L_v4)` and
+  compared to v3 baseline (+4.255%) to isolate the hedge increment.
+
+**Next queued actions** (user / server1):
+- `julia src/vfi_solver_v4.jl --smoke-test` on server1
+- `bash scripts/run_option1_e1.sh` (E1_2L, ~2-3 hr wall)
+- `bash scripts/run_option1_e2.sh` (E2_2L, ~2-3 hr wall)
+- Write `output/diagnostics/p6_option1_decomposition.md` from results
+
+**Hypotheses to verify** (from `next_actions.md`):
+- H1: mean_xB > 0 at ell=A in E2_2L (hedge pre-accumulation activates)
+- H2: CEV(E2_2L_v4 vs E1_2L_v4) > 4.255% (v3 Option 3 baseline)
+- H3: hedge channel ≈ 0.5-1.5% additional CEV
+
