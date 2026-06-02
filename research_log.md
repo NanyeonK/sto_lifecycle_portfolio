@@ -991,3 +991,72 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-06-02 — v4 solver (Option 1 full state extension) implemented
+
+**Action**: P0 Step 2-4 from `next_actions.md` — implement `src/vfi_solver_v4.jl`
+with 6D state `(t, w, z, ell, x_A_prev, x_B_prev)` and proper tau_buy on positive
+x-deltas each period. Per spec `handoff/tau_buy_option1_spec.md`.
+
+**Branch**: `auto/2026-05-02-option1-state-extension`
+
+**What was built** (`src/vfi_solver_v4.jl`, ~550 LOC):
+
+1. **6D state arrays**: `(T, n_w, n_z, n_ell=2, n_xA_prev, n_xB_prev)`. Default
+   N_X_PREV=3 with X_PREV_MAX=1.5, giving grid `{0.0, 0.75, 1.5}`. Memory: ~1.5 MB
+   per policy array at default settings.
+
+2. **tx_cost_v4()**: Regime-specific transaction cost on x deltas each period.
+   - E0: always 0.
+   - E1_2L: `tau_buy * max(x_ell_new - x_ell_prev, 0)` — only occupied location,
+     only on purchase. Relocation forced-sale remains in `sell_factor`; no double-count.
+   - E2_2L: `tau_buy * (pos_delta_A + pos_delta_B) + tau_token * (neg_delta_A + neg_delta_B)`.
+     Incremental purchase of x_B while at ell=A costs tau_buy each period.
+
+3. **interp_4d_v4()**: 16-corner tensor-product linear interpolation over
+   `(w, z, x_A_prev, x_B_prev)`. Required because x_A_new/x_B_new from the
+   optimization don't fall on the xp_grid; out-of-range values clamped to boundary.
+
+4. **continuation_value_v4()**: Takes `(x_A_new, x_B_new)` as the next-period
+   incoming x_prev state. Interpolates the 5D slice `V[t+1, :, :, ell_next, :, :]`
+   using interp_4d_v4. Relocation shock handled as in v3 (Bernoulli, sell_factor).
+
+5. **solve_state_v4()**: Grid search over `(x_A_new, x_B_new)` independently
+   (nx * nx = 25 combinations at nx=5), budget constraint includes tx_cost.
+   For E2_2L, x_A and x_B are on independent grids [0, max_x] rather than
+   the X_total + alpha parameterization of v3 (cleaner with per-delta tx_cost).
+
+6. **VFI loop**: 6-nested over `(t, iw, iz, iell, ixA_prev, ixB_prev)`. Wall time
+   estimate: ~4.6x v3 baseline ≈ 2-3 hours on server1.
+
+7. **smoke_test_v4()**: Tests sigma decomposition, 6D allocation + memory size,
+   tx_cost spot-checks (all 3 regimes, 6 cases), 4D interpolation at grid points
+   and mid-points, shock block weight sum, terminal slice health, p_relocate
+   boundary, kappa rule. Does NOT run VFI.
+
+8. **Run scripts**: `scripts/run_option1_e1.sh` and `scripts/run_option1_e2.sh`
+   with all env vars pre-set per Round-4 confirmed calibration.
+
+**Key design choice**: tx_cost for E1_2L uses tau_buy on purchase only (not
+tau_token on reduction). This avoids double-counting with the sell_factor that
+already charges tau_sell at relocation. Slight asymmetry vs E2_2L is accepted
+as a modeling approximation (tau_token=1% << tau_sell=6%, minimal bias).
+
+**Why hedge channel should now activate**: At ell=A, a household choosing
+x_B_new > 0 pays tau_buy * x_B_new this period, but avoids paying tau_buy * x_B_new
+at relocation (where they would otherwise need to buy from 0). Expected annual hedge
+premium ≈ p_relocate * tau_buy ≈ 0.06 * 0.025 = 0.15% per unit held. Over a 40-year
+working life this is small but real — especially for households with high p_relocate.
+v3 could not detect this because x_B_prev was not tracked; now the continuation
+value correctly reflects the cost saving.
+
+**Next steps for user (server1)**:
+```bash
+julia src/vfi_solver_v4.jl --smoke-test           # fast check
+bash scripts/run_option1_e1.sh                    # E1_2L baseline (~45 min)
+bash scripts/run_option1_e2.sh                    # E2_2L baseline (~2-3 h)
+```
+After runs: check H1 (mean_xB > 0 at ell=A), H2 (CEV > 4.255%), H3 (hedge channel ~0.5-1.5%).
+
+**Files modified**: `src/vfi_solver_v4.jl` (new), `scripts/run_option1_e1.sh` (new),
+`scripts/run_option1_e2.sh` (new), `next_actions.md` (steps 1-4 marked DONE).
+
