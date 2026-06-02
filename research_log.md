@@ -991,3 +991,79 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-06-02 — v4 solver (6D state) implemented: Option 1 branch ready for server1
+
+**Action picked**: P0 Step 1-4 — create `src/vfi_solver_v4.jl` on branch
+`auto/2026-05-02-option1-state-extension`. This is the highest-priority
+unblocked action: all P0 steps 1-4 are cloud-agent-owned and none requires
+a human gate.
+
+**Implementation summary** (`src/vfi_solver_v4.jl`, 991 LOC):
+
+State extended from 4D → 6D: `(t, w, z, ell, x_A_prev, x_B_prev)`.
+`x_A_prev` and `x_B_prev` track holdings from the prior period, enabling
+proper per-period transaction costs on increments:
+
+```
+tx_cost = tau_buy   * (max(x_A_new - x_A_prev, 0) + max(x_B_new - x_B_prev, 0))
+        + tau_token * (max(x_A_prev - x_A_new, 0) + max(x_B_prev - x_B_new, 0))
+```
+
+This is the correct specification (vs. Option 3's relocation-event-only
+approximation). A household at ell=A who pre-holds x_B can do so by paying
+`tau_buy * delta_B` incrementally each period, saving a larger lump-sum
+`tau_buy * x_B` when they eventually relocate to B. Expected hedge premium
+per unit x_B held: `p_relocate * tau_buy ≈ 0.06 * 0.025 = 0.15%` per period.
+
+**Key design choices**:
+
+- Regime set: `REGIME_E1_2L_V4` and `REGIME_E2_2L_V4` (same economics as v3).
+- E1_2L: on relocation, x at origin is forced-sold (sell_factor = 1 - tau_sell);
+  next-period x_prev resets to 0. E2_2L: tokens portable across moves — x_prev
+  carries over intact at relocation.
+- x_prev grid: uniform on [0, x_prev_max] with N_X_PREV points. Defaults:
+  N_X_PREV=3, x_prev_max=1.5. Nearest-neighbour lookup for continuation
+  (conservative first-pass; bilinear over x_prev can be added later).
+- Continuation value: `view(result.value, t+1, :, :, :, :, :)` — 5D slice per
+  period. Within each quadrature draw, x_prev indices for the next period are
+  looked up from the choice made this period.
+- Grid defaults: N_W=15, N_Z=5, ASSET_GRID_SIZE=7, X_GRID_SIZE=4. Per spec,
+  this compensates for the 9x state expansion from x_prev grid.
+- Memory estimate at defaults: ~5 MB per 6D array (56 periods × 15 × 5 × 2 × 3 × 3
+  × 8 bytes ≈ 4.5 MB). Well within server1 budget.
+
+**Smoke test** (`smoke_test_v4()`, callable via `--smoke-test`):
+
+Covers: sigma decomposition, grid construction (including x_prev[1]=0
+and x_prev[end]=x_prev_max), 6D array allocation and memory check,
+7D shock block (weight sum + ra≠rb), `tx_cost_v4` arithmetic (buy / sell /
+mixed), `housing_cost_v4` spot-checks (E1 and E2 rules), `nearest_xprev_idx`
+edge cases, terminal slice (no NaN), and `continuation_value_v4` smoke call
+(returns finite). Julia not available in cloud env; smoke test must be run
+on server1.
+
+**Scripts added**:
+
+- `scripts/run_option1_e1.sh` — runs E1_2L_V4 with baseline coarse grids,
+  writes `output/diagnostics/p6_option1_e1.json`.
+- `scripts/run_option1_e2.sh` — same for E2_2L_V4.
+
+**Estimated compute** (server1, single thread):
+
+Per spec: ~4.6× v3 baseline. v3 baseline full-grid ≈ 30 min → v4 coarse
+grid estimate ≈ 2-3 hours per regime. User can reduce further by setting
+N_X_PREV=3, N_W=10, N_Z=4 for a quick smoke run.
+
+**Branch**: `auto/2026-05-02-option1-state-extension` (pushed to origin).
+v3 preserved at `src/vfi_solver_v3.jl`.
+
+**P0 steps 1-4**: DONE. **P0 step 5 (smoke test on server1)**: USER action.
+
+**Hypotheses to confirm after server1 run**:
+
+- H1: `mean_xB > 0` at ell=A (hedge mechanism activates under Option 1)
+- H2: `CEV(E2_2L_v4 vs E1_2L_v4) > 4.255%` (beats Option 3 baseline)
+- H3: hedge channel `CEV(E2_2L_v4 vs E2_2L_v3) ≈ 0.5-1.5%`
+
+If H1+H2+H3 all hold → RFS-credible; proceed to Phase 2 sensitivity + manuscript.
+If any fails → fall back to Path D (REE/JHE) at +4.26%.

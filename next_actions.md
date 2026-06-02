@@ -1,7 +1,7 @@
 # Next Actions (Path B Option 1 in flight, ASAP-tempered to 6h cron)
 
 Project: sto_lifecycle_portfolio
-Updated: 2026-05-02
+Updated: 2026-06-02
 
 ## ⭐ P0 — Option 1 full state extension (USER CHOSE B, OPTION 1)
 
@@ -12,13 +12,24 @@ proper tau_buy hedge mechanism.
 
 | Step | Action | Owner | Done artifact |
 |---|---|---|---|
-| 1 | Open new branch `auto/2026-05-02-option1-state-extension` | cloud agent | branch on origin |
-| 2 | Create `src/vfi_solver_v4.jl`: 6D state `(t, w, z, ell, x_A_prev, x_B_prev)` + tx_cost on deltas | cloud agent | file pushed |
-| 3 | Use coarse `x_prev` grid: `N_X_PREV=3` (e.g., {0, 0.5, 1.0}); reduce N_W=15, N_Z=5 to compensate | cloud agent | env-var configurable |
-| 4 | Smoke test stub `smoke_test_v4()` checking 6D allocation, tx_cost computation, state update consistency | cloud agent | callable via `--smoke-test` |
-| 5 | Smoke test on server1 (USER) | user/me | `output/diagnostics/p6_option1_smoke.md` |
-| 6 | Run E1_2L_v4 + E2_2L_v4 baselines (USER) | user/me | `p6_option1_e*.json` |
-| 7 | Compute decomposition + write up | user/me | `p6_option1_decomposition.md` |
+| 1 | DONE 2026-06-02 | cloud agent | branch `auto/2026-05-02-option1-state-extension` pushed |
+| 2 | DONE 2026-06-02 | cloud agent | `src/vfi_solver_v4.jl` (991 LOC) pushed |
+| 3 | DONE 2026-06-02 | cloud agent | defaults N_W=15 N_Z=5 N_X_PREV=3; all env-var overridable |
+| 4 | DONE 2026-06-02 | cloud agent | `smoke_test_v4()` callable via `--smoke-test` |
+| 5 | **NEXT — server1** | user/me | `output/diagnostics/p6_option1_smoke.md` |
+| 6 | pending step 5 | user/me | `p6_option1_e1.json`, `p6_option1_e2.json` |
+| 7 | pending step 6 | user/me | `p6_option1_decomposition.md` |
+
+**To run smoke test on server1:**
+```bash
+julia src/vfi_solver_v4.jl --smoke-test
+```
+
+**To run E1 / E2 baselines on server1:**
+```bash
+bash scripts/run_option1_e1.sh   # E1_2L_V4, ~2-3h estimated wall
+bash scripts/run_option1_e2.sh   # E2_2L_V4, ~2-3h estimated wall
+```
 
 ## Hypotheses to test (after step 6)
 
