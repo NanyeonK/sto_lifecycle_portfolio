@@ -1,7 +1,7 @@
 # Next Actions (Path B Option 1 in flight, ASAP-tempered to 6h cron)
 
 Project: sto_lifecycle_portfolio
-Updated: 2026-05-02
+Updated: 2026-06-03
 
 ## ⭐ P0 — Option 1 full state extension (USER CHOSE B, OPTION 1)
 
@@ -12,12 +12,12 @@ proper tau_buy hedge mechanism.
 
 | Step | Action | Owner | Done artifact |
 |---|---|---|---|
-| 1 | Open new branch `auto/2026-05-02-option1-state-extension` | cloud agent | branch on origin |
-| 2 | Create `src/vfi_solver_v4.jl`: 6D state `(t, w, z, ell, x_A_prev, x_B_prev)` + tx_cost on deltas | cloud agent | file pushed |
-| 3 | Use coarse `x_prev` grid: `N_X_PREV=3` (e.g., {0, 0.5, 1.0}); reduce N_W=15, N_Z=5 to compensate | cloud agent | env-var configurable |
-| 4 | Smoke test stub `smoke_test_v4()` checking 6D allocation, tx_cost computation, state update consistency | cloud agent | callable via `--smoke-test` |
-| 5 | Smoke test on server1 (USER) | user/me | `output/diagnostics/p6_option1_smoke.md` |
-| 6 | Run E1_2L_v4 + E2_2L_v4 baselines (USER) | user/me | `p6_option1_e*.json` |
+| 1 | DONE 2026-06-03 — branch `auto/2026-06-03-option1-state-extension` | cloud agent | branch on origin |
+| 2 | DONE 2026-06-03 — `src/vfi_solver_v4.jl` (845 LOC): 6D state `(t, w, z, ell, x_A_prev, x_B_prev)` + tx_cost on deltas | cloud agent | `src/vfi_solver_v4.jl` |
+| 3 | DONE 2026-06-03 — N_X_PREV=3 → {0.0,0.5,1.0}; N_W=15, N_Z=5 defaults; all env-var configurable | cloud agent | `src/vfi_solver_v4.jl` |
+| 4 | DONE 2026-06-03 — `smoke_test_v4()` with 8 checks (sigma decomp, grid, shock block, tx_cost ×4, housing_cost, 6D alloc, terminal slice, p_relocate) | cloud agent | callable via `--smoke-test` |
+| 5 | Run smoke test on server1 (USER) | user/me | `output/diagnostics/p6_option1_smoke.md` |
+| 6 | Run E1_2L_v4 + E2_2L_v4 baselines (USER) via `bash scripts/run_option1_e1.sh` + `run_option1_e2.sh` | user/me | `p6_option1_e*.json` |
 | 7 | Compute decomposition + write up | user/me | `p6_option1_decomposition.md` |
 
 ## Hypotheses to test (after step 6)

@@ -991,3 +991,69 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-06-03 — v4 solver (6D state) implemented: Option 1 cloud fire
+
+**Action picked**: implement `src/vfi_solver_v4.jl` — P0 action from `next_actions.md`.
+This is the first cloud-agent fire on the Option 1 state extension queue.
+
+**Key design decisions in v4 vs v3:**
+
+1. **6D state** `(t, w, z, ell, x_A_prev, x_B_prev)` where `x_A_prev`,
+   `x_B_prev` are the previous period's token holdings (state variables).
+
+2. **Transaction cost on deltas** (correct Option 1 implementation):
+   ```
+   tx_cost = tau_buy  * (max(ΔA,0) + max(ΔB,0))
+           + tau_token * (max(-ΔA,0) + max(-ΔB,0))
+   ```
+   Applied every period on the change in each location's holdings.
+   This makes pre-holding x_B at ell=A genuinely valuable: expected saving
+   per unit x_B = p_relocate * tau_buy ≈ 0.06 * 0.025 = 0.15% per period.
+
+3. **x_prev grid = x_choice grid** `{0.0, ..., 1.0}` with N_X_PREV=3 (default).
+   Choices restricted to grid points → exact lookup in next-period value function,
+   no interpolation needed in x_prev dimension.
+
+4. **E1_2L relocation state update**: sell_factor `(1-tau_sell)` on housing
+   return (existing v3 mechanism) PLUS x_A_prev_next = 0.0 (or x_B_prev_next = 0.0)
+   to correctly reflect completed sale. This avoids double-counting with v3's
+   Option 3 tau_buy approximation.
+
+5. **E2_2L relocation**: tokens portable → x_prev carries through unchanged.
+
+6. **Housing cost** (corrected kappa rule from fix/2026-05-01-housing-cost-only-occupied):
+   `kappa = rho - x_ell_local * (rho - m)` — occupied unit only.
+
+7. **Grid sizes**: N_W=15, N_Z=5 (vs v3 N_W=21, N_Z=7) to offset 9× state-space
+   expansion. Net compute per regime ≈ 4-5× v3, estimated 2-3 h on server1.
+
+**Files created**: `src/vfi_solver_v4.jl` (845 LOC).
+v3 solver preserved at `src/vfi_solver_v3.jl` for baseline CEV comparison.
+
+**Run scripts created**:
+- `scripts/run_option1_e1.sh` — E1_2L baseline with v4 settings
+- `scripts/run_option1_e2.sh` — E2_2L Option 1 baseline
+
+**Smoke test `smoke_test_v4()`** covers 8 structural checks (run with
+`julia src/vfi_solver_v4.jl --smoke-test`). VFI not run (cloud env;
+server1 run queued as next P0 action for user).
+
+**Feature branch**: `auto/2026-06-03-option1-state-extension`.
+
+**Next queued** (user executes on server1):
+1. `julia src/vfi_solver_v4.jl --smoke-test` → verify structural checks PASS
+2. `bash scripts/run_option1_e1.sh` → E1_2L_v4 baseline
+3. `bash scripts/run_option1_e2.sh` → E2_2L_v4 baseline
+4. Compare CEV to v3 baseline (+4.255%); check H1 (mean_xB > 0 at ellA),
+   H2 (CEV > 4.255%), H3 (hedge channel ≈ 0.5-1.5%).
+
+**Hypotheses under test:**
+- H1: mean_xB > 0 at ellA at x_prev=(0,0) entering state
+- H2: CEV(E2_2L_v4 vs E1_2L_v4) > 4.255% (Option 3 baseline)
+- H3: Hedge channel = CEV(E2_2L_v4 vs E2_2L_v3) ≈ 0.5-1.5%
+
+If H1+H2+H3 all hold: RFS-credible mechanism confirmed. Proceed to
+Phase 2 (calibration sensitivity, manuscript prep).
+If any fails: mechanism bounded; REE/JHE path (current +4.26%) is
+the realistic target.
+
