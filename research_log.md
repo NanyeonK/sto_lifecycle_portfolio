@@ -991,3 +991,69 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-06-03 — v4 solver (6D state extension) implemented
+
+**Action picked**: P0 — create `src/vfi_solver_v4.jl`, the Option 1
+full state extension per `handoff/tau_buy_option1_spec.md`.
+
+Chose this because it is the only remaining auto-allowed P0 item.
+The user locked Option 1 on 2026-05-02. All earlier v3 work was on
+the v3/Option 3 path (mean_xB=0 under fixed kappa); Option 1 is the
+mechanically correct implementation that tests whether the hedge
+channel activates at all.
+
+**File created**: `src/vfi_solver_v4.jl` — 692 LOC.
+
+**Design**:
+
+- **6D state**: `(t, w, z, ell, x_A_prev, x_B_prev)`.
+  x_prev grid is coarse (N_X_PREV=3 default: {0, 0.5, 1.0},
+  X_PREV_MAX=1.0) to keep compute manageable (~4.6× v3 per regime).
+  Choices (x_A_new, x_B_new) are restricted to x_prev_grid values
+  so the state transition is exact — no interpolation in x dimensions.
+
+- **Transaction cost (regime-aware)**:
+  - E2_2L: `tau_buy*(max(dA,0)+max(dB,0)) + tau_token*(max(-dA,0)+max(-dB,0))`
+  - E1_2L: `tau_buy*(max(dA,0)+max(dB,0))` only — selling handled by
+    sell_factor (tau_sell) in wealth transition; not double-counted.
+  - E0: zero.
+
+- **Budget**: `c + kappa(x_ell_new) + b + s + xa_new + xb_new + tx_cost = w`.
+
+- **Continuation value**: interpolates only in (w, z); x_prev dimensions
+  are on-grid so sliced exactly. This keeps the inner loop fast.
+
+- **Housing cost**: fixed kappa rule (only occupied unit reduces rent).
+  E2_2L: `kappa = rho - x_ell_local*(rho-m)`.
+
+- **Smoke test** (`--smoke-test`): sigma decomp, 6D array shape + memory
+  estimate, tx_cost spot-checks (9 assertions), terminal slice, housing
+  cost (5 assertions), shock block weight sum. No VFI run.
+
+- **Scripts**:
+  - `scripts/run_option1_e1.sh` — E1_2L baseline, N_W=15 N_Z=5 N_X_PREV=3
+  - `scripts/run_option1_e2.sh` — E2_2L baseline, same grids
+
+**Why E1_2L tau_buy is NOT applied as tau_token on the sell side**:
+In E1_2L, the household holds traditional homeownership (not a tradeable
+token). The cost of leaving ownership is already captured in full by
+tau_sell (~6%) applied to housing returns at relocation via sell_factor.
+Adding tau_token (0.5%) on top would double-count the selling friction.
+E2_2L tokens ARE tradeable so tau_token applies on decrements.
+
+**Mechanism logic under Option 1**:
+At ell=A, the E2_2L household can hold x_B_prev ∈ {0, 0.5, 1.0}.
+Incrementally building x_B (paying tau_buy=2.5% on each increment)
+allows the household to arrive at ell=B with x_B_prev > 0, avoiding
+the full tau_buy lump sum at relocation. Expected hedge premium per unit
+x_B: p_relocate * tau_buy ≈ 0.06 * 0.025 = 0.0015/period. Whether this
+activates in equilibrium (mean_xB > 0 at ell=A) is the empirical test.
+
+**Feature branch**: `auto/2026-06-03-v4-state-extension`.
+
+**Next queued (all require server1)**:
+- Run `julia src/vfi_solver_v4.jl --smoke-test` (USER step 5).
+- Run E1_2L_v4 and E2_2L_v4 baselines via scripts (USER step 6).
+- Compute `CEV(E2_2L_v4 vs E1_2L_v4)` and test H1 (mean_xB > 0),
+  H2 (CEV > 4.255%), H3 (hedge channel ~ 0.5-1.5%) (USER step 7).
+
