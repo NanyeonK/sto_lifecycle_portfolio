@@ -1501,3 +1501,31 @@ bash scripts/run_option1_e1.sh
 bash scripts/run_option1_e2.sh
 ```
 After JSONs are committed, cloud agent runs decomposition analysis.
+
+## 2026-06-03 — Fire 62: orientation audit + v4 design review
+
+Cloned fresh cloud env. Read all project state files in prescribed order.
+Confirmed branch `auto/2026-05-02-option1-state-extension` matches canonical
+fire-61 remote state (9c31bb8). All P0 cloud-agent steps remain DONE.
+
+**Design review conducted**: compared canonical 988-LOC v4 solver against
+the Option 1 spec. Confirmed correct implementation:
+- 6D state `(t, w, z, ell, x_A_prev, x_B_prev)` with N_X_PREV=3 default.
+- tx_cost on deltas: `tau_buy*(max(dA,0)+max(dB,0)) + tau_token*(max(-dA,0)+max(-dB,0))`.
+- E1_2L relocation: x_prev resets to (0,0); E2_2L portable (carries forward).
+- 4D multilinear interpolation in (w, z, x_A_next, x_B_next).
+- Fixed kappa rule retained: only occupied-unit token reduces rent.
+- smoke_test_v4() includes pre-hold savings check and 2-period mini-VFI (fire 55 addition).
+
+**No new cloud work needed.** Sole gate is server1 baseline runs.
+
+**User action required (Gate 1)**:
+```
+# On server1 in tmux session sto_lifecycle_portfolio:
+cd ~/project/sto_lifecycle_portfolio
+git pull origin auto/2026-05-02-option1-state-extension
+julia src/vfi_solver_v4.jl --smoke-test
+bash scripts/run_option1_e1.sh   # E1_2L ~45 min
+bash scripts/run_option1_e2.sh   # E2_2L ~2-3 h
+# Commit output JSONs to branch, then cloud agent runs decomp
+```
