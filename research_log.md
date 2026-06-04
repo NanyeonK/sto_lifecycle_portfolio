@@ -1529,3 +1529,49 @@ bash scripts/run_option1_e1.sh   # E1_2L ~45 min
 bash scripts/run_option1_e2.sh   # E2_2L ~2-3 h
 # Commit output JSONs to branch, then cloud agent runs decomp
 ```
+
+## 2026-06-04 — Fire 63: orientation audit — all cloud work confirmed complete, Gate 1 pending
+
+**Orientation**: Fresh cloud environment. Read all project state files in
+prescribed order. Found branch `auto/2026-05-02-option1-state-extension` at
+canonical fire-62 state (6bbac83). Same situation as fires 47-62: ALL
+cloud-agent work is complete, sole gate is server1 runs.
+
+**Canonical assets confirmed present (unchanged)**:
+- `src/vfi_solver_v4.jl` (988 LOC): 6D state `(t, w, z, ell, x_A_prev, x_B_prev)`,
+  per-period tx_cost on deltas, 4D multilinear interpolation over
+  `(w', z', x_A_new, x_B_new)`, smoke test includes pre-hold savings check +
+  2-period mini-VFI (fire 55 enhancement).
+- `src/vfi_solver_v3.jl` (original v3) and `src/vfi_solver_v2.jl` preserved.
+- All 15 scripts: 5 baseline/counterfactual run scripts + 6 sensitivity sweeps
+  + `compute_option1_decomp.py` + 3 plot scripts.
+- Paper: `paper/main.tex`, `paper/outline_v4.md`, sections s1-s6 (complete
+  draft skeletons), `paper/references.bib`.
+- Phase 2 prep docs: `docs/calibration_v3.md`, `docs/methods_v3.md`,
+  `docs/welfare_decomp_v4.md`.
+
+**Note**: this fire initially drafted a fresh v4 implementation (~959 LOC,
+exact-index-lookup approach with x_new choices constrained to x_prev grid)
+before discovering the remote canonical 988-LOC version via `git log --oneline`.
+Reset to remote; draft discarded. Same pattern as fires 54, 57, 58, 61, 62.
+
+Design difference (not implemented): the draft used exact-index-lookup (choices
+constrained to x_prev grid, no interpolation in x_prev space), while the
+canonical version uses 4D multilinear interpolation over (w, z, x_A_new,
+x_B_new), allowing x_new choices to be continuous in a separate fine grid
+(`x_new_grid_size`). The canonical design allows richer optimization at the
+cost of more complex interpolation.
+
+**Sole blocking gate**: Gate 1 (server1 runs). See `handoff/decisions_needed.md`
+Gate 1 section for exact commands.
+
+**User action required**:
+```bash
+# On server1 in tmux session sto_lifecycle_portfolio:
+cd ~/project/sto_lifecycle_portfolio
+git pull origin auto/2026-05-02-option1-state-extension
+julia src/vfi_solver_v4.jl --smoke-test
+bash scripts/run_option1_e1.sh         # E1_2L baseline
+bash scripts/run_option1_e2.sh         # E2_2L baseline
+# Then commit JSONs; cloud agent runs compute_option1_decomp.py
+```
