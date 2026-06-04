@@ -991,3 +991,53 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-06-04 — v4 solver implemented (Option 1 full state extension)
+
+**Action picked**: P0 — implement `src/vfi_solver_v4.jl` (Option 1 full state
+extension). This was the highest-priority auto-allowed action per `next_actions.md`.
+
+**What was built**: a 6D-state VFI solver `(t, w, z, ell, x_A_prev, x_B_prev)` with
+proper tau_buy charging on positive x deltas each period. Core new mechanism:
+pre-holding x_B while at ell=A incrementally pays tau_buy, saving a lump-sum
+tau_buy at forced relocation — the genuine hedge incentive that was absent in v3.
+
+**Files created / modified**:
+- `src/vfi_solver_v4.jl` (~520 LOC) — complete 6D solver with:
+  - `ModelParams_v4`: tau_buy and tau_token both active (no longer deferred)
+  - `Grids_v4`: adds `x_prev::Vector{Float64}` (default {0, 0.75, 1.5}, N_X_PREV=3)
+  - `SolverResult_v4`: 6D arrays (T×N_W×N_Z×2×N_XAPREV×N_XBPREV)
+  - `tx_cost_v4()`: `tau_buy*(max(dA,0)+max(dB,0)) + tau_token*(max(-dA,0)+max(-dB,0))`
+  - `interp_v4_slice()`: 4D linear interpolation (w, z, x_A_prev, x_B_prev); ell exact
+  - `continuation_value_v4()`: x_new carries forward as x_prev into next period
+  - `solve_state_v4()`: budget now includes tx_cost; E2_2L alpha×X_total grid
+  - `smoke_test_v4()`: algebraic/allocation checks (no VFI); `--smoke-test-full` adds tiny VFI
+- `scripts/run_option1_e1.sh` — E1_2L baseline run script
+- `scripts/run_option1_e2.sh` — E2_2L baseline run script
+
+**Key design decisions**:
+1. `x_prev` grid starts at 0.0 (initial condition) and has N_X_PREV=3 points by default.
+   Default range [0, 1.5] to handle leveraged positions. Configurable via `X_PREV_MAX` env var.
+2. Housing cost rule: correct (fixed) v3 version — only occupied-unit token reduces rent.
+   Non-occupied x_B at ell=A is purely financial (capital gain, no rent saving).
+3. E1_2L: binary admissibility maintained. x_B_new=0 always. tx_cost charged on
+   voluntary x changes; tau_sell at forced relocation still via sell_factor.
+4. Removed `apply_tau_buy_at_reloc` flag from v3 (Option 3 approximation, now superseded).
+5. Memory: ~4 MB for 7 arrays at N_W=15, N_Z=5, N_X_PREV=3. Compute ~4.6x v3.
+
+**Why hedge should activate in v4**: at ell=A, holding x_B_prev>0 means any further
+increase toward x_B=1 at relocation costs only tau_buy*(1 - x_B_prev) instead of
+tau_buy*1. Expected per-period hedge premium: p_relocate * tau_buy ≈ 0.06*0.025 = 0.0015
+per unit x_B. Over lifetime with multiple relocations, this accumulates. Hypothesis:
+mean_xB > 0 at ell=A, CEV improvement ≈ 0.5-1.5% vs v3.
+
+**Smoke test run**: NOT run in cloud environment (Julia not available). User must run
+`julia src/vfi_solver_v4.jl --smoke-test` on server1 (step 5 in next_actions).
+
+**Branch**: `auto/2026-05-02-option1-state-extension`
+
+**Next (user/server1)**:
+1. `julia src/vfi_solver_v4.jl --smoke-test` (step 5)
+2. `bash scripts/run_option1_e1.sh` (step 6a)
+3. `bash scripts/run_option1_e2.sh` (step 6b)
+4. Compute CEV and test H1 (mean_xB > 0 at ellA) + H2 (CEV > 4.255%) + H3 (hedge channel ≈ 0.5-1.5%)
+
