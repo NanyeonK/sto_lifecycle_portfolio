@@ -991,3 +991,76 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-06-04 — P0 DONE: vfi_solver_v4.jl created (Option 1 full state extension)
+
+**Action picked**: P0 Step 2-4 from `next_actions.md` — create
+`src/vfi_solver_v4.jl` with 6D state `(t, w, z, ell, x_A_prev,
+x_B_prev)` and proper per-period tau_buy on token increments.
+
+**Why now**: Per `handoff/tau_buy_option1_spec.md` and the research
+log entries 2026-05-01 (hedge dead) + 2026-05-02 (Option 3 final),
+the cross-location hedge channel remains zero because pre-holding x_B
+at ell=A earns no savings without proper state tracking. Option 1 is
+the P0 critical path: it makes the cost of pre-buying tokens
+state-contingent, giving the household a literal incentive to
+gradually accumulate the future-location token before relocation.
+
+**Files created/modified**:
+- `src/vfi_solver_v4.jl` (~560 LOC) — full 6D solver on branch
+  `auto/2026-06-04-option1-state-extension`
+- `scripts/run_option1_e1.sh` — E1_2L baseline run script
+- `scripts/run_option1_e2.sh` — E2_2L baseline run script
+- `next_actions.md` — steps 1-4 marked DONE
+
+**Key design decisions in v4**:
+
+1. **6D state arrays** indexed `(t, iw, iz, iell, ixA_prev, ixB_prev)`.
+   At `N_W=15, N_Z=5, N_X_PREV=3`: state expansion is 15×5×2×3×3 =
+   1,350 (w,z,ell,xp,xp) points per period. Memory ~10-20 MB per
+   array × 7 arrays.
+
+2. **Per-period tx_cost on increments** via `token_tx_cost_v4()`:
+   ```
+   tx_cost = tau_buy * (max(dA,0) + max(dB,0))
+           + tau_token * (max(-dA,0) + max(-dB,0))
+   ```
+   Applied in the budget constraint at every period for E2_2L.
+   For E1_2L: tau_buy on binary transitions (0→1) and tau_token on
+   (1→0), plus tau_sell at relocation via wealth transition.
+
+3. **x_prev → x_new state propagation**: at t+1, `x_A_prev = x_A_new`
+   from t. Continuation value uses `interp_next_v4()` which snaps
+   x_A_new and x_B_new to nearest x_prev grid points. Nearest-neighbor
+   is appropriate given the coarse x_prev grid (3 points).
+
+4. **x_prev grid**: `{0.0, 0.75, 1.5}` at default `N_X_PREV=3,
+   X_PREV_MAX=1.5` — covers the no-hold, half-unit, and full-unit
+   positions that matter most for the hedge incentive.
+
+5. **Hedge mechanism activation test**: the pre-buy incentive per
+   period per unit x_B held is `p_relocate * tau_buy ≈ 0.06 * 0.025 =
+   0.15%`. Lifetime accumulation across ~40 working years: ~6% if
+   the household anticipates sustained mobility. This is the magnitude
+   the full solver should confirm numerically.
+
+6. **Smoke test**: `smoke_test_v4()` (run via `--smoke-test`) checks
+   6D array allocation, memory size, terminal slice, shock block,
+   tx_cost spot-checks, housing cost spot-checks, nearest_idx, and
+   state-update consistency. No VFI run needed for smoke test.
+
+**VFI not run** (cloud env lacks Julia; server1 runs via scripts above
+are P0 Steps 5-6, owner: user).
+
+**Expected run time on server1**: ~2-3h per regime at default grids
+(15×5×2×3×3 state × 2187 quadrature × 4×4×7×7 choice grid).
+
+**Next P0 steps for user (server1)**:
+1. `julia src/vfi_solver_v4.jl --smoke-test` → write
+   `output/diagnostics/p6_option1_smoke.md`.
+2. `bash scripts/run_option1_e1.sh` (E1_2L baseline).
+3. `bash scripts/run_option1_e2.sh` (E2_2L baseline).
+4. Compare `V_t1_midpoint_ellA` and check `mean_xB_t1_ellA > 0`.
+5. Compute CEV decomposition per `handoff/tau_buy_option1_spec.md`
+   hypotheses H1-H3.
+
+**Feature branch**: `auto/2026-06-04-option1-state-extension`.
