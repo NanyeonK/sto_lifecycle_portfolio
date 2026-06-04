@@ -1597,3 +1597,50 @@ bash scripts/run_option1_e2.sh
 ```
 
 **Status**: no new artifacts this fire. Gate 1 still pending.
+
+## 2026-06-04 — Fire 65: orientation audit + E1_2L tx_cost design note; Gate 1 still pending
+
+Fresh environment. Read all project state files. Confirmed canonical v4 at commit aee5d11
+(fire 64). All cloud-agent P0/P1/Phase-2-prep work remains DONE.
+
+**New observation this fire (not noted in fires 47-64)**:
+
+In `src/vfi_solver_v4.jl`, `tx_cost_v4()` uses `tau_token` (not `tau_sell`) for
+E1_2L voluntary selling (transitioning from own → rent without relocating). This is
+intentional: `tau_sell` is captured at relocation via `sell_factor = 1 - tau_sell` in
+the wealth transition, and voluntary mid-period downsizing from owner to renter is
+economically infrequent in lifecycle models. Using `tau_token` ≈ 0.5% for this
+edge-case path is a conservative simplification that slightly understates E1_2L
+friction for voluntary downsizing, but does not affect the forced-relocation channel
+(which correctly uses `tau_sell`). This is a valid modeling choice.
+
+**Verification**: implemented a fresh v4 using exact-grid-lookup (choices constrained
+to x_prev grid, 2D bilinear interpolation only) as an independent check. Key design
+conclusions match the canonical: 6D state, x_A_prev→0 on E1_2L relocation, x_prev
+unchanged on E2_2L relocation. Canonical's 4D multilinear is strictly superior (richer
+optimization, continuous x_new). Discarded local draft; reset to canonical remote.
+
+**Gate 1 urgency note**: This gate has been pending since 2026-05-25 (fire ~25 first
+confirmed canonical complete). Now at fire 65, ~11 days later. Server1 baselines block
+ALL remaining cloud work (decomposition, sensitivity sweep, figure generation). The
+project cannot advance further without server1 output.
+
+**Commands to unblock** (exact, copy-paste ready for server1):
+```bash
+# On server1, tmux session sto_lifecycle_portfolio:
+cd ~/project/sto_lifecycle_portfolio
+git pull origin auto/2026-05-02-option1-state-extension
+
+# Step 1 — smoke test (~1 min):
+julia src/vfi_solver_v4.jl --smoke-test
+
+# Step 2 — E1_2L baseline (~45 min):
+bash scripts/run_option1_e1.sh
+
+# Step 3 — E2_2L baseline (~2.5 h):
+bash scripts/run_option1_e2.sh
+
+# After each run, commit the output JSON to the branch:
+git add output/diagnostics/p6_option1_e*.json && git commit -m "server1: v4 baseline results" && git push origin auto/2026-05-02-option1-state-extension
+# Cloud agent will then run: python scripts/compute_option1_decomp.py
+```
