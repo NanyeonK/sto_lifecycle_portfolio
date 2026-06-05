@@ -991,3 +991,60 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-06-05 — v4 solver: Option 1 full state extension implemented
+
+**Action picked**: P0 from `next_actions.md` — implement `src/vfi_solver_v4.jl`,
+the 6D state extension per `handoff/tau_buy_option1_spec.md`.
+
+**State extension**: `(t, w, z, ell)` → `(t, w, z, ell, x_A_prev, x_B_prev)`.
+All policy and value arrays are now 6D. Memory for coarse-default grids
+(T=57, N_W=15, N_Z=5, N_ell=2, N_xprev=3, N_xprev=3): ~80k elements per
+array, ~4 MB total — well within server1 RAM.
+
+**Per-period delta tx_cost**: `tx_cost_v4(x_A_new, x_B_new, x_A_prev, x_B_prev, p, regime)`:
+- E2_2L: `tau_buy * max(dA,0) + tau_buy * max(dB,0) + tau_token * max(-dA,0) + tau_token * max(-dB,0)`
+- E1_2L: `tau_buy * max(dA,0)` only (sell cost captured by sell_factor in wealth transition)
+- E0: zero
+
+**Relocation x_prev propagation** (key mechanism):
+- E2_2L: tokens portable — x_prev indices carry over unchanged. Household at A
+  with x_B_prev=0.5 arrives at B with x_B_prev=0.5 → pays tau_buy only on remaining
+  delta to reach target, not on full position.
+- E1_2L: forced sale → x_prev resets to (0,0). Household at B starts fresh
+  (must pay full tau_buy to buy B unit if it wants to own). This asymmetry
+  is what generates the E2_2L pre-buy hedge premium.
+
+**Grid design decision (deviation from spec)**: X_PREV_MAX=1.0 (not 1.5) so
+that E1_2L binary {0,1} maps exactly to grid endpoints {0.0, 0.5, 1.0} with
+N_X_PREV=3. Using X_PREV_MAX=1.5 would map x=1 to x_prev=0.75 (nearest
+grid point), creating a spurious ~0.6% per-period tau_buy charge for
+maintained ownership — a material bias inflating CEV(E2_2L vs E1_2L).
+
+**Hedge premium expected**: at p_relocate=0.06, tau_buy=0.025:
+- Expected annual premium per unit x_B held at ell=A: 0.06×0.025 = 0.15%
+- Spec hypothesis: +0.5–1.5% lifetime CEV vs Option 3 (+4.26% baseline)
+- Combined target: +5–6% total CEV; RFS-marginal
+
+**Files created**:
+- `src/vfi_solver_v4.jl` (~430 LOC) — full 6D solver
+- `scripts/run_option1_e1.sh` — E1_2L baseline run script
+- `scripts/run_option1_e2.sh` — E2_2L baseline run script
+
+**Smoke test** (`julia src/vfi_solver_v4.jl --smoke-test`):
+- 6D array allocation check
+- tx_cost_v4 unit tests (buying, selling, no-rebalance, E1_2L no tau_token)
+- nearest_xprev_idx boundary/midpoint checks
+- housing_cost_v4 spot-checks
+- Minimal VFI run at T=3 for both E1_2L and E2_2L (no NaN/Inf assertion)
+- Cannot run in cloud env (Julia not installed); queued for server1.
+
+**Branch**: `auto/2026-06-05-option1-state-extension`
+
+**Next steps** (per next_actions.md P0 step 5–7, owner: user/server1):
+1. Run smoke test on server1: `julia src/vfi_solver_v4.jl --smoke-test`
+2. Run E1_2L baseline: `bash scripts/run_option1_e1.sh`
+3. Run E2_2L baseline: `bash scripts/run_option1_e2.sh`
+4. Check H1 (mean_xB > 0 at ell=A), H2 (CEV > 4.255%), H3 (hedge channel 0.5–1.5%)
+5. If H1+H2+H3 hold → RFS-credible; proceed to Phase 2
+6. If any fail → Path D (REE/JHE at +4.26%)
+
