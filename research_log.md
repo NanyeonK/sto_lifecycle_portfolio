@@ -1744,3 +1744,71 @@ action can unblock Gate 1.
 
 **Files modified**: `scripts/compute_option1_decomp.py`, `src/vfi_solver_v4.jl`
 **Branch**: `auto/2026-05-02-option1-state-extension`
+
+## 2026-06-05 — Fire 68: full audit; all cloud work confirmed complete; Gate 1 still pending
+
+**Action picked**: orientation + correctness audit. All auto-allowed actions were
+already completed in prior fires. No new implementation work is possible until
+server1 JSON results land.
+
+**Prior state on arrival**: Remote branch at fire-67 tip (cf9546c). Merged remote.
+All Phase 2 prep DONE (fires 1-35). Fire 67 fixed the n_x_prev/x_prev_max key
+bug in `scripts/compute_option1_decomp.py`.
+
+**Audit findings (this fire)**:
+
+1. **v4 solver correctness** (`src/vfi_solver_v4.jl`, 989 LOC): verified the
+   E1_2L relocation logic — `xA_next_reloc = 0.0; xB_next_reloc = 0.0` correctly
+   clears x_prev after forced sale. No double-counting: tau_sell deducted via
+   sell_factor in wealth transition; tau_buy on new purchase via delta tx_cost at
+   t+1 (with x_prev = 0 after relocation). Design is consistent with the Option 1
+   spec in `handoff/tau_buy_option1_spec.md`.
+
+2. **tx_cost_v4 signature**: verified call sites (lines 539, 579) and smoke test
+   assertions (lines 837-888) all use consistent `(x_A_new, x_B_new, x_A_prev,
+   x_B_prev, tau_buy, tau_token)` signature. Pre-hold savings arithmetic check
+   passes: `tau_buy * 0.5 = 0.0125` per 0.5 unit pre-held.
+
+3. **Decomp script** (`scripts/compute_option1_decomp.py`): fire-67 fix verified
+   correct (lines 182-185). All other key names verified: `V_t1_midpoint_ellA_xprev0`,
+   `mean_xB_t1_ellA`, `mean_xA_t1_ellA` — solver writes all three. CEV formula
+   `(V_a/V_b)^(1/(1-5)) - 1` correct for CRRA. Channel math additive. ✓
+
+4. **sweep scripts**: `sweep_rhoAB.sh`, `sweep_prelocate.sh` headers verified —
+   reference `src/vfi_solver_v4.jl` correctly, proper env-var passthrough.
+
+5. **Paper sections**: `s4_results.tex` has figure PLACEHOLDER shells that require
+   server1 policy arrays — cannot be pre-filled. No numeric shells in prose text.
+   Nothing actionable.
+
+6. **Note on E1_2L voluntary sell cost**: voluntary sells in E1_2L use tau_token
+   (1%) not tau_sell (6%) — consistent with spec formula. Forced relocation sells
+   use tau_sell via sell_factor. This is an intentional simplification documented
+   in the solver header; not a bug.
+
+**Gate 1 — server1 (sole remaining blocker)**:
+
+Gate 1 has been pending since fire ~25 (~2026-05-25), now 11 days. Exact commands:
+```bash
+cd ~/project/sto_lifecycle_portfolio
+git pull origin auto/2026-05-02-option1-state-extension
+
+# Smoke test (~1 min):
+julia src/vfi_solver_v4.jl --smoke-test
+
+# Baselines (~2-4h each, single thread):
+bash scripts/run_option1_e1.sh       # -> output/diagnostics/p6_option1_e1.json
+bash scripts/run_option1_e2.sh       # -> output/diagnostics/p6_option1_e2.json
+
+# Counterfactuals for 3-channel decomp (~2-4h each):
+bash scripts/run_option1_e1_notx.sh  # -> p6_option1_e1_notx.json
+bash scripts/run_option1_e2_notau.sh # -> p6_option1_e2_notau.json
+
+# Commit and push JSON outputs; cloud agent handles decomp on next fire:
+git add output/diagnostics/p6_option1_*.json
+git commit -m "server1: v4 option1 baseline results"
+git push origin auto/2026-05-02-option1-state-extension
+```
+
+**Files modified**: `research_log.md` (this entry only)
+**Branch**: `auto/2026-05-02-option1-state-extension`
