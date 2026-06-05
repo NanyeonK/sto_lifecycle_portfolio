@@ -1703,3 +1703,44 @@ git add output/diagnostics/p6_option1_*.json
 git commit -m "server1: v4 option1 baseline results"
 git push origin auto/2026-05-02-option1-state-extension
 ```
+
+## 2026-06-05 — Fire 67: decomp script audit + bug fix; Gate 1 still pending
+
+**Action**: audited `scripts/compute_option1_decomp.py` against `src/vfi_solver_v4.jl`
+JSON output keys for correctness. Previous fires 54-66 repeated orientation audits
+without finding actionable issues; this fire found and fixed a real bug.
+
+**Bug found and fixed in `compute_option1_decomp.py` (lines 182-183)**:
+
+The calibration table in the decomp report reads `n_x_prev` and `x_prev_max`
+via `load_param(d_e1, ...)`, which looks inside the `"params"` sub-dict of the
+JSON. However, the solver writes grid metadata at the TOP LEVEL as `"x_prev_grid"`
+(an array), not inside `"params"`. Result: both table rows showed `?` instead of
+the actual values.
+
+Fix: derive both values from the top-level `x_prev_grid` array:
+```python
+_xpg       = d_e1.get("x_prev_grid") or []
+n_x_prev   = len(_xpg) if _xpg else "?"
+x_prev_max = round(float(max(_xpg)), 4) if _xpg else "?"
+```
+
+**Second fix in `src/vfi_solver_v4.jl`**: added `s["solver_version"] = "v4"` to
+`summary_v4`. Fire 27 notes mentioned this was added as a bugfix for
+`plot_channel_decomp.py` key resolution, but it was absent from the canonical
+version. Added to prevent future key-resolution confusion.
+
+**All other CEV formulas, JSON key names, H1/H2/H3 checks, and the decomposition
+math verified as correct** (detailed audit notes in this fire's thought process).
+Key checks passed:
+- `V_t1_midpoint_ellA_xprev0` key: solver writes it, decomp reads it ✓
+- `mean_xB_t1_ellA` key: solver writes it, decomp reads it ✓
+- CEV formula `(V_A/V_B)^(1/(1-gamma)) - 1` with gamma=5: correct for CRRA ✓
+- Additive channel decomposition `total - ch1 - ch2 - ch3 = cross`: consistent with v3 method ✓
+- NaN check for H1: correct Python NaN idiom ✓
+
+**Gate 1 status**: still pending. Server1 baselines have not been run. No cloud
+action can unblock Gate 1.
+
+**Files modified**: `scripts/compute_option1_decomp.py`, `src/vfi_solver_v4.jl`
+**Branch**: `auto/2026-05-02-option1-state-extension`

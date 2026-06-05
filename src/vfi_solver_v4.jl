@@ -728,6 +728,7 @@ end
 function summary_v4(result::SolverResult_v4, grids::Grids_v4,
                     params::ModelParams_v4, regime::Int)
     s = Dict{String,Any}()
+    s["solver_version"]  = "v4"
     s["regime"]          = regime_name_v4(regime)
     s["total_points"]    = length(result.feasible)
     s["feasible_points"] = count(result.feasible)

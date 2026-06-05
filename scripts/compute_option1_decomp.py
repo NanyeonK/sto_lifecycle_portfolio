@@ -179,8 +179,10 @@ def write_report(out_path: str, channels: dict, hypotheses: dict,
     tau_token  = load_param(d_e2, "tau_token", "?")
     rho_AB     = load_param(d_e1, "rho_AB", "?")
     p_reloc    = load_param(d_e1, "p_relocate_working", "?")
-    n_x_prev   = load_param(d_e1, "n_x_prev", "?")
-    x_prev_max = load_param(d_e1, "x_prev_max", "?")
+    # x_prev_grid is a top-level key (array), not inside "params"
+    _xpg       = d_e1.get("x_prev_grid") or []
+    n_x_prev   = len(_xpg) if _xpg else "?"
+    x_prev_max = round(float(max(_xpg)), 4) if _xpg else "?"
 
     e0_cev_str = "n/a (e0.json not provided)"
     if d_e0 is not None:
