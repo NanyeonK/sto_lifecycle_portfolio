@@ -1644,3 +1644,62 @@ bash scripts/run_option1_e2.sh
 git add output/diagnostics/p6_option1_e*.json && git commit -m "server1: v4 baseline results" && git push origin auto/2026-05-02-option1-state-extension
 # Cloud agent will then run: python scripts/compute_option1_decomp.py
 ```
+
+## 2026-06-05 — Fire 66: orientation audit + independent v4 design validation; Gate 1 still pending
+
+Fresh cloud environment. Read all project state files in prescribed order.
+Found branch `auto/2026-05-02-option1-state-extension` at fire-65 state (fa95195).
+
+**Pattern (same as fires 54, 57, 58, 61–65)**: this fire drafted a complete
+v4 solver implementation (~650 LOC: 6D state, `tx_cost_v4`, `interp_4d_v4`,
+`continuation_value_v4`, `solve_state_v4`, `solve_v4`, `smoke_test_v4`) before
+discovering the remote canonical 988-LOC version via `git log --oneline`.
+Reset to remote; local draft discarded.
+
+**Independent design validation (from local draft before discard)**:
+
+The local implementation independently arrived at identical core design choices
+as the canonical:
+- `tx_cost = tau_buy*(max(dA,0)+max(dB,0)) + tau_token*(max(-dA,0)+max(-dB,0))`
+  on per-period x deltas.
+- E2_2L: `x_prev_next = x_new` at both stay and relocation (tokens portable).
+- E1_2L: `x_prev_next = (0, 0)` at relocation (forced sale); sell_factor = 1-tau_sell
+  applied in wealth transition (no double-counting with tau_buy).
+- Housing cost: `kappa = rho - x_ell_new*(rho-m)` (occupied token only; fixed rule).
+- 4D interpolation: quadrilinear in `(w', z', x_A_new, x_B_new)` for continuation
+  value.
+
+The canonical version additionally includes: `x_new_grid_size` separate from
+`N_X_PREV` (richer choice optimization), 2-period mini-VFI in smoke test,
+pre-hold savings arithmetic check. Both implementations agree on the mechanistic
+core.
+
+**Confirmed canonical assets (unchanged from fires 63-65)**:
+- `src/vfi_solver_v4.jl` (988 LOC): 6D state, proper tau_buy hedge mechanism.
+- All 15 scripts (baseline, counterfactual, sweep, decomp driver, plot scripts).
+- Paper sections s1-s6, `paper/main.tex`, `paper/outline_v4.md`,
+  `paper/references.bib`.
+- Docs: `docs/calibration_v3.md`, `docs/methods_v3.md`, `docs/welfare_decomp_v4.md`.
+- `handoff/decisions_needed.md` Gate 1: server1 runs documented with exact commands.
+
+**Gate 1 (server1) — SOLE remaining blocker**:
+Gate 1 has been pending since fire ~25 (2026-05-25), now 11 days. The project
+cannot advance further without server1 baseline JSONs. Once committed to branch,
+the next cloud fire will run `scripts/compute_option1_decomp.py` for H1/H2/H3
+verdict.
+
+**Exact commands to unblock (server1, tmux sto_lifecycle_portfolio)**:
+```bash
+cd ~/project/sto_lifecycle_portfolio
+git pull origin auto/2026-05-02-option1-state-extension
+julia src/vfi_solver_v4.jl --smoke-test         # ~1 min
+bash scripts/run_option1_e1.sh                  # ~45 min
+bash scripts/run_option1_e2.sh                  # ~2.5 h
+# Optional counterfactuals for 3-channel decomp (~2-3h each):
+bash scripts/run_option1_e1_notx.sh
+bash scripts/run_option1_e2_notau.sh
+# Commit and push output JSONs; cloud agent runs decomp on next fire.
+git add output/diagnostics/p6_option1_*.json
+git commit -m "server1: v4 option1 baseline results"
+git push origin auto/2026-05-02-option1-state-extension
+```
