@@ -1855,3 +1855,34 @@ bash scripts/run_gate1_all.sh           # ~8-10 h full Gate 1
 
 **Files modified**: `research_log.md`, `next_actions.md`, `scripts/run_gate1_all.sh` (new)
 **Branch**: `auto/2026-05-02-option1-state-extension`
+
+## 2026-06-06 — Fire 70: orientation audit — all cloud work confirmed complete
+
+**Fire context**: This fire (70) independently confirmed the state
+from fire 69. All cloud-doable work remains complete. Gate 1 (server1
+VFI baselines) is the sole blocker, pending for ≥ 36 days.
+
+**Orientation** (independent re-verification of key artifacts):
+
+- `src/vfi_solver_v4.jl` (989 LOC): 6D state, 4D linear interpolation
+  over `(w, z, x_A_prev, x_B_prev)`, continuous x_new grid, correct
+  forced-sale state reset for E1_2L, delta-based tx_cost formula.
+- `scripts/run_gate1_all.sh` (fire 69): single-command launcher with
+  `--small` flag for 20-min sanity check before full 8-10h run.
+- All Phase 2 prep, paper sections, calibration docs, sensitivity
+  scripts, figure specs, decomp driver — complete.
+- `handoff/decisions_needed.md`: comprehensive Gate 1 commands.
+
+**No new cloud-executable work found.** Correct per orientation-stop
+condition in `decisions_needed.md`.
+
+**Gate 1 action** (for the user):
+```bash
+cd ~/project/sto_lifecycle_portfolio
+git pull origin auto/2026-05-02-option1-state-extension
+bash scripts/run_gate1_all.sh --small   # ~20 min sanity check
+bash scripts/run_gate1_all.sh           # ~8-10 h full Gate 1
+```
+
+**Files modified**: `research_log.md` (this entry only)
+**Branch**: `auto/2026-05-02-option1-state-extension`
