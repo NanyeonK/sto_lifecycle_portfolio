@@ -1812,3 +1812,46 @@ git push origin auto/2026-05-02-option1-state-extension
 
 **Files modified**: `research_log.md` (this entry only)
 **Branch**: `auto/2026-05-02-option1-state-extension`
+
+## 2026-06-06 — Orientation audit + Gate 1 convenience script
+
+**Fire context**: All cloud-doable work confirmed complete (fires 1-68).
+Gate 1 (server1 VFI baselines) remains sole blocker for ≥ 36 days.
+
+**Orientation findings**:
+
+1. `src/vfi_solver_v4.jl` (989 LOC): implementation correct and complete.
+   4D interpolation over (w, z, x_A_prev, x_B_prev); continuous x_new
+   choices via `cfg.x_new_grid_size`; forced-E1_2L-sale correctly clears
+   x_prev to 0.0 without double-counting tau_sell. Design matches
+   `handoff/tau_buy_option1_spec.md`.
+
+2. All run scripts present and verified: `run_option1_{e1,e2,e1_notx,
+   e2_notau,e0,smoke}.sh`, `compute_option1_decomp.py`, `compute_cev_sweep.jl`,
+   `plot_channel_decomp.py`, `plot_sensitivity_heatmap.py`, all sweep scripts.
+
+3. Paper skeleton complete: `paper/main.tex`, all 6 section LaTeX files,
+   `paper/references.bib`, `paper/outline_v4.md`.
+
+4. Calibration docs complete: `docs/calibration_v3.md`,
+   `docs/sensitivity_grid_v4.md`, `docs/welfare_decomp_v4.md`,
+   `docs/methods_v3.md`.
+
+**New artifact**: Added `scripts/run_gate1_all.sh` — a single convenience
+script that runs all 6 Gate 1 steps in sequence (smoke, E1, E2, E1_NOTX,
+E2_NOTAU, decomposition) and prints next-step commit instructions. Supports
+`--small` flag for a quick 20-minute sanity run before committing to the
+full ~8-10 hour Gate 1 run.
+
+**Gate 1 escalation**: The earliest possible action to unblock all remaining
+work is:
+```bash
+cd ~/project/sto_lifecycle_portfolio
+git pull origin auto/2026-05-02-option1-state-extension
+bash scripts/run_gate1_all.sh --small   # ~20 min sanity check
+# If smoke+small pass:
+bash scripts/run_gate1_all.sh           # ~8-10 h full Gate 1
+```
+
+**Files modified**: `research_log.md`, `next_actions.md`, `scripts/run_gate1_all.sh` (new)
+**Branch**: `auto/2026-05-02-option1-state-extension`
