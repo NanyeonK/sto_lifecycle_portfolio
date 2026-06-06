@@ -1923,3 +1923,60 @@ bash scripts/run_gate1_all.sh           # ~8-10 h full Gate 1
 
 **Files modified**: `research_log.md`, `next_actions.md` (date bump only)
 **Branch**: `auto/2026-05-02-option1-state-extension`
+
+## 2026-06-06 — Fire 72: orientation audit + independent design validation
+
+**Fire context**: Routine cron fire (fire 72). Fresh cloud environment.
+Read all project state files in prescribed order (README, project_state,
+next_actions, research_log, main_question, pivot memo, decision_log, tau_buy
+spec). Confirmed canonical branch state at fire 71 (720b63b).
+
+**Pattern (same as fires 54, 57–66, 70–71)**: this fire initially drafted
+a complete `vfi_solver_v4.jl` implementation (~560 LOC, quadrilinear 4D
+interpolation, tx_cost_v4 delta rule, portability logic) and committed it
+before discovering the remote canonical 989-LOC version via `git fetch`.
+Reset to remote canonical; local draft discarded.
+
+**Independent design validation (from this fire's draft before discard)**:
+
+The local draft independently arrived at identical core design choices as the
+canonical version. Confirmed by code inspection:
+
+1. **Kappa rule** (`housing_cost_v4`): `rho - x_ell * (rho - m)` where
+   `x_ell = (ell==LOC_A ? x_A : x_B)` — occupied-unit only, consistent with
+   the critical kappa fix from v3 (commit e20f7eb, research_log 2026-05-01).
+   Lines 315-317 of canonical verified correct.
+
+2. **Portability**: `xA_next_reloc = x_A_new; xB_next_reloc = x_B_new`
+   (default E2_2L, lines 453+); overridden to `(0.0, 0.0)` only for E1_2L
+   and E0 (line 456, 459-460). Design correctly captures the structural
+   distinction between regimes.
+
+3. **Tx_cost**: `tau_buy * max(delta,0) + tau_token * max(-delta,0)` applied
+   per-period from budget in E2_2L (lines 507+). E1_2L: forced-sale cost via
+   `sell_factor = 1 - tau_sell` in wealth transition (no double-counting).
+
+4. **4D interpolation** (`interp_4d_v4`, quadrilinear over `(w, z, x_A_prev,
+   x_B_prev)`): remote implementation verified correct by independent
+   re-implementation match.
+
+**Confirmed canonical assets (unchanged from fires 70-71)**:
+- `src/vfi_solver_v4.jl` (989 LOC): 6D state with 4D multilinear interp,
+  per-period tx_cost, E2_2L portable, E1_2L reset. Smoke test with
+  mini-VFI + pre-hold savings check.
+- `scripts/run_gate1_all.sh`: single-command Gate 1 launcher (fire 69).
+- All 15 run/sweep/plot/decomp scripts, 6 paper sections, docs: DONE.
+
+**No new cloud-executable work found.** Correct per `decisions_needed.md`
+orientation stop condition.
+
+**Gate 1 action** (for the user):
+```bash
+cd ~/project/sto_lifecycle_portfolio
+git pull origin auto/2026-05-02-option1-state-extension
+bash scripts/run_gate1_all.sh --small   # ~20 min sanity check
+bash scripts/run_gate1_all.sh           # ~8-10 h full Gate 1
+```
+
+**Files modified**: `research_log.md`, `next_actions.md` (date bump only)
+**Branch**: `auto/2026-05-02-option1-state-extension`
