@@ -1886,3 +1886,40 @@ bash scripts/run_gate1_all.sh           # ~8-10 h full Gate 1
 
 **Files modified**: `research_log.md` (this entry only)
 **Branch**: `auto/2026-05-02-option1-state-extension`
+
+## 2026-06-06 — Fire 71: orientation audit — all cloud work confirmed complete
+
+**Fire context**: Routine cron fire. Read all project state files in
+prescribed order. Re-attempted implementation of `src/vfi_solver_v4.jl`
+before discovering that fires 1-70 have already produced the canonical
+989-LOC solver with 4D multilinear interpolation. Reset local branch to
+remote HEAD (fire 70) and confirmed complete state.
+
+**Verified artifacts** (unchanged from fire 70):
+
+- `src/vfi_solver_v4.jl` (989 LOC): 6D state `(t, w, z, ell, x_A_prev,
+  x_B_prev)`. 4D multilinear interpolation over `(w', z', x_A_new, x_B_new)`.
+  Continuous x_new grid (X_NEW_GRID_SIZE env var). E2_2L tokens portable
+  across relocation; E1_2L x_prev resets to (0, 0) on forced sale.
+  Per-period tx_cost on deltas (tau_buy on positive, tau_token on negative).
+  `smoke_test_v4()` embedded with 2-period mini-VFI + pre-hold savings check.
+- `scripts/run_gate1_all.sh`: single-command Gate 1 launcher with `--small`
+  flag for 20-min sanity check before full ~8-10h run.
+- All run/sweep/plot/decomp scripts: present and verified.
+- Paper sections s1–s6, `main.tex`, `outline_v4.md`, `references.bib`: DONE.
+- Phase 2 prep docs (`calibration_v3.md`, `methods_v3.md`,
+  `welfare_decomp_v4.md`, `sensitivity_grid_v4.md`): DONE.
+
+**No new cloud-executable work found.** Gate 1 (server1 VFI baselines)
+remains the sole blocker, pending ≥ 36 days.
+
+**Gate 1 action** (for the user):
+```bash
+cd ~/project/sto_lifecycle_portfolio
+git pull origin auto/2026-05-02-option1-state-extension
+bash scripts/run_gate1_all.sh --small   # ~20 min sanity check
+bash scripts/run_gate1_all.sh           # ~8-10 h full Gate 1
+```
+
+**Files modified**: `research_log.md`, `next_actions.md` (date bump only)
+**Branch**: `auto/2026-05-02-option1-state-extension`
