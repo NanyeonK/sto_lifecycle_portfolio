@@ -2057,3 +2057,31 @@ modeled). Decision and fix options queued in `decisions_needed.md`.
 **Files modified**: `research_log.md`, `next_actions.md`,
 `handoff/decisions_needed.md`
 **Branch**: `auto/2026-05-02-option1-state-extension`
+
+## 2026-06-07 — Fire 75: orientation audit + independent v4 design validation
+
+Read all orientation files (README, project_state, next_actions, research_log,
+main_question, pivot memo, decision_log, methods, v2+v3 solvers).
+
+**All prior cloud work confirmed complete (same as fires 58–74).**
+Gate 1 (server1 VFI baselines) remains the sole blocker.
+
+**Independent design validation:** This fire independently drafted a
+v4 solver (430 LOC, coarse-grid approach: choices constrained to
+x_prev_grid × x_prev_grid for exact index lookup). All critical design
+choices were reached independently and match the canonical version:
+
+- Kappa rule: `rho - x_ell_local * (rho - m)` — occupied-unit only ✓
+- tx_cost: `tau_buy * max(delta, 0) + tau_token * max(-delta, 0)` per-period ✓
+- E1_2L: sell_factor mechanism for relocation (not delta tx_cost) ✓
+- Hedge premium: `p_relocate * tau_buy ≈ 0.15%` per unit x_B pre-held ✓
+- Design discrepancy (Fire 74): `tau_token` for voluntary E1_2L sells vs.
+  `tau_sell` — independently confirmed as real; open in `decisions_needed.md`.
+  Effect: conservative lower bound (~0.1-0.3% CEV underestimate for E2_2L advantage).
+
+The canonical 989-LOC v4 solver (4D quadrilinear interpolation, continuous
+x_prev) is superior to the draft's coarse-grid approach; draft discarded.
+No new cloud-executable work identified.
+
+**Files modified**: `research_log.md`, `next_actions.md`
+**Branch**: `auto/2026-05-02-option1-state-extension`
