@@ -158,3 +158,52 @@ H1/H2/H3, approve v3 mobility-hedge framing for manuscript writing.
 Paper outline at `paper/outline_v4.md`; sections s1-s6 drafted and
 ready for numerical filling once headline CEV is confirmed.
 
+---
+
+## 2026-06-07 — Design discrepancy: E1_2L voluntary sell cost (fire 74)
+
+**Issue found in `vfi_solver_v4.jl`**:
+
+`tx_cost_v4` charges `tau_token` (1%) for selling in BOTH regimes.
+For E1_2L (traditional ownership), voluntary sells should cost
+`tau_sell` (6%), not `tau_token` (1%). Currently, only the
+RELOCATION forced sale uses tau_sell (via `sell_factor` in
+`next_wealth_v4`). Voluntary portfolio rebalancing in E1_2L
+(e.g., owner → renter transition without relocation) costs 1%
+in the current implementation instead of 6%.
+
+**Economic implication**: current estimates are CONSERVATIVELY LOW.
+- E1_2L appears more flexible (cheaper to exit) than reality
+- CEV(E2_2L vs E1_2L) is understated by ~0.1–0.3% CEV
+- Primary mechanism (relocation round-trip) is correctly modeled;
+  discrepancy is only for non-relocation voluntary sells
+
+**Decision needed before writing the results section**:
+
+**Option A — Run as-is, note as conservative bias** (recommended):
+- Server1 baselines will give conservative lower-bound CEV
+- If H2 passes (CEV > 4.255%), fix makes it pass more clearly
+- Note in paper: "Our E1_2L sell cost is charged at tau_token for
+  non-relocation events, making CEV estimates conservative;
+  corrected estimates would be ~0.1-0.3% higher"
+- Fastest path to results; no re-run needed
+
+**Option B — Fix before server1 runs**:
+- Change `tx_cost_v4` to dispatch on regime:
+  `sell_c = regime == REGIME_E1_2L ? p.tau_sell : p.tau_token`
+- Remove `sell_factor` at relocation (redundant with this fix);
+  let the negative delta at next period handle the forced sell
+- More correct model; 6D state at relocation would show delta=-1
+  in E1_2L at t+1, charged at tau_sell
+- Requires re-running all server1 baselines after code change
+
+**Recommendation**: Option A. The mechanism is conservative, not
+wrong. The primary relocation sell cost is correctly charged (via
+sell_factor). Non-relocation voluntary sells at 1% vs 6% is a
+minor discrepancy. Run baselines first; fix in robustness section
+or v4.1 if needed.
+
+**Cloud agent note**: if user requests fix, implement Option B
+by adding `regime` parameter to `tx_cost_v4` and removing the
+`sell_factor` logic from the E1_2L continuation value block.
+

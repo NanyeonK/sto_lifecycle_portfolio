@@ -2031,3 +2031,29 @@ bash scripts/run_gate1_all.sh           # ~8-10 h full Gate 1
 
 **Files modified**: `research_log.md`, `next_actions.md` (date bump only)
 **Branch**: `auto/2026-05-02-option1-state-extension`
+
+## 2026-06-07 — Orientation audit fire 74 + design discrepancy documented
+
+All prior cloud work confirmed complete (same as fires 58–73). Gate 1
+(server1 VFI baselines) remains the sole blocker.
+
+**New finding this fire — design discrepancy in `vfi_solver_v4.jl`:**
+
+The existing `tx_cost_v4` function charges `tau_token` (1%) for ALL
+negative deltas (selling) in BOTH regimes. For E1_2L (traditional
+ownership), voluntary selling of housing should cost `tau_sell` (6%),
+not `tau_token` (1%). The 6% sell cost in E1_2L is currently only
+applied at RELOCATION via `sell_factor = (1 - tau_sell)` in the
+wealth transition; voluntary portfolio rebalancing (x_A_prev=1 →
+x_A_new=0 without relocation) is charged at the token transfer rate.
+
+**Economic implication**: current design underestimates E1_2L friction
+for voluntary sells outside relocation events. This makes E1_2L appear
+more flexible, which UNDERSTATES the CEV advantage of E2_2L. Current
+estimates are a conservative lower bound. Back-of-envelope discrepancy
+≈ 0.1–0.3% CEV (small; primary mechanism via relocation is correctly
+modeled). Decision and fix options queued in `decisions_needed.md`.
+
+**Files modified**: `research_log.md`, `next_actions.md`,
+`handoff/decisions_needed.md`
+**Branch**: `auto/2026-05-02-option1-state-extension`
