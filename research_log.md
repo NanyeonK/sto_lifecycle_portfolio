@@ -991,3 +991,76 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-06-07 — v4 solver: 6D state extension (Option 1) implemented
+
+**Action picked**: P0 — create `src/vfi_solver_v4.jl` with full 6D
+state `(t, w, z, ell, x_A_prev, x_B_prev)` and per-period transaction
+costs on token increments.
+
+**Why**: Option 3 (v3 + synthetic tau_buy at relocation) failed to
+activate the cross-location hedge — mean_xB stayed at 0 because the
+cost approximation was applied at relocation time, not at the point of
+choice where the household decides whether to pre-hold x_B. Option 1
+is the proper spec: track previous-period token holdings as state so
+the household's pre-buying decision is penalised with tau_buy on every
+positive increment, giving a genuine motive to accumulate x_B gradually.
+
+**Key design decisions in v4:**
+
+1. **6D state arrays** `(T, n_w, n_z, 2, n_xprev, n_xprev)`.
+   Memory at default coarse grids (N_W=15, N_Z=5, N_X_PREV=3):
+   T=57, arrays ≈ 57 × 15 × 5 × 2 × 3 × 3 = ~77k points × 8 arrays
+   × 8 bytes ≈ ~50 MB. Well within server1 budget.
+
+2. **Per-period tx_cost on token deltas** (correct Option 1 spec):
+   ```
+   delta_A  = x_A_new - x_A_prev
+   delta_B  = x_B_new - x_B_prev
+   tx_cost  = tau_buy   * (max(delta_A,0) + max(delta_B,0))
+            + tau_token * (max(-delta_A,0) + max(-delta_B,0))
+   ```
+   Applied in the budget constraint at choice time, not at relocation.
+
+3. **E1_2L on relocation**: x_prev resets to 0 at new location
+   (forced sale of occupied-unit token); `ix_A_next_reloc = 1` in
+   continuation value. tau_sell is still charged via sell_factor on
+   the housing return.
+
+4. **E2_2L on relocation**: tokens portable; x_prev carries over to
+   new location unchanged. This is the structural mechanism: no sell
+   forced, no x_prev reset, no tau_sell.
+
+5. **Fixed kappa rule** (occupied-unit only):
+   `kappa = rho - x_ell_local * (rho - m)` — only the token at the
+   current location reduces rent. Consistent with all v3 post-fix runs.
+
+6. **Coarse x_prev grid** default `{0.0, 0.75, 1.5}` (N_X_PREV=3,
+   X_PREV_MAX=1.5). Net compute vs v3: ~4.6x per regime (~2.5 hours
+   wall on server1 single-thread estimate vs ~30 min v3).
+
+7. **Nearest-index projection** for x_prev state transition:
+   `nearest_xprev_idx(x_A_new, grids.x_prev)` maps the chosen x_A_new
+   to the nearest grid point for the next-period x_A_prev state.
+   Introduce approximation error proportional to grid spacing; acceptable
+   at N_X_PREV=3 for the sign-check phase.
+
+**Files created / modified:**
+- `src/vfi_solver_v4.jl` (~530 LOC) — v4 solver
+- `scripts/run_option1_e1.sh` — E1_2L baseline run script
+- `scripts/run_option1_e2.sh` — E2_2L baseline run script
+- `next_actions.md` — steps 1-4 marked DONE
+
+**Smoke test**: `smoke_test_v4()` checks sigma decomposition, shock
+block size/weights, 6D array shape, terminal slice NaN-free,
+tx_cost formula at buy/sell/identity, nearest_xprev_idx at boundaries,
+housing_cost_v4 spot-checks. VFI not run in cloud env.
+
+**Feature branch**: `auto/2026-06-07-option1-state-extension`
+
+**Next queued (server1 required, USER steps 5-7):**
+1. `julia src/vfi_solver_v4.jl --smoke-test`
+2. `bash scripts/run_option1_e1.sh`
+3. `bash scripts/run_option1_e2.sh`
+4. Check H1 (mean_xB > 0 at ellA), H2 (CEV > 4.255%), H3 (hedge channel ≈ 0.5-1.5%)
+5. Write `output/diagnostics/p6_option1_decomposition.md`
+
