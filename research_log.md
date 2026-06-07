@@ -1980,3 +1980,54 @@ bash scripts/run_gate1_all.sh           # ~8-10 h full Gate 1
 
 **Files modified**: `research_log.md`, `next_actions.md` (date bump only)
 **Branch**: `auto/2026-05-02-option1-state-extension`
+
+## 2026-06-07 — Fire 73: orientation audit + independent design validation
+
+**Fire context**: Routine cron fire (fire 73). Fresh cloud environment.
+Read all project state files in prescribed order (README, project_state,
+next_actions, research_log, main_question, pivot memo, decision_log, tau_buy
+spec). Confirmed canonical branch state at fire 72 (0593eeb).
+
+**Pattern (same as fires 46, 54, 57–66, 70–72)**: this fire initially drafted
+a `vfi_solver_v4.jl` implementation (~600 LOC, grid-constrained x choices,
+2D bilinear interpolation in (w, z), per-period tx_cost delta rule, E1_2L
+via sell_factor + buy_ded_reloc) and committed it before discovering the
+remote canonical 989-LOC version via `git fetch`. Reset to remote canonical;
+local draft discarded.
+
+**Independent design validation**:
+
+Core design choices independently reached by this fire's draft match the
+canonical version on all critical points:
+
+1. **Kappa rule**: `rho - x_ell_local * (rho - m)` — occupied-unit only
+   (consistent with the 2026-05-01 kappa fix).
+2. **tx_cost formula for E2_2L**: `tau_buy * max(delta, 0) + tau_token * max(-delta, 0)`
+   applied per-period on deltas from x_prev state.
+3. **No double-counting for E1_2L**: forced-sale cost via sell_factor in
+   wealth transition (not via tx_cost formula).
+4. **Hedge motive**: pre-holding x_B at ell=A at incremental tau_buy cost
+   saves lump tau_buy at relocation — expected hedge premium
+   `p_relocate * tau_buy ≈ 0.15%` per period per unit.
+
+**Canonical assets confirmed (unchanged from fire 72)**:
+- `src/vfi_solver_v4.jl` (989 LOC): 6D state with 4D quadrilinear
+  interpolation over `(w, z, x_A_prev, x_B_prev)`, per-period tx_cost,
+  E2_2L portable, E1_2L x_prev resets to (0,0) on forced sale.
+  Smoke test with 2-period mini-VFI + pre-hold savings check.
+- `scripts/run_gate1_all.sh`: single-command Gate 1 launcher.
+- All 15 run/sweep/plot/decomp scripts, 6 paper sections, docs: DONE.
+
+**No new cloud-executable work found.** Gate 1 (server1 VFI baselines)
+remains the sole blocker, pending ≥ 37 days.
+
+**Gate 1 action** (for the user):
+```bash
+cd ~/project/sto_lifecycle_portfolio
+git pull origin auto/2026-05-02-option1-state-extension
+bash scripts/run_gate1_all.sh --small   # ~20 min sanity check
+bash scripts/run_gate1_all.sh           # ~8-10 h full Gate 1
+```
+
+**Files modified**: `research_log.md`, `next_actions.md` (date bump only)
+**Branch**: `auto/2026-05-02-option1-state-extension`
