@@ -991,3 +991,85 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-06-08 — v4 solver (6D state extension) implemented
+
+**Action picked**: create `src/vfi_solver_v4.jl` — Option 1 full state
+extension per `handoff/tau_buy_option1_spec.md`. This is the P0 item
+approved by user on 2026-05-02.
+
+**Why this item**: highest-priority auto-allowed action. v3 showed the
+cross-location hedge channel is dead at any p_relocate under the fixed
+kappa rule because x_A's per-period rent saving always dominates x_B's
+deferred hedge benefit. Option 1 corrects this by tracking x_A_prev and
+x_B_prev as state variables and charging tau_buy incrementally on positive
+deltas, so pre-holding x_B at ell=A now yields a LITERAL future tax saving
+(avoiding a lump tau_buy at relocation), not just a conjectured hedge.
+
+**State extension**: 4D → 6D
+- Old: `(t, w, z, ell)`
+- New: `(t, w, z, ell, x_A_prev, x_B_prev)` with discrete x_prev grid
+
+**Design decisions**:
+
+1. **x_prev grid**: `linspace(0, X_PREV_MAX, N_X_PREV)` — default
+   `{0.0, 0.5, 1.0}` (N_X_PREV=3, X_PREV_MAX=1.0). x choices constrained
+   to grid points, so next-period x_prev lookup requires no x-interpolation
+   (only (w,z) interpolation as in v3). 9 housing portfolios in E2_2L.
+
+2. **tx_cost per period**:
+   ```
+   tx_cost = tau_buy   * [max(Δx_A,0) + max(Δx_B,0)]
+           + tau_token * [max(-Δx_A,0) + max(-Δx_B,0)]   [E2_2L]
+           = tau_buy   * [max(Δx_A,0) + max(Δx_B,0)]     [E1_2L]
+   ```
+   E1_2L sell cost remains via sell_factor at relocation (tau_sell ~6%).
+   E2_2L sell cost is tau_token ~0.5% (token transfer, not physical sale).
+
+3. **Continuation value**: given (x_A_new, x_B_new) at grid indices
+   (i_xA_n, i_xB_n), the next-value slice is
+   `value[t+1, :, :, :, i_xA_n, i_xB_n]` — a (n_w, n_z, 2) view —
+   identical structure to v3's continuation_value input. The quadrature
+   integration is mathematically unchanged.
+
+4. **E1_2L in 6D**: binary x_ell ∈ {0, 1}; x_{ell'}=0. 1.0 guaranteed
+   on grid (X_PREV_MAX=1.0). tx_cost for E1_2L: tau_buy on first purchase
+   (Δ>0), 0 on sell (sell_factor handles tau_sell). tau_buy for first-time
+   buyer now properly charged at decision time (not approximated at reloc).
+
+**Files created**:
+- `src/vfi_solver_v4.jl` (~560 LOC)
+- `scripts/run_option1_e1.sh` (E1_2L baseline with v4 settings)
+- `scripts/run_option1_e2.sh` (E2_2L Option 1 with v4 settings)
+
+**Smoke test**: `smoke_test_v4()` embedded in v4. Checks:
+- 6D array allocation and shape (T×15×5×2×3×3 at small grids, ~14 MB)
+- sigma decomposition invariant
+- shock block: size=3^7=2187, weights sum to 1, R_A≠R_B
+- tx_cost_v4 spot-checks: no-change=0, buy=tau_buy*Δ, sell=tau_token*Δ (E2_2L) / 0 (E1_2L), mixed
+- x_prev grid contains 0.0 and 1.0 (E1_2L owner state is on grid)
+- state update consistency (x_new on grid → no x-interpolation)
+- terminal slice: all feasible, no NaN
+
+Run on server1 to confirm: `julia src/vfi_solver_v4.jl --smoke-test`
+
+**Feature branch**: `auto/2026-06-08-v4-state-extension`
+
+**Memory estimate at default small grids**:
+- dims = (57, 15, 5, 2, 3, 3) = 76,950 state points
+- 7 Float64 arrays = ~4.3 MB total — very lightweight
+
+**Compute estimate per regime (server1)**:
+- Per state: 9 housing pairs × 9^2 (b,s) = 729 inner evals
+- Per continuation: 2187 quadrature points
+- Total ops: 76,950 × 729 × 2187 ≈ 1.2 × 10^11 — ~2-3h single thread
+
+**Next queued** (all server1-dependent):
+- Step 5: run `bash scripts/run_option1_e1.sh` (USER)
+- Step 6: run `bash scripts/run_option1_e2.sh` (USER)
+- Step 7: compute CEV and channel decomposition (USER or next cloud fire)
+
+**Hypotheses to test after runs**:
+- H1: mean_xB > 0 at ell=A in E2_2L (hedge motive activates)
+- H2: CEV(E2_2L_v4 vs E1_2L_v4) > 4.255% (Option 3 baseline)
+- H3: hedge channel ≈ 0.5-1.5%
+
