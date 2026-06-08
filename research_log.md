@@ -991,3 +991,70 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-06-08 — v4 solver (6D state, Option 1) implemented
+
+**Action picked**: P0 — create `src/vfi_solver_v4.jl` per
+`handoff/tau_buy_option1_spec.md`. This is the proper tau_buy state
+extension that could resurrect the cross-location hedge mechanism.
+
+**Why this action**: `next_actions.md` lists Option 1 state extension
+as P0 (highest priority, user-confirmed 2026-05-02). All human gates
+(H1'–H4') are deferred. No blocked actions above this.
+
+**What was built** (`src/vfi_solver_v4.jl`, ~430 LOC):
+
+1. **6D state** `(t, w, z, ell, x_A_prev, x_B_prev)` replacing v3's 4D.
+   Value function and all policy arrays are 6D. Grids:
+   default N_W=15, N_Z=5, N_X_PREV=3 (points {0, 0.75, 1.5}).
+
+2. **Per-period tx_cost on deltas** (the key new mechanism):
+   ```
+   delta_A  = x_A_new - x_A_prev
+   delta_B  = x_B_new - x_B_prev
+   tx_cost  = tau_buy   * (max(delta_A,0) + max(delta_B,0))
+            + tau_token * (max(-delta_A,0) + max(-delta_B,0))
+   ```
+   Budget: `c + kappa(x_new) + b + s + x_A_new + x_B_new + tx_cost = w`.
+   State update: `(x_A_prev, x_B_prev) -> (x_A_new, x_B_new)`.
+
+3. **4D quadrilinear interpolation** (`interp_4d_v4`): extends v3's
+   bilinear `(w, z)` interp to `(w, z, x_A_prev, x_B_prev)`. 16-corner
+   quadrilinear interpolation. Next period's x_prev = current x_new,
+   so continuation value is evaluated at the chosen x_A_new, x_B_new.
+
+4. **Regime mechanics**:
+   - E0: forced liquidation of any x_prev at tau_token; same as v3.
+   - E1_2L: binary x_ell; tx_own/tx_rent depend on x_ell_prev delta;
+     non-current location x_alt_prev forced sell at tau_token.
+   - E2_2L: full tx_cost on (x_A_prev → x_A_new) and (x_B_prev → x_B_new)
+     deltas; households at ell=A can pre-buy x_B_new > 0.
+
+5. **Sell factor for E1_2L relocation** preserved from v3: tau_sell
+   applied to housing return at relocation event (not to the x_prev
+   state — that is a separate cost via tx_cost at next period).
+
+6. **Smoke test** (`smoke_test_v4()`): checks sigma decomposition,
+   grid build (N_X_PREV=3 starting at 0), shock block (2187 pts,
+   weight sum=1), 6D array allocation, terminal slice, tx_cost at
+   four cases (buy, no-change, sell, mixed), interp_4d identity,
+   housing_cost and p_relocate spot-checks. Does NOT run VFI
+   (cloud env lacks Julia).
+
+7. **Run scripts**: `scripts/run_option1_e1.sh` and
+   `scripts/run_option1_e2.sh` for server1 execution.
+
+**Design note**: x_prev is the CHOSEN value from last period, not
+return-adjusted. This is an approximation (proper spec would track
+x_{t-1}^chosen * R_{t-1} / hp_t as a continuous state, which is
+infeasible). Coarse N_X_PREV=3 grid is appropriate given this.
+
+**Pre-holding hedge premium** (theoretical): expected tau_buy savings
+per unit x_B pre-held = p_relocate * tau_buy ≈ 0.06 * 0.025 = 0.0015
+per period per unit. Lifetime CEV impact: ~1-2% on top of Option 3.
+
+**Feature branch**: `auto/2026-06-08-option1-state-extension`
+**Files**: `src/vfi_solver_v4.jl`, `scripts/run_option1_e1.sh`,
+           `scripts/run_option1_e2.sh`
+
+**Next (server1, user)**: run smoke test, then E1_2L and E2_2L baselines.
+Check H1: `mean_xB_t1_xprev0_ellA > 0`. Compute CEV(E2_2L_v4 vs E1_2L_v4).
