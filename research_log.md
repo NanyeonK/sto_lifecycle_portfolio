@@ -2085,3 +2085,28 @@ No new cloud-executable work identified.
 
 **Files modified**: `research_log.md`, `next_actions.md`
 **Branch**: `auto/2026-05-02-option1-state-extension`
+
+## 2026-06-08 — Fire 76: Option A decision + conservative-bias code comment
+
+**Context**: Fire 74 (2026-06-07) documented a design discrepancy in `vfi_solver_v4.jl`:
+`tx_cost_v4` uses `tau_token` for BOTH regime sells (E1_2L and E2_2L). For E1_2L,
+voluntary exits should cost `tau_sell` (6%), not `tau_token` (~1%). The forced
+relocation sell IS correctly charged via `sell_factor` in `next_wealth_v4`. The
+discrepancy is only for non-relocation voluntary portfolio rebalancing.
+
+**Action taken**: Option A — no code logic change. Added CONSERVATIVE BIAS NOTE
+comment to `tx_cost_v4` (line ~321 of `src/vfi_solver_v4.jl`) documenting:
+- Scope of discrepancy: voluntary non-relocation E1_2L exits only
+- Magnitude: ~0.1-0.3% CEV conservative bias (lower bound on true CEV)
+- That primary mechanism (relocation round-trip) is correctly modeled
+- That Option B (regime-dispatch fix) is available if user requests it
+
+**Decision rationale**: relocation sell cost (tau_sell via sell_factor) is the
+primary economic mechanism. Voluntary exits at tau_token is secondary. Conservative
+bias is acceptable for first-pass baselines; robustness can note it.
+
+**Gate 1 status**: server1 baselines remain the ONLY remaining critical-path item.
+All cloud prep is fully complete since fire 35. No additional cloud work identified.
+
+**Files modified**: `src/vfi_solver_v4.jl` (comment added), `handoff/decisions_needed.md`
+**Branch**: `auto/2026-05-02-option1-state-extension`

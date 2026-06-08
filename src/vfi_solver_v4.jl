@@ -319,6 +319,16 @@ end
 end
 
 # Per-period transaction cost on delta from x_prev to x_new.
+# CONSERVATIVE BIAS NOTE (Option A decision, 2026-06-08):
+# tau_token is used for negative deltas (sells) in BOTH regimes. For E1_2L
+# (traditional homeownership), voluntary non-relocation exits should strictly
+# cost tau_sell (~6%), not tau_token (~0.5-1%). The forced-relocation sell is
+# correctly charged via sell_factor in next_wealth_v4 (tau_sell on gross return).
+# This function only affects VOLUNTARY portfolio rebalancing (e.g., owner→renter
+# without a relocation event). Using tau_token here makes E1_2L appear cheaper to
+# exit voluntarily, understating CEV(E2_2L vs E1_2L) by approximately 0.1-0.3%.
+# Estimates below are conservative lower bounds. A corrected model (Option B) would
+# replace tau_token with tau_sell for negative E1_2L deltas; see decisions_needed.md.
 @inline function tx_cost_v4(x_A_new::Float64, x_B_new::Float64,
                               x_A_prev::Float64, x_B_prev::Float64,
                               tau_buy::Float64, tau_token::Float64)::Float64

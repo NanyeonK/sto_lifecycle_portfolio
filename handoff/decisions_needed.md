@@ -207,3 +207,21 @@ or v4.1 if needed.
 by adding `regime` parameter to `tx_cost_v4` and removing the
 `sell_factor` logic from the E1_2L continuation value block.
 
+## 2026-06-08 — Option A decision taken (fire 76)
+
+**Decision**: Option A — run as-is, note conservative bias.
+
+Rationale: relocation sell cost (tau_sell via sell_factor) is correctly
+modeled. Voluntary non-relocation exits at tau_token is a minor
+secondary discrepancy. Conservative bias ~0.1-0.3% CEV is within
+robustness tolerance. No server1 re-run required.
+
+**Action taken**: added CONSERVATIVE BIAS NOTE comment to `tx_cost_v4`
+in `src/vfi_solver_v4.jl` (line ~321). Paper should state:
+"E1_2L voluntary exits at tau_token; relocation exits at tau_sell
+via sell_factor. CEV estimates are conservative; true estimates
+0.1-0.3% higher." This closes the fire 74 design discrepancy item.
+
+**Next**: server1 baselines remain the critical path. No further
+cloud-agent work is available until output JSONs are committed.
+
