@@ -991,3 +991,90 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-06-08 — v4 solver (Option 1 full state extension) implemented
+
+**Action picked**: create `src/vfi_solver_v4.jl` — the full Option 1 6D state
+extension as specified in `handoff/tau_buy_option1_spec.md`. This is the
+highest-priority P0 action in `next_actions.md`.
+
+**Background**: Path B Option 3 (v3 solver with synthetic tau_buy approximation)
+showed cross-location hedge dead even with tau_buy asymmetry (+4.255% total;
+mean_xB = 0 at ell=A). Option 3's limitation: E1_2L was penalised at
+relocation, but E2_2L household still had no incentive to pre-hold x_B because
+the cost (tau_buy applied in a lump at relocation) was already sunk by the time
+the choice was made. Option 1 fixes this: tracking (x_A_prev, x_B_prev) as
+state enables the per-period incremental-buying incentive.
+
+**Solver design (v4):**
+
+State: `(t, w, z, ell, x_A_prev, x_B_prev)` — 6D.
+Value function: `value[t, iw, iz, iell, ix_A_prev, ix_B_prev]`.
+
+Transaction cost rule (applied every period):
+```
+delta_A  = x_A_new - x_A_prev
+delta_B  = x_B_new - x_B_prev
+tx_cost  = tau_buy   * (max(delta_A, 0) + max(delta_B, 0))   [buying]
+         + tau_token * (max(-delta_A,0) + max(-delta_B,0))   [token sell]
+```
+
+Regime-specific tx_cost:
+- E1_2L: `tau_buy * max(delta_ell, 0)` only (current location); forced
+  relocation sell captured by `sell_factor = (1-tau_sell)` in wealth
+  transition (no double-counting).
+- E2_2L: full delta-based formula above; sell_factor=1 always (tokens portable).
+
+Hedge mechanism activated: household at ell=A can pre-buy x_B incrementally
+each period (paying tau_buy * small_delta_B), reducing the future lump tau_buy
+when arriving at B. Expected hedge premium per unit x_B pre-held:
+p_relocate * tau_buy ≈ 0.06 * 0.025 = 0.15% per year.
+
+**Key implementation details:**
+
+1. **4D interpolation** (`interp_4d_v4`): bilinear in (w,z) × bilinear in
+   (x_A_prev, x_B_prev). x_prev indices pre-computed outside the 2187-point
+   quadrature loop (x_A_new and x_B_new are fixed per continuation_value call).
+   Avoids allocations in the hot path.
+
+2. **Continuation value** (`continuation_value_v4`): takes `(x_A_new, x_B_new)`
+   as inputs (they become x_A_prev and x_B_prev next period), looks up
+   `V[t+1, w_next, z_next, ell_next, x_A_new, x_B_new]` via 4D interp.
+
+3. **x_prev grid**: evenly spaced `{0.0, 1.0, 2.0}` with `N_X_PREV=3`
+   (env-var configurable; `X_PREV_MAX` default 2.0). Covers v3's observed
+   mean_x ≈ 0.9–1.75 range.
+
+4. **Reduced grids**: `N_W=15`, `N_Z=5` (down from v3's 21/7) to compensate
+   for the 9x state factor from x_prev dims. Net compute factor: ~4.6x v3.
+
+5. **Memory**: 6D value array at small defaults = ~618 KB = ~3.7 MB total.
+   Well within spec's 10–20 MB target.
+
+6. **E2_2L budget constraint**: conservative max_X = (w-rho) / (1+tau_buy),
+   then feasibility checked per (X_total, alpha) candidate. Same X_total/alpha
+   parameterisation as v3 for compatibility.
+
+7. **Smoke test** (`--smoke-test` flag): tests sigma decomposition, grid/array
+   allocation, terminal slice, shock block, tx_cost formula (7 spot-checks),
+   housing_cost (5 spot-checks), 4D interpolation, state count. No VFI run.
+
+**Files created:**
+- `src/vfi_solver_v4.jl` (~830 LOC)
+- `scripts/run_option1_e1.sh` (E1_2L baseline run at reduced grids)
+- `scripts/run_option1_e2.sh` (E2_2L Option 1 run)
+
+**Feature branch**: `auto/2026-06-08-v4-state-extension`
+
+**Next actions queued (user runs on server1):**
+1. Run `julia src/vfi_solver_v4.jl --smoke-test` → should PASS without Julia-side
+   compute.
+2. Run `bash scripts/run_option1_e1.sh` → E1_2L baseline (~2–2.5 h wall).
+3. Run `bash scripts/run_option1_e2.sh` → E2_2L Option 1 (~2–2.5 h wall).
+4. Collect `output/diagnostics/p6_option1_e1.json` and `p6_option1_e2.json`.
+5. Compute `CEV(E2_2L_v4 vs E1_2L_v4)` and check H1 (mean_xB > 0 at ell=A).
+
+**Hypotheses to verify (as per spec):**
+- H1: mean_xB > 0 at ell=A (hedge mechanism activates)
+- H2: CEV(E2_2L_v4 vs E1_2L_v4) > 4.255% (beats Option 3 baseline)
+- H3: Hedge channel ≈ 0.5–1.5% additional
+
