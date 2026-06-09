@@ -991,3 +991,70 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-06-09 — v4 solver implemented: Option 1 full state extension
+
+**Action**: Implement `src/vfi_solver_v4.jl` — Path B Option 1 full
+state extension as specified in `handoff/tau_buy_option1_spec.md`.
+
+**What was built** (~680 LOC, new file, v3 preserved):
+
+State extended from 4D `(t, w, z, ell)` to 6D
+`(t, w, z, ell, x_A_prev, x_B_prev)`. This is the minimum extension
+needed for the hedge mechanism to activate: a household at ell=A can
+now pre-hold x_B tokens (paying tau_buy incrementally), then arrive
+at ell=B with those tokens already purchased (zero tx_cost to maintain
+position). Expected hedge premium per unit pre-held:
+`p_relocate * tau_buy ≈ 0.06 * 0.025 = 0.0015/period`.
+
+**Key design choices**:
+
+1. **Transaction cost formula (per period)**:
+   `tx_cost = tau_buy * (max(δA,0) + max(δB,0)) + tau_token * (max(-δA,0) + max(-δB,0))`
+   where `δA = x_A_new - x_A_prev`, `δB = x_B_new - x_B_prev`.
+   Applied in the budget constraint at choice time.
+
+2. **State transition at relocation**:
+   - E2_2L: `(x_A_prev, x_B_prev)_{t+1} = (x_A_new, x_B_new)` always
+     (tokens portable across moves — the hedge mechanism).
+   - E1_2L: `(x_A_prev, x_B_prev)_{t+1} = (0, 0)` at relocation
+     (forced liquidation; sell proceeds enter wealth via sell_factor).
+     At no-relocation: `= (x_A_new, x_B_new)`.
+
+3. **Interpolation**: 4D bilinear — bilinear in (w, z) composed with
+   bilinear in (x_A_prev, x_B_prev). Helper `interp_v4()` takes a
+   `(n_w, n_z, n_xA, n_xB)` slice and interpolates continuously.
+
+4. **Grid defaults** (coarse for first run, env-var configurable):
+   N_W=15, N_Z=5, N_X_PREV=3, X_PREV_MAX=1.5
+   Net compute vs v3: ~4-6× (9× state factor, ~0.55× per-dim reduction).
+   Estimated wall time: 2-3h per regime on server1.
+
+5. **No apply_tau_buy_at_reloc flag**: v4 handles tau_buy properly
+   via state, so the v3 approximation flag is not carried over.
+
+**Smoke test** (`--smoke-test` mode, no VFI): checks sigma decomp,
+6D array allocation+size, terminal slice correctness, tx_cost formula
+(4 spot-checks including mixed buy/sell and no-change), housing_cost,
+p_relocate boundary, 4D interpolation at exact grid nodes and midpoints,
+hedge mechanism design consistency (holding unchanged costs zero vs
+fresh buy costs tau_buy * units).
+
+**Run scripts added**:
+- `scripts/run_option1_e1.sh` — E1_2L v4 at small grids
+- `scripts/run_option1_e2.sh` — E2_2L v4 at small grids
+
+**Key diagnostic to look for after server1 run**:
+- `mean_xB_t1_xprev00_ellA` — should be > 0 if hedge channel activates
+- `V_t1_midpoint_ellA_xprev00` — compare to v3 for CEV computation
+- Hypothesis: `CEV(E2_2L_v4 vs E1_2L_v4)` > 4.255% (Option 3 baseline)
+
+**Feature branch**: `auto/2026-06-09-option1-state-extension`
+**Suggested PR title**: "feat: v4 solver — Option 1 6D state extension with tau_buy on deltas"
+
+**Next actions** (server1, user):
+1. `julia src/vfi_solver_v4.jl --smoke-test` — verify no import errors
+2. `bash scripts/run_option1_e1.sh` — E1_2L baseline (~2-3h)
+3. `bash scripts/run_option1_e2.sh` — E2_2L baseline (~2-3h)
+4. Compare `V_t1_midpoint_ellA_xprev00` between regimes to compute CEV
+5. Check `mean_xB_t1_xprev00_ellA` for hedge channel activation
+
