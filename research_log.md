@@ -991,3 +991,79 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-06-09 — v4 solver implemented: 6D state extension with proper tau_buy
+
+**Action picked**: P0 — create `src/vfi_solver_v4.jl` per `handoff/tau_buy_option1_spec.md`.
+This is the highest-priority auto-allowed action: every v3 run confirmed the cross-location
+hedge is dead under v3's design, and the spec explicitly designates Option 1 as P0.
+
+**What was implemented:**
+
+State space extended from 4D to 6D: `(t, w, z, ell, ix_A_prev, ix_B_prev)`.
+`x_A_prev` and `x_B_prev` are grid-index states tracking the previous period's
+housing token holdings for both locations A and B.
+
+**Key design decisions:**
+
+1. **x_prev grid**: choices of `x_A_new` and `x_B_new` are restricted to
+   `x_prev_grid` values (default `N_X_PREV=3`, `X_PREV_MAX=1.0` → `{0.0, 0.5, 1.0}`).
+   This makes the `(x_A_prev, x_B_prev)` state transition deterministic and
+   grid-aligned — no interpolation needed in x_prev dimensions. Only `(w, z)`
+   require bilinear interpolation each period.
+
+2. **Transaction-cost rule (E2_2L)**: per-period on deltas:
+   ```
+   delta_A  = x_A_new - x_A_prev
+   delta_B  = x_B_new - x_B_prev
+   tx_cost  = tau_buy  * (max(delta_A,0) + max(delta_B,0))
+            + tau_token * (max(-delta_A,0) + max(-delta_B,0))
+   ```
+   Defaults: `tau_buy=0.025`, `tau_token=0.005`.
+
+3. **Transaction-cost rule (E1_2L)**: `tau_buy * max(x_ell_new - x_ell_prev, 0)`
+   at choice time for the occupied-location token only. Forced-sale cost
+   (tau_sell=6%) is still applied via wealth-transition `sell_factor` on
+   relocation — same mechanism as v3.
+
+4. **E2_2L: tokens portable across relocation**: sell_factor = 1.0 always.
+   Pre-holding x_B at ell=A saves tau_buy at relocation to B.
+   Hedge premium per unit x_B held per period: `p_relocate * tau_buy ≈ 0.0015`.
+
+5. **E1_2L: x_prev state correctly captures tau_buy on new purchases**:
+   After relocating from A to B, state carries `x_A_prev=1, x_B_prev=0`.
+   At ell=B, choosing `x_B_new=1` triggers `tau_buy * max(1 - 0, 0) = tau_buy`.
+   The `apply_tau_buy_at_reloc` approximation from v3 is now removed (proper state
+   tracking replaces it).
+
+6. **Memory**: T=57, N_W=15, N_Z=5, 2 ells, N_xA=3, N_xB=3 → ~0.6 MB per 6D array.
+   Total state points per period: 1350. Manageable on server1.
+
+**Files created:**
+
+- `src/vfi_solver_v4.jl` (~560 LOC):
+  - `ModelParams_v4` (no `apply_tau_buy_at_reloc`; has `tau_token`)
+  - `GridSpec_v4` (adds `n_x_prev`, `x_prev_max`)
+  - `SolverResult_v4` (6D arrays)
+  - `tx_cost_v4()` (regime-dispatched, delta-based)
+  - `continuation_value_v4()` (bilinear in w/z; exact index in ell/xA_prev/xB_prev)
+  - `solve_state_v4()` (grid search over x_prev_grid × x_prev_grid for E2_2L)
+  - `solve_v4()` (6D VFI loop, backward induction)
+  - `summary_v4()` (entry-state + aggregate statistics)
+  - `smoke_test_v4()` (10 checks, no VFI run; cloud-safe)
+- `scripts/run_option1_e1.sh` (E1_2L v4 run script for server1)
+- `scripts/run_option1_e2.sh` (E2_2L v4 run script for server1)
+
+**Feature branch:** `auto/2026-06-09-v4-state-extension`
+
+**Next (user runs on server1):**
+
+1. `bash scripts/run_option1_e1.sh` — E1_2L baseline (~1-2h wall at N_W=15, N_Z=5, N_xprev=3)
+2. `bash scripts/run_option1_e2.sh` — E2_2L Option 1 (~same compute)
+3. Check: `mean_xB_t1_entry_ellA > 0` in E2_2L (Hypothesis H1: hedge mechanism activates)
+4. Compute `CEV(E2_2L_v4 vs E1_2L_v4)` (Hypothesis H2: > 4.255%)
+5. Compute `CEV(E2_2L_v4 vs E2_2L_v3)` (Hypothesis H3: ~0.5-1.5% hedge channel)
+
+If H1+H2+H3 all pass → RFS-marginal path confirmed. If any fails → Path D (REE/JHE).
+
+Smoke test command (no VFI, cloud-safe): `julia src/vfi_solver_v4.jl --smoke-test`
+
