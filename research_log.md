@@ -2110,3 +2110,44 @@ All cloud prep is fully complete since fire 35. No additional cloud work identif
 
 **Files modified**: `src/vfi_solver_v4.jl` (comment added), `handoff/decisions_needed.md`
 **Branch**: `auto/2026-05-02-option1-state-extension`
+
+## 2026-06-09 — Fire 77: orientation audit — all cloud work confirmed complete
+
+Read orientation files: README, project_state, next_actions, research_log (fires
+1-76), pivot memo, decisions_needed, v3 and v4 solvers.
+
+**All prior cloud work confirmed complete (same as fires 58-76).** Gate 1
+(server1 VFI baselines) remains the sole blocker.
+
+**Action taken this fire**: Orientation audit only. No new code produced.
+
+Initial mis-step: began re-implementing `src/vfi_solver_v4.jl` (390 LOC draft)
+before discovering the remote branch was at fire 76, not at the project-start
+state. The canonical 999-LOC v4 solver (fire 35, 4D quadrilinear interpolation,
+full tx_cost-on-deltas, smoke test + 2-period mini-VFI) already exists. Reset
+to remote HEAD; draft discarded. `decisions_needed.md` note at fire 38 explicitly
+warns against this; noted for future fires.
+
+**All cloud-preparatory work is done:**
+- `src/vfi_solver_v4.jl` (999 LOC): 6D state, 4D interp, smoke test ✓
+- `paper/sections/s1_intro.tex` through `s6_conclusion.tex`: full drafts ✓
+- `paper/main.tex`, `paper/outline_v4.md`, `paper/references.bib` ✓
+- `scripts/run_option1_e*.sh` (baselines + counterfactuals) ✓
+- `scripts/compute_option1_decomp.py` (auto-generates decomposition) ✓
+- All sensitivity sweeps (rhoAB, prelocate, txcost, asymmetric, mortgage) ✓
+- `docs/calibration_v3.md`, `docs/methods_v3.md`, `docs/welfare_decomp_v4.md` ✓
+- Fire 76 design discrepancy (tau_token vs tau_sell) closed as Option A ✓
+
+**Gate 1 (server1) commands** (unchanged from fires 18-76):
+```bash
+julia src/vfi_solver_v4.jl --smoke-test          # ~10-20 s
+bash scripts/run_option1_e1.sh                    # ~2-3 h E1_2L
+bash scripts/run_option1_e2.sh                    # ~2-3 h E2_2L
+bash scripts/run_option1_e1_notx.sh              # E1_NOTX counterfactual
+bash scripts/run_option1_e2_notau.sh             # E2_NOTAU counterfactual
+# then: git add output/diagnostics/p6_option1_*.json && git push
+# cloud agent auto-runs: python scripts/compute_option1_decomp.py
+```
+
+**Files modified**: `research_log.md` (this entry)
+**Branch**: `auto/2026-05-02-option1-state-extension`
