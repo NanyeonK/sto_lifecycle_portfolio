@@ -2151,3 +2151,40 @@ bash scripts/run_option1_e2_notau.sh             # E2_NOTAU counterfactual
 
 **Files modified**: `research_log.md` (this entry)
 **Branch**: `auto/2026-05-02-option1-state-extension`
+
+## 2026-06-09 — Fire 78: orientation audit — all cloud work confirmed complete, Gate 1 pending
+
+Read orientation files: README, project_state, next_actions, research_log
+(fires 1-77), pivot memo, decisions_needed, v3 and v4 solvers.
+
+**State unchanged from fire 77.** Gate 1 (server1 VFI baselines) remains
+the sole critical-path item. No new cloud-executable P0/P1 work available.
+
+**Recurrent pattern note**: fires 42, 58-77, and now 78 have each begun
+by attempting to re-implement `src/vfi_solver_v4.jl` before discovering
+the remote branch is far ahead of main. The `decisions_needed.md` note at
+fire 38 warns against this. Future fires should check
+`git log --oneline origin/<branch> | head -5` immediately after branch
+creation to detect prior work before drafting code.
+
+**Confirmed complete (same as fires 35-77)**:
+- `src/vfi_solver_v4.jl` (999 LOC): 6D state, 4D quadrilinear interp,
+  tx_cost-on-deltas, conservative-bias note (fire 76 Option A), smoke test ✓
+- `paper/sections/` s1-s6 + `main.tex` + `references.bib` + `outline_v4.md` ✓
+- All run scripts (baselines + counterfactuals + sensitivity sweeps) ✓
+- `scripts/compute_option1_decomp.py` (auto-decomposition after JSONs land) ✓
+- `docs/calibration_v3.md`, `docs/methods_v3.md`, `docs/welfare_decomp_v4.md` ✓
+
+**Gate 1 (server1) commands** — see `handoff/decisions_needed.md` §Gate 1
+for full instructions:
+```bash
+julia src/vfi_solver_v4.jl --smoke-test
+bash scripts/run_option1_e1.sh          # ~2-3h
+bash scripts/run_option1_e2.sh          # ~2-3h
+bash scripts/run_option1_e1_notx.sh
+bash scripts/run_option1_e2_notau.sh
+git add output/diagnostics/p6_option1_*.json && git push
+```
+
+**Files modified**: `research_log.md`, `next_actions.md` (date/fire counter)
+**Branch**: `auto/2026-05-02-option1-state-extension`
