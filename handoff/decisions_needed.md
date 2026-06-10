@@ -1,6 +1,6 @@
 # Decisions Needed (human gate items)
 
-Updated: 2026-05-01
+Updated: 2026-06-10
 
 ## STRATEGIC: v3 mechanism is empirically dead at symmetric calibration
 
@@ -68,6 +68,53 @@ probability. Option (C) is empirically against natural sign. Option
 hedge channel is < 1.5% lifetime CEV, fall back to (D).
 
 **Time**: (B) implementation ~2-4 weeks. Decision after run.
+
+---
+
+## URGENT (2026-06-10): ~45 redundant auto branches — server1 action needed
+
+**Observation**: The 6h cron has been firing since 2026-05-02. Every fire
+sees `next_actions.md` on `main` (unchanged, still showing Steps 1-4 as
+pending) and re-implements `vfi_solver_v4.jl`. Result: 45+ branches, all
+with similar v4 implementations, none merged to main.
+
+**Root cause**: Steps 5-8 require server1 runs (user tasks). Without
+server1 output, the state files cannot be updated on main, so every cron
+fire restarts from the same stale `main`.
+
+### What needs to happen (server1, ~1 hour)
+
+1. Pick one v4 branch to test. Best option:
+   - **`auto/2026-06-10-option1-4dinterp`** (today's fire):
+     uses 4D linear interpolation in (w, z, x_A_prev, x_B_prev) rather than
+     nearest-neighbor. Reduces discretization error at the coarse 3-point
+     x_prev grid. Other branches snap to nearest grid point, causing jumps
+     in the value function.
+
+2. Run smoke test on server1:
+   ```bash
+   julia src/vfi_solver_v4.jl --smoke-test
+   ```
+   Write result to `output/diagnostics/p6_option1_smoke.md`.
+
+3. Run baselines:
+   ```bash
+   bash scripts/run_option1_e1.sh   # E1_2L, ~2-3 hours
+   bash scripts/run_option1_e2.sh   # E2_2L, ~2-3 hours
+   ```
+
+4. Check H1: `mean_xB > 0` at `ell=A` in E2_2L output JSON.
+   - If YES: compute CEV and update research_log.md. RFS path open.
+   - If NO: fall back to Path D (REE/JHE with +4.26% continuous-x).
+
+5. Update `next_actions.md` Steps 5-8 status on `main` after runs complete.
+   This breaks the cron redundancy cycle.
+
+### To stop the cron from re-firing the same work
+
+Once server1 runs complete and results are committed to `main`, future cron
+fires will see the updated `next_actions.md` and pick the NEXT action
+(sensitivity sweeps, calibration docs) instead of re-implementing v4.
 
 ---
 
