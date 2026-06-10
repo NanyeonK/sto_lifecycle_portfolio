@@ -991,3 +991,69 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-06-10 — v4 solver (6D state, Option 1) implemented
+
+**Action**: Implement `src/vfi_solver_v4.jl` — full Option 1 state
+extension (Steps 1-4 of next_actions.md P0 chain).
+
+**Motivation**: Option 3 (synthetic tau_buy approximation) confirmed
+the hedge mechanism empirically dead at any p_relocate. Option 1 is the
+proper implementation — adding `(x_A_prev, x_B_prev)` to the state space
+lets tau_buy be charged on positive deltas every period, making pre-holding
+x_B at ell=A yield *literal savings* on subsequent relocation.
+
+**Files created**:
+- `src/vfi_solver_v4.jl` (~500 LOC): 6D VFI solver
+- `scripts/run_option1_e1.sh`: E1_2L baseline run script
+- `scripts/run_option1_e2.sh`: E2_2L baseline run script
+- Branch: `auto/2026-06-10-v4-state-extension`
+
+**Architecture changes from v3**:
+
+1. **State extended to 6D**: `(T, n_w, n_z, 2, n_xA_prev, n_xB_prev)`.
+   Default T=57, N_W=15, N_Z=5, N_ell=2, N_X_PREV=3 → 77,130 entries
+   ≈600 KB per array, ~10 MB total for all 6 policy arrays.
+
+2. **x_prev_grid**: `linspace(0, X_PREV_MAX, N_X_PREV)`. Default
+   X_PREV_MAX=1.0, N_X_PREV=3 → `{0.0, 0.5, 1.0}`. x_A_new and
+   x_B_new in the optimization are restricted to this grid, enabling
+   exact (zero-interpolation) lookups in the x dimensions.
+
+3. **tx_cost per period**:
+   `tau_buy * max(dA, 0) + tau_token * max(-dA, 0) + same for dB`
+   Applied every period on deltas from x_prev → x_new. Default
+   tau_buy=0.025, tau_token=0.01.
+
+4. **Budget**: `c + kappa + b + s + x_A_new + x_B_new + tx_cost = w`.
+
+5. **Regime-specific state transitions** (key innovation):
+   - E2_2L: `(x_A_prev, x_B_prev)_next = (x_A_new, x_B_new)` always
+     — tokens portable across relocation.
+   - E1_2L stay: `(x_A_new, 0)` — x_B always 0 by admissibility.
+   - E1_2L reloc: `(0, 0)` — forced sale resets to no-holdings state.
+   This means E2_2L household's pre-held x_B survives relocation;
+   E1_2L household's holdings reset to zero.
+
+6. **Continuation value**: precomputes two 2D (w,z) views per state
+   (slice_stay and slice_reloc), then loops over 2187 quadrature points
+   with bilinear interpolation in (w, z) and direct index in (ell, ixA, ixB).
+
+7. **E1_2L admissibility**: binary choices {0.0, xg[end]≈1.0} for
+   x_ell; x_ell' = 0 enforced. X_PREV_MAX=1.0 ensures grid[end]=1.0
+   exactly. Non-binary grid points skipped.
+
+8. **Smoke test**: checks sigma decomposition, 6D array dimensions,
+   terminal slice health, tx_cost spot-checks (hold/buy/sell/mixed),
+   housing cost rule correctness, and p_relocate boundary.
+
+**Expected hedge mechanism**: E2_2L household at ell=A sees expected
+savings of `p_relocate * tau_buy ≈ 0.06 * 0.025 = 0.15%` per period per
+unit x_B pre-held. Over a working life of 40 years, pre-holding x_B=0.5
+saves ~3% cumulative. CEV impact conjecture: +0.5-1.5% on top of v3
+baseline +4.26%. Combined: ~5.0-5.5%.
+
+**Next**: user runs smoke test then E1_2L + E2_2L baselines on server1.
+Key hypothesis to verify: `mean_xB_t1_entry_ellA > 0` (pre-holding
+activates) and `CEV(E2_2L_v4 vs E1_2L_v4) > 4.255%` (v3 baseline).
+
+**Feature branch**: `auto/2026-06-10-v4-state-extension`
