@@ -991,3 +991,67 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-06-10 — v4 solver (Option 1 full state extension) implemented
+
+**Action picked**: P0 from `next_actions.md` — create `src/vfi_solver_v4.jl`
+with full 6D state `(t, w, z, ell, x_A_prev, x_B_prev)` per the spec at
+`handoff/tau_buy_option1_spec.md`. This is the proper tau_buy implementation
+that may resurrect the cross-location hedge channel.
+
+**Branch**: `auto/2026-06-10-option1-state-extension`
+
+**Key design decisions:**
+
+1. **6D state arrays** indexed `[t, iw, iz, iell, ix_A_prev, ix_B_prev]`.
+   At N_W=15, N_Z=5, T=57, N_ell=2, N_xprev=3: ~75K elements per array,
+   ~600 KB per policy function — well within memory budget.
+
+2. **x_prev grid**: coarse `{0.0, 0.75, 1.5}` at N_X_PREV=3 (env-var
+   configurable). Continuation value uses nearest-neighbor lookup on x_prev
+   dimension; bilinear interpolation over (w, z) as in v3.
+
+3. **tx_cost rule** (per-period on deltas):
+   - E2_2L: `tau_buy * max(δA,0) + tau_buy * max(δB,0) + tau_token * max(-δA,0) + tau_token * max(-δB,0)`
+   - E1_2L: `tau_buy * max(δ_ell,0)` only — selling handled by `sell_factor`
+     at relocation event (no double-counting with tau_sell).
+   - E0: 0.
+
+4. **E2_2L relocation**: tokens portable → `sell_factor_A = sell_factor_B = 1.0`
+   always. Pre-holding `x_B_prev > 0` at ell=A saves `tau_buy * δ_B` when
+   arriving at B (the hedge channel). E1_2L still applies `sell_factor_A =
+   (1 - tau_sell)` at relocation.
+
+5. **Housing cost**: identical to v3 fixed kappa rule —
+   `kappa = rho - x_ell_local * (rho - m)`. Only occupied-location token
+   saves rent; `x_{ell'}` is purely financial (prevents the rental-income
+   artifact that made mean_xB artificially > 0 in the original v3 rule).
+
+6. **Smoke test stub** (`--smoke-test` flag): checks sigma decomposition
+   invariant, shock block size + weight sum, 6D array allocation, terminal
+   slice, tx_cost computations (5 cases), nearest_xprev_idx, housing_cost,
+   p_relocate boundary. VFI not run (cloud env lacks Julia).
+
+7. **Run scripts**:
+   - `scripts/run_option1_e1.sh` — E1_2L at v4 small-grid defaults
+   - `scripts/run_option1_e2.sh` — E2_2L at v4 small-grid defaults
+
+**Files created:**
+- `src/vfi_solver_v4.jl` (~490 LOC)
+- `scripts/run_option1_e1.sh`
+- `scripts/run_option1_e2.sh`
+
+**Next steps (user runs on server1):**
+1. `julia src/vfi_solver_v4.jl --smoke-test`
+2. `bash scripts/run_option1_e1.sh`
+3. `bash scripts/run_option1_e2.sh`
+4. Inspect `output/diagnostics/p6_option1_e1.json` and `p6_option1_e2.json`
+5. Check: does `mean_xB_t1_feasible_ellA > 0` in E2_2L? (H1 in spec)
+6. Compute `CEV(E2_2L_v4 vs E1_2L_v4)` — expect > 4.255% if hedge activates
+
+**Hedge mechanism check** (why v4 may differ from v3):
+In v3, holding x_B at ell=A gave no benefit (kappa only used x_ell_local;
+no tau_buy cost differential). In v4, pre-holding x_B_prev > 0 reduces
+future delta_B when arriving at B, saving `tau_buy * x_B_prev` at relocation.
+Expected hedge premium per unit: `p_relocate * tau_buy ≈ 0.06 * 0.025 = 0.15%`
+per period per unit — marginal but cumulative over lifecycle.
+
