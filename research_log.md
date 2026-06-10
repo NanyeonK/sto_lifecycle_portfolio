@@ -991,3 +991,68 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-06-10 — Option 1 v4 solver implemented (6D state extension)
+
+**Action picked**: P0 Step 2 — create `src/vfi_solver_v4.jl`, the full
+Option 1 state extension. This is the highest-priority non-blocked
+action per `next_actions.md`.
+
+**Rationale**: v3 hedge channel was zero because x_B_prev was never tracked
+as state; tau_buy applied only at relocation (approximation) couldn't
+motivate pre-holding x_B. With full state extension, a household at ell=A
+that pre-holds x_B > 0 carries it to B with x_prev_next = x_B_new
+(portable), delta_B = 0, and avoids the tau_buy the E1_2L household
+pays (tau_buy * 1 forced buy). Expected hedge premium per unit x_B:
+p_relocate * tau_buy ≈ 0.06 * 0.025 = 0.0015/period.
+
+**Key design decisions**:
+
+1. **6D arrays** `(t, w, z, ell, x_A_prev, x_B_prev)` using Julia's
+   native `Array{Float64,6}`. At N_W=15, N_Z=5, N_X_PREV=3:
+   ~76,950 state points × 7 float64 arrays ≈ 4.3 MB.
+
+2. **x_prev grid**: uniform 0 → X_PREV_MAX=1.5 at N_X_PREV=3 points:
+   {0.0, 0.75, 1.5}. All env-var configurable.
+
+3. **4D interpolation** `interp_4d_v4(vals, w_grid, z_grid, xp_grid, w, z, xA, xB)`:
+   16-point 4D linear interpolation for (w, z, x_A_prev, x_B_prev) per
+   fixed ell. Avoids grid snapping artifacts at the coarse x_prev grid.
+
+4. **tx_cost rule** (per spec §"Transaction costs"):
+   `tx = tau_buy * (max(ΔA,0) + max(ΔB,0)) + tau_token * (max(-ΔA,0) + max(-ΔB,0))`
+   Applied to the budget every period based on changes from x_A_prev.
+
+5. **Relocation x_prev asymmetry** (the mechanism):
+   - E2_2L: `x_prev_reloc_next = x_new` (tokens portable, carried to B)
+   - E1_2L: `x_prev_reloc_next = (0, 0)` (forced sale via sell_factor;
+     household must re-buy at new location, paying tau_buy from scratch)
+
+6. **sell_factor** for E1_2L relocation kept from v3 (tau_sell ~6% applied
+   to wealth transition). Within-period voluntary sell uses tau_token
+   (approximation — forced relocation sell is the dominant cost).
+
+7. **Smoke test** `smoke_test_v4()` checks: sigma decomposition, 6D
+   allocation + memory estimate, terminal slice, tx_cost spot-checks
+   (no-change=0, buy=tau_buy, sell=tau_token, mixed), pre-holding
+   hedge scenario (x_B_prev=0.5, no-rebalance tx=0), 4D interpolation
+   at exact grid points and midpoints, shock block sum.
+
+**Files created**:
+- `src/vfi_solver_v4.jl` (~650 LOC)
+- `scripts/run_option1_e1.sh` (E1_2L baseline run)
+- `scripts/run_option1_e2.sh` (E2_2L baseline run)
+
+**Feature branch**: `auto/2026-06-10-option1-state-extension`
+
+**Next queued for server1 (user)**:
+- Step 6: `julia src/vfi_solver_v4.jl --smoke-test`
+  Verify PASS before running full VFI.
+- Step 7: `bash scripts/run_option1_e1.sh` then `run_option1_e2.sh`
+  Estimated 2-3 hours wall each at N_X_PREV=3, N_W=15, N_Z=5.
+- Step 8: Check mean_xB at ell=A in E2_2L (H1 test). If > 0 with
+  x_prev=0 entry condition, hedge mechanism is alive.
+
+**Hypotheses to verify** (spec §"Expected results"):
+- H1: mean_xB > 0 at ell=A in E2_2L — hedge mechanism activated.
+- H2: CEV(E2_2L_v4 vs E1_2L_v4) > 4.255% (v3 Option 3 baseline).
+- H3: CEV improvement over v3 ≈ 0.5-1.5% (hedge channel magnitude).
