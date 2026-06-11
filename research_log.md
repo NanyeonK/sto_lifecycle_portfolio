@@ -2269,3 +2269,40 @@ Only then read state files. This check takes ~5 seconds and avoids
 
 **Files modified**: `research_log.md`, `next_actions.md` (fire counter → 80)
 **Branch**: `auto/2026-05-02-option1-state-extension`
+
+## 2026-06-11 — Fire 81: orientation audit — re-implementation anti-pattern hit again; Gate 1 pending
+
+**Action**: orientation audit + state-file update only.
+
+**What happened (same as fires 42, 58-80)**:
+- Read local `next_actions.md` without first fetching the remote branch.
+- Implemented `src/vfi_solver_v4.jl` (~490 LOC, 6D state, tx_cost-on-deltas),
+  `scripts/run_option1_e1.sh`, `scripts/run_option1_e2.sh`.
+- Committed, attempted to push → rejected ("fetch first").
+- Fetched remote: found 80 existing commits (Fires 3–80). Canonical
+  999-LOC v4 solver (fire 35) already complete; all phase-2-prep done.
+- Reset `--hard` to `origin/auto/2026-05-02-option1-state-extension` (Fire 80 HEAD).
+- All duplicate commits discarded.
+
+**Root cause (persistent)**: the local working tree is cloned from `main`
+without the remote feature branch committed state. Until server1 JSONs are
+pushed and merged, the cron fires will keep seeing a "stale" local next_actions.md
+from `main`. Each fire must run the fetch+log+reset protocol FIRST:
+```bash
+git fetch origin auto/2026-05-02-option1-state-extension
+git log --oneline origin/auto/2026-05-02-option1-state-extension | head -3
+git reset --hard origin/auto/2026-05-02-option1-state-extension
+```
+
+**All cloud work confirmed complete (same as fires 58-80)**:
+- `src/vfi_solver_v4.jl` (999 LOC): 6D state, 4D quadrilinear interp,
+  tx_cost-on-deltas, conservative-bias note (fire 76), smoke test ✓
+- All paper sections (s1-s6), main.tex, references.bib ✓
+- All scripts (baselines, counterfactuals, sensitivity, decomp) ✓
+- All docs (calibration_v3, methods_v3, welfare_decomp_v4) ✓
+
+**Gate 1 (server1 VFI baselines) remains the sole critical-path blocker.**
+Run commands are in `handoff/decisions_needed.md` §Gate 1.
+
+**Files modified**: `research_log.md`, `next_actions.md` (fire counter → 81)
+**Branch**: `auto/2026-05-02-option1-state-extension`
