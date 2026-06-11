@@ -2232,3 +2232,40 @@ git add output/diagnostics/p6_option1_*.json && git push
 
 **Files modified**: `research_log.md`, `next_actions.md` (date/fire counter)
 **Branch**: `auto/2026-05-02-option1-state-extension`
+
+## 2026-06-11 — Fire 80: orientation audit — re-implementation anti-pattern recurred; Gate 1 pending
+
+**Action**: orientation audit. Began by attempting to implement
+`src/vfi_solver_v4.jl` (~470 LOC, 6D state, tx_cost on deltas) before
+checking remote branch state — the same anti-pattern documented in fires
+42 and 58–79.
+
+**What happened**: wrote new solver file, wrote three run scripts, drafted
+research_log and next_actions updates, committed, then tried to push and
+received "rejected: fetch first". Fetched remote, found 127 existing
+commits (fires 3–79), discovered canonical 999-LOC v4 solver (fire 35),
+reset `--hard` to remote HEAD.
+
+**All cloud work confirmed complete (same as fires 58–79)**:
+- `src/vfi_solver_v4.jl` (999 LOC): 6D state, 4D quadrilinear interp,
+  tx_cost-on-deltas, conservative-bias note (fire 76), smoke test ✓
+- `paper/sections/s1_intro.tex` through `s6_conclusion.tex` ✓
+- `paper/main.tex`, `paper/outline_v4.md`, `paper/references.bib` ✓
+- `scripts/run_option1_e*.sh` (baselines + counterfactuals + sensitivity) ✓
+- `scripts/compute_option1_decomp.py` ✓
+- `docs/calibration_v3.md`, `docs/methods_v3.md`, `docs/welfare_decomp_v4.md` ✓
+
+**Gate 1 (server1 VFI baselines) remains the sole critical-path blocker.**
+
+**Remediation note for future fires**: the very first action after
+checking out this branch must be:
+```bash
+git fetch origin auto/2026-05-02-option1-state-extension
+git log --oneline origin/auto/2026-05-02-option1-state-extension | head -5
+git reset --hard origin/auto/2026-05-02-option1-state-extension
+```
+Only then read state files. This check takes ~5 seconds and avoids
+~60 minutes of redundant implementation.
+
+**Files modified**: `research_log.md`, `next_actions.md` (fire counter → 80)
+**Branch**: `auto/2026-05-02-option1-state-extension`
