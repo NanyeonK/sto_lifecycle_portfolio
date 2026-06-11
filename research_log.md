@@ -2188,3 +2188,47 @@ git add output/diagnostics/p6_option1_*.json && git push
 
 **Files modified**: `research_log.md`, `next_actions.md` (date/fire counter)
 **Branch**: `auto/2026-05-02-option1-state-extension`
+
+## 2026-06-11 — Fire 79: orientation audit — all cloud work confirmed complete, Gate 1 pending
+
+Read orientation files: README, project_state, next_actions, research_log
+(fires 1–78), pivot memo, decisions_needed, v4 solver header, run scripts.
+
+**All prior cloud work confirmed complete (same as fires 58–78).** Gate 1
+(server1 VFI baselines) remains the sole blocker.
+
+**Recurrence of re-implementation anti-pattern**: this fire also began by
+drafting `src/vfi_solver_v4.jl` (~640 LOC) before checking
+`git log --oneline origin/<branch>`. Reset to remote HEAD (fire 78) after
+discovering the canonical 999-LOC v4 solver (fire 35, 4D quadrilinear
+interpolation, smoke test + 2-period mini-VFI) was already complete.
+The `decisions_needed.md` orientation note (fire 38) and log entries from
+fires 77–78 document this exact pattern. Future fires: run
+`git log --oneline origin/auto/2026-05-02-option1-state-extension | head -5`
+BEFORE writing any code.
+
+**All cloud-preparatory work is done (fires 3–76)**:
+- `src/vfi_solver_v4.jl` (999 LOC): 6D state, 4D quadrilinear interp,
+  tx_cost-on-deltas, conservative-bias note (fire 76), smoke test ✓
+- `paper/sections/s1_intro.tex` through `s6_conclusion.tex` ✓
+- `paper/main.tex`, `paper/outline_v4.md`, `paper/references.bib` ✓
+- `scripts/run_option1_e*.sh` (baselines + counterfactuals) ✓
+- `scripts/compute_option1_decomp.py` (auto-decomposes after JSONs) ✓
+- All sensitivity sweeps (rhoAB, prelocate, txcost, asymmetric, mortgage) ✓
+- `docs/calibration_v3.md`, `docs/methods_v3.md`, `docs/welfare_decomp_v4.md` ✓
+- Design discrepancy (tau_token vs tau_sell for E1_2L voluntary sell) closed
+  as Option A (conservative bias noted, no re-run required) ✓
+
+**Gate 1 server1 commands** (see `handoff/decisions_needed.md` §Gate 1):
+```bash
+julia src/vfi_solver_v4.jl --smoke-test        # ~10-20 s
+bash scripts/run_option1_e1.sh                  # ~2-3 h E1_2L
+bash scripts/run_option1_e2.sh                  # ~2-3 h E2_2L
+bash scripts/run_option1_e1_notx.sh            # E1_NOTX counterfactual
+bash scripts/run_option1_e2_notau.sh           # E2_NOTAU counterfactual
+git add output/diagnostics/p6_option1_*.json && git push
+# cloud agent then auto-runs compute_option1_decomp.py
+```
+
+**Files modified**: `research_log.md`, `next_actions.md` (date/fire counter)
+**Branch**: `auto/2026-05-02-option1-state-extension`
