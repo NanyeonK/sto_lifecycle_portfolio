@@ -12,13 +12,13 @@ proper tau_buy hedge mechanism.
 
 | Step | Action | Owner | Done artifact |
 |---|---|---|---|
-| 1 | Open new branch `auto/2026-05-02-option1-state-extension` | cloud agent | branch on origin |
-| 2 | Create `src/vfi_solver_v4.jl`: 6D state `(t, w, z, ell, x_A_prev, x_B_prev)` + tx_cost on deltas | cloud agent | file pushed |
-| 3 | Use coarse `x_prev` grid: `N_X_PREV=3` (e.g., {0, 0.5, 1.0}); reduce N_W=15, N_Z=5 to compensate | cloud agent | env-var configurable |
-| 4 | Smoke test stub `smoke_test_v4()` checking 6D allocation, tx_cost computation, state update consistency | cloud agent | callable via `--smoke-test` |
-| 5 | Smoke test on server1 (USER) | user/me | `output/diagnostics/p6_option1_smoke.md` |
-| 6 | Run E1_2L_v4 + E2_2L_v4 baselines (USER) | user/me | `p6_option1_e*.json` |
-| 7 | Compute decomposition + write up | user/me | `p6_option1_decomposition.md` |
+| 1 | Open new branch `auto/2026-06-11-option1-state-extension` | cloud agent | branch on origin ✓ |
+| 2 | Create `src/vfi_solver_v4.jl`: 6D state `(t, w, z, ell, x_A_prev, x_B_prev)` + tx_cost on deltas | cloud agent | **DONE 2026-06-11** |
+| 3 | Use coarse `x_prev` grid: `N_X_PREV=3` ({0, 0.5, 1.0}); N_W=15, N_Z=5 | cloud agent | **DONE 2026-06-11** |
+| 4 | Smoke test stub `smoke_test_v4()` checking 6D allocation, tx_cost, state update consistency | cloud agent | **DONE 2026-06-11** callable via `--smoke-test` |
+| 5 | `bash scripts/run_option1_smoke.sh` on server1 | **USER** | `output/diagnostics/p6_option1_smoke.log` |
+| 6 | `bash scripts/run_option1_e1.sh` + `run_option1_e2.sh` on server1 | **USER** | `p6_option1_e*.json` |
+| 7 | Compute CEV(E2_2L_v4 vs E1_2L_v4); check H1/H2/H3 | **USER** | `p6_option1_decomposition.md` |
 
 ## Hypotheses to test (after step 6)
 

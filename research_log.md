@@ -991,3 +991,52 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-06-11 — v4 solver: Option 1 full state extension implemented
+
+**Action picked**: implement `src/vfi_solver_v4.jl` — the P0 item approved
+by user on 2026-05-02 ("Option 1, full state extension").
+
+**What changed from v3**: added `(x_A_prev, x_B_prev)` as explicit state
+dimensions → 6D state `(t, w, z, ell, ix_A_prev, ix_B_prev)`. Choices of
+`(x_A_new, x_B_new)` are restricted to `x_prev_grid` (default 3 points,
+{0, 0.5, 1.0} with X_PREV_MAX=1.0), enabling exact state indexing of
+the next period's x_prev.
+
+**Transaction-cost implementation**:
+- E2_2L: `tx = tau_buy*(max(δA,0)+max(δB,0)) + tau_token*(max(-δA,0)+max(-δB,0))`
+  applied at choice time each period (proper Option 1 specification).
+- E1_2L: `tx = tau_buy * max(x_ell_new - x_ell_prev, 0)` — buy cost only;
+  sell at relocation still via `sell_factor = (1-tau_sell)` in wealth transition.
+
+**Hedge mechanism as designed**: at ell=A, E2_2L household can pre-buy
+x_B incrementally (paying tau_buy * delta_B each period). At relocation to
+B, the delta_B needed is small → lump-sum buying cost avoided. E1_2L
+households cannot pre-buy x_B (admissibility: x_{ell'} = 0), so they
+always pay tau_buy on the full unit at forced relocation. This is the
+tax asymmetry that should motivate non-zero mean_xB at ell=A in E2_2L.
+
+**Grid sizing** (coarse first-cut per spec):
+- N_W=15 (down from 21 in v3), N_Z=5 (down from 7)
+- N_X_PREV=3, X_PREV_MAX=1.0 → x_prev_grid = {0.0, 0.5, 1.0}
+- ASSET_GRID_SIZE=7 (down from 9)
+- Compute factor vs v3: 9 * (15*5)/(21*7) ≈ 4.6x per regime
+
+**Files created**:
+- `src/vfi_solver_v4.jl` (~580 LOC): 6D state VFI with proper tx_cost
+- `scripts/run_option1_smoke.sh`: smoke test (struct + tx_cost + shock checks)
+- `scripts/run_option1_e1.sh`: E1_2L baseline run
+- `scripts/run_option1_e2.sh`: E2_2L baseline run
+
+**NOT done (needs server1)**:
+- Smoke test not executed (cloud env lacks Julia)
+- E1_2L and E2_2L VFI runs not executed
+- CEV decomposition and H1/H2/H3 hypothesis checks pending
+
+**Next P0 action for user (server1)**:
+1. `bash scripts/run_option1_smoke.sh` — fast check, no VFI
+2. `bash scripts/run_option1_e1.sh` — ~2-3h wall
+3. `bash scripts/run_option1_e2.sh` — ~2-3h wall
+4. Compute CEV(E2_2L_v4 vs E1_2L_v4); check H1 (mean_xB > 0), H2 (CEV > 4.255%), H3 (hedge channel ≈ 0.5-1.5%)
+
+**Feature branch**: `auto/2026-06-11-option1-state-extension`
+
