@@ -2345,3 +2345,48 @@ BEFORE reading any state files, which eliminates the stale-read root cause.
 **Files modified**: `CLAUDE.md` (NEW), `research_log.md`, `next_actions.md`
 (fire counter → 82)
 **Branch**: `auto/2026-05-02-option1-state-extension`
+
+## 2026-06-12 — Fire 83: orientation audit — anti-pattern recurred; Gate 1 pending
+
+**Action**: orientation audit + state-file update only.
+
+**What happened (same as fires 42, 58-82)**:
+- Read local `next_actions.md` without first fetching remote branch (CLAUDE.md
+  does not exist on `main` — it was only created in Fire 82 on the feature
+  branch — so the mandatory fetch+reset protocol was invisible at start).
+- Implemented `src/vfi_solver_v4.jl` (~620 LOC, 6D state, tx_cost-on-deltas,
+  4D tensor-product interpolation) and run scripts.
+- Committed, attempted push → rejected ("fetch first").
+- Fetched remote: found 82 existing commits (Fires 1-82). Canonical 999-LOC
+  v4 solver and all prep already done.
+- Reset `--hard` to `origin/auto/2026-05-02-option1-state-extension` (Fire 82 HEAD).
+- All duplicate commits discarded.
+
+**Gate 1 status confirmed**: `output/diagnostics/` directory does not exist in
+the repo. No JSON files present. Gate 1 (server1 VFI runs) remains the sole
+critical-path blocker.
+
+**Residual anti-pattern note**: CLAUDE.md exists on the feature branch but NOT
+on `main`. Since the repo is always cloned fresh from `main`, the agent never
+sees CLAUDE.md unless it first fetches and resets to the feature branch. The
+fire-start instruction in the task prompt says to read project files in order
+(README, project_state, next_actions, research_log, etc.) — all of which exist
+on `main` and show stale state. This is a structural tension that will persist
+until the feature branch merges to `main` (after Gate 1 resolves).
+
+**Recommended mitigation**: human can either (a) merge/rebase the feature branch
+onto `main` periodically so stale reads stop triggering re-implementation, or
+(b) add a `CLAUDE.md` to `main` pointing to the feature branch — a 2-line file
+would suffice. Until then, the cron fires will continue hitting this pattern.
+
+**All cloud work confirmed complete (same as fires 58-82)**:
+- `src/vfi_solver_v4.jl` (999 LOC): 6D state, 4D quadrilinear interp,
+  tx_cost-on-deltas, enhanced smoke test ✓
+- All paper sections (s1-s6), main.tex, references.bib ✓
+- All scripts (baselines, counterfactuals, sensitivity sweeps, decomp) ✓
+- All docs (calibration_v3, methods_v3, welfare_decomp_v4, exhibit memos) ✓
+
+**Gate 1 (server1 VFI baselines) remains the sole critical-path blocker.**
+
+**Files modified**: `research_log.md`, `next_actions.md` (fire counter → 83)
+**Branch**: `auto/2026-05-02-option1-state-extension`
