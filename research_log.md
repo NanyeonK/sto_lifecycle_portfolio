@@ -2306,3 +2306,42 @@ Run commands are in `handoff/decisions_needed.md` §Gate 1.
 
 **Files modified**: `research_log.md`, `next_actions.md` (fire counter → 81)
 **Branch**: `auto/2026-05-02-option1-state-extension`
+
+## 2026-06-12 — Fire 82: orientation audit + CLAUDE.md created to break anti-pattern cycle
+
+**Action**: orientation audit + new CLAUDE.md to resolve structural cause
+of the recurring re-implementation anti-pattern.
+
+**What happened**:
+- Read local `next_actions.md` without first fetching the remote branch.
+- Implemented `src/vfi_solver_v4.jl` (924 LOC) and run scripts from scratch.
+- Committed, attempted to push → rejected ("fetch first").
+- Fetched remote: found 81 existing commits (Fires 1-81). Canonical
+  999-LOC v4 solver already complete; all phase-2-prep done.
+- Reset `--hard` to `origin/auto/2026-05-02-option1-state-extension` (Fire 81 HEAD).
+
+**New work this fire**: Created `CLAUDE.md` at repo root with:
+1. Mandatory fetch+reset protocol (should prevent future recurrences).
+2. Clear summary of what is DONE vs NOT DONE.
+3. Decision tree for next actions depending on whether Gate 1 JSONs exist.
+4. Anti-pattern history note.
+
+**Root cause analysis**: The local clone always starts from `main`. The
+`next_actions.md` on `main` shows steps 1-4 as not yet done (they say
+"file pushed" in Done column but not explicitly DONE). Future fires read
+this as work to do and re-implement. CLAUDE.md instructs fetch+reset
+BEFORE reading any state files, which eliminates the stale-read root cause.
+
+**All cloud work confirmed complete (same as fires 58-81)**:
+- `src/vfi_solver_v4.jl` (999 LOC, fire 25): 6D state, 4D quadrilinear
+  interp, tx_cost-on-deltas, conservative-bias note (fire 76), enhanced
+  smoke test with pre-hold savings check + 2-period mini-VFI (fire 30) ✓
+- All paper sections (s1-s6), main.tex, references.bib ✓
+- All scripts (baselines, counterfactuals, sensitivity sweeps, decomp) ✓
+- All docs (calibration_v3, methods_v3, welfare_decomp_v4, exhibit memos) ✓
+
+**Gate 1 (server1 VFI baselines) remains the sole critical-path blocker.**
+
+**Files modified**: `CLAUDE.md` (NEW), `research_log.md`, `next_actions.md`
+(fire counter → 82)
+**Branch**: `auto/2026-05-02-option1-state-extension`
