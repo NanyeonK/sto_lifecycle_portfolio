@@ -2346,6 +2346,36 @@ BEFORE reading any state files, which eliminates the stale-read root cause.
 (fire counter → 82)
 **Branch**: `auto/2026-05-02-option1-state-extension`
 
+## 2026-06-12 — Fire 84: orientation audit — anti-pattern recurred (fires 42, 58-84); Gate 1 pending
+
+**Action**: orientation audit + state-file update only.
+
+**What happened**: Same structural anti-pattern as fires 42, 58-83:
+- Cloned fresh from `main`; CLAUDE.md not on `main`; read stale state files.
+- Implemented `src/vfi_solver_v4.jl` (~870 LOC) + two run scripts from scratch.
+- Committed locally, attempted push → rejected (remote branch 131 commits ahead).
+- Fetched remote; found canonical 999-LOC v4 solver + all prep done in fires 1-83.
+- Reset `--hard` to `origin/auto/2026-05-02-option1-state-extension` (Fire 83 HEAD).
+- All duplicate commits discarded.
+
+**Gate 1 status confirmed**: `output/diagnostics/p6_option1_e1.json` absent.
+Gate 1 (server1 VFI runs) remains the sole critical-path blocker.
+
+**Anti-pattern root cause (unchanged from fire 83)**: CLAUDE.md exists only
+on the feature branch, not on `main`. Fresh clones always start from `main`
+and never see CLAUDE.md. The structural fix requires either (a) adding a
+minimal CLAUDE.md to `main`, or (b) merging the feature branch to main.
+The cloud agent cannot do either without server1 results.
+
+**All cloud work confirmed complete (same as fires 58-83)**:
+- `src/vfi_solver_v4.jl` (999 LOC) ✓; all scripts ✓; all paper sections ✓;
+  all docs ✓; all exhibit memos ✓
+
+**Gate 1 (server1 VFI baselines) remains the sole critical-path blocker.**
+
+**Files modified**: `research_log.md`, `next_actions.md` (fire counter → 84)
+**Branch**: `auto/2026-05-02-option1-state-extension`
+
 ## 2026-06-12 — Fire 83: orientation audit — anti-pattern recurred; Gate 1 pending
 
 **Action**: orientation audit + state-file update only.
