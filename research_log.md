@@ -991,3 +991,85 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-06-12 — v4 solver (6D state, tau_buy Option 1) implemented
+
+**Action picked**: P0 Step 2-4 from `next_actions.md` — implement
+`src/vfi_solver_v4.jl` with 6D state extension and proper per-period
+tau_buy transaction costs. This is the highest-priority auto-allowed
+action: all human gates (H1'-H4') are deferred; Option 1 implementation
+was explicitly designated P0 by the user on 2026-05-02.
+
+**Why this action**: Option 3 tau_buy (v3) confirmed the hedge channel
+is empirically dead because pre-holding x_B provides no per-period
+incentive. Option 1 is the mechanically correct specification:
+households who pre-hold x_B save `tau_buy * delta_B = 0` only if
+they don't GROW x_B position later. Under proper state tracking,
+pre-holding x_B at ell=A reduces future buying cost at relocation
+(expected savings = `p_relocate * tau_buy * x_B` per period per unit),
+creating a genuine hedge motive.
+
+**Solver design (6D state)**:
+
+State: `(t, w, z, ell, x_A_prev, x_B_prev)` — 6D.
+Controls: `(c, b, s, x_A_new, x_B_new)` where x_A/B_new ∈ x_prev_grid.
+x_prev grid: {0.0, 0.5, 1.0} at default N_X_PREV=3, X_PREV_MAX=1.0.
+
+Transaction costs (per-period on net position changes):
+```
+delta_A = x_A_new - x_A_prev
+delta_B = x_B_new - x_B_prev
+E2_2L: tx = tau_buy*(max(dA,0)+max(dB,0)) + tau_token*(max(-dA,0)+max(-dB,0))
+E1_2L: tx = tau_buy*(max(dA,0)+max(dB,0))   [sell captured by sell_factor]
+E0:    tx = 0
+```
+
+Budget: `c + kappa(x_ell_new) + b + s + x_A_new + x_B_new + tx_cost = w`
+
+**Key implementation decisions**:
+
+1. x_new constrained to x_prev_grid: makes the state at t+1 exactly
+   representable on the grid (no interpolation in x_prev dimension).
+   With N_X_PREV=3: 9 (x_A, x_B) combinations for E2_2L, 2 for E1_2L.
+
+2. E1_2L tx_cost: only tau_buy on positive deltas. tau_sell for forced
+   relocation sale is preserved via sell_factor in wealth transition
+   (same as v3). No tau_token charge on voluntary sell (delta < 0 for
+   E1_2L → tx = 0).
+
+3. E2_2L: tau_buy on buying (positive delta), tau_token on selling
+   (negative delta). Sell_factor = 1.0 always (tokens portable).
+
+4. Continuation value: bilinear interpolation in (w, z), exact lookup
+   in (ell, ix_A_prev, ix_B_prev). The 6D next_slice
+   (n_w, n_z, 2, n_xA, n_xB) is indexed directly.
+
+5. Memory: 7 × T × 15 × 5 × 2 × 3 × 3 = 7 × 76,950 = ~4.3 MB.
+   Well within server1 limits.
+
+6. Compute estimate: ~4.6× v3 baseline (~2.5 hours wall per regime
+   at default small grid). Per spec.
+
+**Files created**:
+- `src/vfi_solver_v4.jl` (901 LOC)
+- `scripts/run_option1_e1.sh` (E1_2L baseline run script)
+- `scripts/run_option1_e2.sh` (E2_2L Option 1 run script)
+
+**Branch**: `auto/2026-06-12-v4-state-extension`
+
+**Smoke test**: `smoke_test_v4()` checks 9 conditions — sigma
+decomposition, x_prev grid shape, 6D array allocation, terminal slice,
+tx_cost arithmetic (7 cases), housing_cost spot-checks, shock block
+weight sum, p_relocate boundary, index consistency. All runnable via
+`julia src/vfi_solver_v4.jl --smoke-test` on server1 (no VFI required).
+
+**Next actions** (server1 required, user-owned):
+- Step 5: `julia src/vfi_solver_v4.jl --smoke-test` → write
+  `output/diagnostics/p6_option1_smoke.md` with PASS/FAIL per check
+- Step 6: `bash scripts/run_option1_e1.sh` and `bash scripts/run_option1_e2.sh`
+- Step 7: compute `CEV(E2_2L_v4 vs E1_2L_v4)`, verify H1/H2/H3
+
+**Hypotheses to test after step 6**:
+- H1: mean_xB > 0 at ell=A (hedge channel activates)
+- H2: CEV(E2_2L_v4 vs E1_2L_v4) > 4.255% (Option 3 baseline)
+- H3: hedge channel CEV(E2_2L_v4 vs E2_2L_v3) ≈ 0.5-1.5%
+
