@@ -16,9 +16,10 @@ proper tau_buy hedge mechanism.
 | 2 | Create `src/vfi_solver_v4.jl`: 6D state `(t, w, z, ell, x_A_prev, x_B_prev)` + tx_cost on deltas | cloud agent | file pushed |
 | 3 | Use coarse `x_prev` grid: `N_X_PREV=3` (e.g., {0, 0.5, 1.0}); reduce N_W=15, N_Z=5 to compensate | cloud agent | env-var configurable |
 | 4 | Smoke test stub `smoke_test_v4()` checking 6D allocation, tx_cost computation, state update consistency | cloud agent | callable via `--smoke-test` |
-| 5 | Smoke test on server1 (USER) | user/me | `output/diagnostics/p6_option1_smoke.md` |
-| 6 | Run E1_2L_v4 + E2_2L_v4 baselines (USER) | user/me | `p6_option1_e*.json` |
-| 7 | Compute decomposition + write up | user/me | `p6_option1_decomposition.md` |
+| **DONE 2026-06-13** | Steps 1–4 above completed. Branch: `auto/2026-06-13-option1-state-extension`. File: `src/vfi_solver_v4.jl` (~490 LOC). Run scripts: `scripts/run_option1_e1.sh`, `scripts/run_option1_e2.sh`. | cloud agent | pushed |
+| 5 | Smoke test on server1: `julia src/vfi_solver_v4.jl --smoke-test` | user/me | `output/diagnostics/p6_option1_smoke.md` |
+| 6 | Run E1_2L_v4 + E2_2L_v4 baselines: `bash scripts/run_option1_e1.sh` and `run_option1_e2.sh` | user/me | `p6_option1_e*.json` |
+| 7 | Compute decomposition + write up. Key check: H1 mean_xB>0 at ellA, H2 CEV>4.255%, H3 hedge channel ~0.5-1.5% | user/me | `p6_option1_decomposition.md` |
 
 ## Hypotheses to test (after step 6)
 

@@ -991,3 +991,73 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-06-13 — vfi_solver_v4.jl: 6D state extension (Option 1) implemented
+
+**Action picked**: P0 item 2 from `next_actions.md` — create
+`src/vfi_solver_v4.jl` with the 6D state `(t, w, z, ell, x_A_prev,
+x_B_prev)` and per-period tau_buy on positive x deltas.
+
+**Rationale**: This is the highest-priority unblocked action (P0,
+user-confirmed 2026-05-02). Option 3 (v3 synthetic tau_buy at
+relocation) left mean_xB=0 in E2_2L — the hedge mechanism never
+activated. Option 1 is the proper fix: pre-holding x_B at ell=A costs
+tau_buy NOW, but saves tau_buy on future relocation buying. The option
+value of pre-holding should be large enough to make mean_xB > 0 at
+ell=A, activating the hedge mechanism and lifting CEV above 4.26%.
+
+**Architecture** (`src/vfi_solver_v4.jl`, ~490 LOC):
+
+- **6D value function**: `[T, N_W, N_Z, 2, N_X_PREV, N_X_PREV]`.
+  Default dims at small mode: 57 × 15 × 5 × 2 × 3 × 3 ≈ 76 K entries
+  = ~4 MB total (6 Float64 arrays + BitArray). Very manageable.
+
+- **x choices restricted to x_prev_grid**: avoids x_prev interpolation
+  in continuation value; exact 6D index lookup. x_prev_grid linearly
+  spaced 0..X_PREV_MAX (default 1.0, N_X_PREV=3 → {0, 0.5, 1.0}).
+  Set X_PREV_MAX=1.0 so grid[end]=1.0 exactly (E1_2L binary ownership).
+
+- **Transaction cost rule (per period)**:
+  `tx_cost = tau_buy*(max(Δ_A,0)+max(Δ_B,0)) + tau_token*(max(-Δ_A,0)+max(-Δ_B,0))`
+  Applied in the budget constraint every period for all regimes.
+
+- **x_prev state transition**:
+  - Stay: next x_prev = (ix_A_new, ix_B_new) for all regimes.
+  - E1_2L relocate: x_prev resets to (1,1)=(0.0,0.0) — forced sale
+    clears position. sell_factor = (1 - tau_sell) on wealth transition.
+  - E2_2L relocate: x_prev = (ix_A_new, ix_B_new) — tokens portable.
+
+- **Hedge mechanism** now correctly incentivized: a household at ell=A
+  with x_B_prev=0 who buys x_B_new=0.5 pays tau_buy*0.5 = 1.25% this
+  period. If they relocate to B next period (prob p_relocate=6%), they
+  arrive with x_B_prev=0.5 and avoid paying tau_buy*0.5 again.
+  Expected savings: p_reloc * tau_buy * x_B = 0.06 * 0.025 * 0.5 ≈
+  0.075% per period. Lifetime NPV non-trivial at high mobility ages.
+
+- **v3 solver preserved** at `src/vfi_solver_v3.jl` (baseline ref).
+
+- **Defaults** coarser than v3 to offset ~4.6x state expansion:
+  N_W=15 (vs 21), N_Z=5 (vs 7), ASSET_GRID_SIZE=7 (vs 9). Net
+  compute ratio vs v3: state expansion (4.6x) × grid reduction (0.51)
+  ≈ 2.35x per regime. Estimate ~70 min per regime on server1
+  (vs ~30 min for v3).
+
+**Smoke test** (`--smoke-test` flag): checks 6D allocation, terminal
+slice, tx_cost_v4 spot-checks (5 cases), housing_cost spot-checks,
+x_prev_grid anchor, shock block, state count, state transition logic.
+VFI not run (no Julia in cloud env).
+
+**Run scripts** added:
+- `scripts/run_option1_e1.sh` — E1_2L baseline (user runs on server1)
+- `scripts/run_option1_e2.sh` — E2_2L baseline (user runs; check
+  `mean_xB_t1_ellA > 0` as the primary hedge-activation indicator)
+
+**Feature branch**: `auto/2026-06-13-option1-state-extension`
+
+**Next queued (user on server1)**:
+1. `julia src/vfi_solver_v4.jl --smoke-test` — confirm smoke PASS
+2. `bash scripts/run_option1_e1.sh` — E1_2L baseline
+3. `bash scripts/run_option1_e2.sh` — E2_2L baseline
+4. Check hypotheses: H1 mean_xB>0, H2 CEV>4.255%, H3 hedge channel~0.5-1.5%
+5. If H1+H2+H3 hold: RFS-credible → proceed to Phase 2 (calibration,
+   sensitivity, manuscript). If fail: Path D (REE/JHE, +4.26%).
+
