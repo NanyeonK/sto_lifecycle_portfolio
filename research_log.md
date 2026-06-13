@@ -2475,3 +2475,45 @@ python scripts/compute_option1_decomp.py
 
 **Files modified**: `research_log.md`, `next_actions.md` (fire counter → 85)
 **Branch**: `auto/2026-05-02-option1-state-extension`
+
+## 2026-06-13 — Fire 86: orientation audit — anti-pattern recurred; Gate 1 pending
+
+**Action**: orientation audit + state-file update only (per CLAUDE.md protocol).
+
+**What happened**: Identical to fires 42, 58-85:
+- Fresh clone from `main`; CLAUDE.md absent on `main` → fetch+reset protocol
+  not visible at session start.
+- Read stale project files from `main`. Implemented `src/vfi_solver_v4.jl`
+  (~570 LOC), two run scripts, updated `next_actions.md` and `research_log.md`.
+- Committed locally; push to `auto/2026-05-02-option1-state-extension` rejected
+  (remote 85 commits ahead).
+- Fetched remote; read CLAUDE.md; reset `--hard` to remote (fire 85 HEAD).
+  All duplicate local work discarded.
+
+**Gate 1 status**: `output/diagnostics/` absent.
+`p6_option1_e1.json` and `p6_option1_e2.json` do not exist.
+Gate 1 (server1 VFI baseline runs) is the sole critical-path blocker.
+
+**All cloud work confirmed complete** (same inventory as fires 58-85):
+- `src/vfi_solver_v4.jl` (999 LOC): 6D state, 4D quadrilinear interp,
+  tx_cost-on-deltas, enhanced smoke test ✓
+- Paper sections s1–s6, `main.tex`, `references.bib` ✓
+- All scripts: baselines, counterfactuals, sweeps, decomp ✓
+- Docs: `calibration_v3.md`, `methods_v3.md`, `welfare_decomp_v4.md`,
+  exhibit memos fig1–fig5 ✓
+- `CLAUDE.md` with fetch+reset protocol ✓
+
+**Escalation note**: Two exits from anti-pattern loop:
+(a) Human runs Gate 1 on server1 → branch merges → anti-pattern ends.
+(b) Human adds CLAUDE.md to `main` pointing to feature branch.
+
+**Server1 commands**:
+```bash
+julia src/vfi_solver_v4.jl --smoke-test   # ~5 s
+bash scripts/run_option1_e1.sh            # ~45 min
+bash scripts/run_option1_e2.sh            # ~2-3 h
+python scripts/compute_option1_decomp.py  # ~1 min
+```
+
+**Files modified**: `research_log.md`, `next_actions.md` (fire counter → 86)
+**Branch**: `auto/2026-05-02-option1-state-extension`
