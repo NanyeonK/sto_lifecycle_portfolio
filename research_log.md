@@ -2420,3 +2420,58 @@ would suffice. Until then, the cron fires will continue hitting this pattern.
 
 **Files modified**: `research_log.md`, `next_actions.md` (fire counter → 83)
 **Branch**: `auto/2026-05-02-option1-state-extension`
+
+## 2026-06-13 — Fire 85: orientation audit — anti-pattern recurred (fires 42, 58-85); Gate 1 pending
+
+**Action**: orientation audit + state-file update only.
+
+**What happened**: Same structural anti-pattern as fires 42, 58-84:
+- Fresh clone from `main`; CLAUDE.md does not exist on `main` so mandatory
+  fetch+reset protocol was invisible at start.
+- Read stale `next_actions.md` (from `main`) showing steps 1-4 as "file pushed"
+  without explicit DONE markers; re-implemented `src/vfi_solver_v4.jl` (~630 LOC)
+  and wrote three run scripts.
+- Committed locally, attempted `git push -u origin auto/2026-05-02-option1-state-extension`.
+- Push rejected: remote branch was 84 commits ahead (fires 1-84).
+- Fetched remote; read CLAUDE.md; reset `--hard` to remote (fire 84 HEAD).
+- All duplicate local work discarded.
+
+**Gate 1 status confirmed**: `output/diagnostics/` directory empty.
+`p6_option1_e1.json` and `p6_option1_e2.json` absent.
+Gate 1 (server1 VFI baseline runs) remains the sole critical-path blocker.
+
+**Anti-pattern root cause (unchanged from fire 84)**:
+CLAUDE.md lives only on `auto/2026-05-02-option1-state-extension`, not on `main`.
+The cron fires always clone from `main` and are structurally blind to CLAUDE.md
+until the feature branch is merged. Recommended mitigations (unchanged):
+(a) Human runs Gate 1 on server1 to unblock merge, OR
+(b) Human adds a 2-line CLAUDE.md to `main` pointing to the feature branch.
+
+**All cloud work confirmed complete** (same as fires 58-84):
+- `src/vfi_solver_v4.jl` (999 LOC): 6D state, 4D quadrilinear interp,
+  tx_cost-on-deltas, enhanced smoke test ✓
+- All paper sections (s1-s6), `main.tex`, `references.bib` ✓
+- All scripts: baselines, counterfactuals, sensitivity sweeps, decomp ✓
+- All docs: `calibration_v3.md`, `methods_v3.md`, `welfare_decomp_v4.md`,
+  all exhibit memos ✓
+- `CLAUDE.md` with fetch+reset protocol ✓
+
+**Gate 1 (server1 VFI baselines) is the sole critical-path blocker.**
+
+**Server1 commands (ready to run)**:
+```bash
+# 1. Smoke test (~5 seconds, no VFI):
+julia src/vfi_solver_v4.jl --smoke-test
+
+# 2. E1_2L baseline (~45 min):
+bash scripts/run_option1_e1.sh
+
+# 3. E2_2L baseline (~2-3 hours):
+bash scripts/run_option1_e2.sh
+
+# 4. CEV decomposition:
+python scripts/compute_option1_decomp.py
+```
+
+**Files modified**: `research_log.md`, `next_actions.md` (fire counter → 85)
+**Branch**: `auto/2026-05-02-option1-state-extension`
