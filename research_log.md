@@ -991,3 +991,74 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-06-14 — v4 solver implemented (Option 1 full state extension)
+
+**Action picked**: P0 — create `src/vfi_solver_v4.jl`, the 6D state extension
+with proper tau_buy on deltas. This is the approved Option 1 path per
+`handoff/tau_buy_option1_spec.md` (user decision 2026-05-02).
+
+**What changed from v3:**
+
+1. **6D state** `(t, w, z, ell, ix_A_prev, ix_B_prev)` replaces the 4D
+   `(t, w, z, ell)`. `ix_A_prev` and `ix_B_prev` are grid indices into
+   the x_prev grid (default N_X_PREV=3: {0.0, 0.5, 1.0}).
+
+2. **Transaction costs on deltas every period:**
+   ```
+   delta_A  = x_A_new - x_A_prev
+   delta_B  = x_B_new - x_B_prev
+   tx_cost  = tau_buy   * (max(delta_A,0) + max(delta_B,0))
+            + sell_rate * (max(-delta_A,0) + max(-delta_B,0))
+   ```
+   `sell_rate = tau_sell (6%) for E1_2L; tau_token (1%) for E2_2L`.
+   Sell cost fully in the budget constraint; sell_factor removed from
+   the wealth transition.
+
+3. **Hedge mechanism now properly encoded**: a household at ell=A who
+   pre-holds x_B tokens by paying `tau_buy * delta_B` today avoids
+   paying `tau_buy * x_B_prev` at next relocation to B. The x_prev
+   state carries this position forward deterministically.
+
+4. **x_new choices from same grid as x_prev**: enables exact-index state
+   transition (no interpolation in x dimensions — only (w, z) interp).
+   This keeps the implementation tractable: per-choice continuation
+   value uses `view(next_value_arr, :, :, :, ix_A_new, ix_B_new)` — a
+   (n_w, n_z, 2) slice, same as v3.
+
+5. **E1_2L forced round-trip captured naturally**: at (ell=B, x_A_prev=1,
+   x_B_prev=0) after relocating from A, E1_2L admissibility forces
+   x_A_new=0, so delta_A=-1 → budget deduction tau_sell*1. Choosing
+   x_B_new=1: delta_B=+1 → tau_buy*1. Total round-trip = 8.5%. No
+   special-case logic needed.
+
+**Default grid spec (coarse first-cut):**
+- N_X_PREV=3, X_PREV_MAX=1.0 → x_prev grid {0.0, 0.5, 1.0}
+- N_W=15, N_Z=5, ASSET_GRID_SIZE=7, GH_NODES=3
+- State array: 57×15×5×2×3×3 = 76,950 state points (~0.6 MB per array)
+- Compute: ~4-8x v3 baseline (~2-4h per regime on server1 estimate)
+
+**Files created:**
+- `src/vfi_solver_v4.jl` (~630 LOC)
+- `scripts/run_option1_e1.sh` (E1_2L baseline)
+- `scripts/run_option1_e2.sh` (E2_2L baseline)
+- Feature branch: `auto/2026-06-14-v4-state-extension`
+
+**Smoke test stub** `smoke_test_v4()` checks: sigma decomposition,
+6D array allocation + memory, terminal slice, tx_cost computation
+(buy/sell/round-trip/zero cases), housing_cost rule, shock block,
+x_prev state-transition consistency, p_relocate boundary.
+
+**NOT run** — cloud env lacks Julia; queued for server1.
+
+**Hypotheses to test after server1 run:**
+- H1: mean_xB > 0 at ell=A (hedge mechanism activates with proper state)
+- H2: CEV(E2_2L_v4 vs E1_2L_v4) > 4.255% (beats Option 3 baseline)
+- H3: hedge channel `CEV(E2_2L_v4 vs E2_2L_v3)` ≈ 0.5-1.5%
+
+If H1+H2+H3: RFS-marginal. If any fails: Path D (REE/JHE at +4.26%).
+
+**Next queued (server1, USER):**
+1. `bash scripts/run_option1_e1.sh` → `output/diagnostics/p6_option1_e1.json`
+2. `bash scripts/run_option1_e2.sh` → `output/diagnostics/p6_option1_e2.json`
+3. Compute CEV and report decomposition.
+

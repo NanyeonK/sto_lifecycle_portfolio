@@ -2,7 +2,20 @@
 
 Updated: 2026-05-01
 
-## STRATEGIC: v3 mechanism is empirically dead at symmetric calibration
+## STATUS UPDATE 2026-06-14: Option 1 (B) implementation in progress
+
+v4 solver with 6D state extension committed to branch
+`auto/2026-06-14-v4-state-extension`. Awaiting server1 runs
+(steps 5-7 in next_actions.md P0 table). User runs:
+  bash scripts/run_option1_e1.sh   # E1_2L baseline
+  bash scripts/run_option1_e2.sh   # E2_2L baseline
+Then compute CEV and compare to H1/H2/H3 hypotheses.
+
+Decision below was resolved by choosing Path (B). Keeping for record.
+
+---
+
+## [RESOLVED 2026-05-02] STRATEGIC: v3 mechanism is empirically dead at symmetric calibration
 
 Three rounds of empirical evidence (full-grid baseline + Round 4
 falsification + p_relocate sensitivity at p in {0, 0.06, 0.30})
