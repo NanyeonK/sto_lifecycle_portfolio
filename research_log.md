@@ -991,62 +991,54 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
-## 2026-06-14 — v4 solver (Option 1 full state extension) implemented
+## 2026-06-14 — Option 1 v4 solver implemented (6D state extension)
 
-**Action picked**: P0 — create `src/vfi_solver_v4.jl` per
-`handoff/tau_buy_option1_spec.md`. This is the proper implementation
-of the tau_buy pre-hold hedge channel that Option 3 could not test
-(Option 3 was a static approximation; Option 1 tracks previous-period
-x holdings as state so the dynamic pre-hold incentive is correctly
-priced in).
-
-**Key design choices**:
-
-1. **State**: `(t, w, z, ell, x_A_prev, x_B_prev)` — 6D.
-   x_prev grid: `N_X_PREV=3` points, {0, 0.75, 1.5} default
-   (env-var `N_X_PREV`, `X_PREV_MAX`). Compensated by N_W=15, N_Z=5.
-
-2. **Per-period tx_cost on deltas**:
-   ```
-   delta_A = x_A_new - x_A_prev
-   delta_B = x_B_new - x_B_prev
-   tx_cost = tau_buy  * (max(Δ_A,0) + max(Δ_B,0))
-           + sell_rate * (max(-Δ_A,0) + max(-Δ_B,0))
-   ```
-   where `sell_rate = tau_token` for E2_2L (digital tokens, cheap)
-   and `sell_rate = tau_sell` for E1_2L (physical property sale, 6%).
-   This is the structural difference that makes x_B pre-holding
-   genuinely attractive in E2_2L.
-
-3. **Continuation value**: 4D interpolation over (w, z, x_A_prev, x_B_prev)
-   via `interp_4d_v4()`. Choices (x_A_new, x_B_new) become (x_A_prev,
-   x_B_prev) at t+1 — picked up naturally in the interpolation lookup.
-
-4. **6D SolverResult arrays**: (T, n_w, n_z, n_ell, n_xAprev, n_xBprev).
-   Memory at defaults: ~600 KB (trivially small).
-
-5. **Smoke test**: `smoke_test_v4()` checks 6D allocation, terminal slice,
-   tx_cost computations (5 cases including zero-delta, buy, sell for
-   E1_2L and E2_2L), shock block, 4D interpolation at grid point,
-   p_relocate boundaries. Run via `julia src/vfi_solver_v4.jl --smoke-test`.
-
-**Files created**:
-- `src/vfi_solver_v4.jl` (~560 LOC)
-- `scripts/run_option1_e1.sh` (E1_2L baseline run script)
-- `scripts/run_option1_e2.sh` (E2_2L baseline run script)
+**Action picked**: P0 in `next_actions.md` — create `src/vfi_solver_v4.jl`
+implementing the full 6D state `(t, w, z, ell, x_A_prev, x_B_prev)` plus
+delta-based transaction costs, per the Option 1 spec in
+`handoff/tau_buy_option1_spec.md`.
 
 **Branch**: `auto/2026-06-14-option1-state-extension`
 
-**Next_actions.md steps 1-4 marked DONE**. Steps 5-7 are USER actions
-on server1:
-- Step 5: `julia src/vfi_solver_v4.jl --smoke-test`
-- Step 6: `bash scripts/run_option1_e1.sh` then `bash scripts/run_option1_e2.sh`
-- Step 7: compute `CEV(E2_2L_v4 vs E1_2L_v4)` and check H1/H2/H3 hypotheses
+**Files**:
+- `src/vfi_solver_v4.jl` (~560 LOC): full 6D solver
+- `scripts/run_option1_e1.sh`: E1_2L baseline run script (ASSET=7, X=4)
+- `scripts/run_option1_e2.sh`: E2_2L baseline run script
 
-**Hypotheses to verify** (from spec):
-- H1: `mean_xB > 0` at `ell=A` in E2_2L (hedge mechanism activates)
-- H2: `CEV(E2_2L_v4 vs E1_2L_v4) > 4.255%` (Option 3 baseline)
+**Design**:
+
+1. **State**: `(t, w, z, ell, x_A_prev, x_B_prev)` — 6D.
+   x_prev grid: N_X_PREV=3 points {0, 0.75, 1.5}. N_W=15, N_Z=5.
+
+2. **Per-period delta tx_cost**:
+   ```
+   tx_cost = tau_buy   * (max(Δ_A,0) + max(Δ_B,0))
+           + sell_rate * (max(-Δ_A,0) + max(-Δ_B,0))
+   ```
+   sell_rate = tau_sell for E1_2L (physical property); tau_token for E2_2L
+   (tokens). E1_2L forced sell at relocation also uses sell-factor (1-tau_sell)
+   in wealth transition.
+
+3. **Continuation value**: 4D bilinear interpolation over (w, z, x_A_prev,
+   x_B_prev) via `interp_4d_v4()`. Choices (x_A_new, x_B_new) become the
+   next period's (x_A_prev, x_B_prev) via direct interpolation lookup.
+
+4. **Smoke test**: 5 tx_cost cases (buy, sell, mixed, zero, regime-switch),
+   4D interp at grid point, 6D shape, terminal slice, shock block.
+   Run: `julia src/vfi_solver_v4.jl --smoke-test`.
+
+**Hypotheses to verify on server1**:
+- H1: `mean_xB > 0` at ell=A in E2_2L (hedge mechanism activates)
+- H2: `CEV(E2_2L_v4 vs E1_2L_v4) > 4.255%` (beat Option 3 baseline)
 - H3: `CEV(E2_2L_v4 vs E2_2L_v3) ≈ 0.5-1.5%` (incremental hedge channel)
 
-If H1+H2+H3: RFS-credible path. If any fails: fall back to Path D (REE/JHE).
+Expected mechanism: E2_2L household at ell=A pre-holds x_B now (pays tau_buy
+incrementally), avoids lump tau_buy on relocation. Expected saving per unit
+x_B: `p_relocate * tau_buy = 0.06 × 0.025 = 0.0015` per period.
+
+**Next step for user (server1)**:
+1. `julia src/vfi_solver_v4.jl --smoke-test`
+2. `bash scripts/run_option1_e1.sh` → `output/diagnostics/p6_option1_e1.json`
+3. `bash scripts/run_option1_e2.sh` → `output/diagnostics/p6_option1_e2.json`
+4. Check H1/H2/H3. If all hold → RFS-marginal; if any fails → PATH D (REE/JHE).
 
