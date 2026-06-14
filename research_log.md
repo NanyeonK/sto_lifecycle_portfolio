@@ -991,3 +991,93 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-06-14 — Option 1 v4 solver implemented (6D state extension)
+
+**Action picked**: P0 in `next_actions.md` — create `src/vfi_solver_v4.jl`
+implementing the full 6D state `(t, w, z, ell, x_A_prev, x_B_prev)` plus
+delta-based transaction costs, per the Option 1 spec in
+`handoff/tau_buy_option1_spec.md`.
+
+**Branch**: `auto/2026-06-14-option1-state-extension`
+
+**Files created**:
+- `src/vfi_solver_v4.jl` (~530 LOC): full 6D solver
+- `scripts/run_option1_e1.sh`: E1_2L baseline run script
+- `scripts/run_option1_e2.sh`: E2_2L baseline run script
+
+**Key design decisions in v4**:
+
+1. **State extension to 6D**: `(t, w, z, ell, x_A_prev, x_B_prev)`.
+   `SolverResult_v4` holds six 6D arrays. At default small grids
+   (N_W=15, N_Z=5, N_X_PREV=3): 6 × (57 × 15 × 5 × 2 × 3 × 3) ≈ 230 K entries
+   per array, ~10 MB total. Tractable.
+
+2. **Delta-based transaction costs** (correct Option 1 spec):
+   ```julia
+   dA = x_A_new - x_A_prev
+   dB = x_B_new - x_B_prev
+   tx_cost = tau_buy   * (max(dA,0) + max(dB,0))
+           + tau_token * (max(-dA,0) + max(-dB,0))
+   ```
+   Applied inside `solve_state_v4()` before the budget constraint, so the
+   household internalises the full incremental cost of buying tokens at any point
+   in the lifecycle — not just at forced relocation.
+
+3. **E1_2L sell-side**: tau_sell still applied in the wealth transition on
+   relocation (unchanged from v3). After relocation, x_prev indices for the
+   next period are reset to (1, 1) = (0.0, 0.0) because the E1_2L household
+   exits both positions at the relocation event (forced sale at current
+   location; fresh start at new location).
+
+4. **E1_2L buy-side**: tau_buy is charged in the *next* period as a positive
+   delta when x_ell_new = 1 at the new location. This is the correct,
+   non-approximate treatment vs. the Option 3 approximation.
+
+5. **E2_2L portability**: tokens portable across moves — sell factors remain
+   1.0 on relocation; (x_A_prev, x_B_prev) passed to the next-period state
+   are the chosen holdings, not zeroed out.
+
+6. **Continuation value**: `lookup_v_v4()` dispatches to bilinear interpolation
+   in (w, z) for each (ell, ix_A_prev, ix_B_prev) index. x_prev state
+   transitions use `nearest_xprev_idx()` (nearest-grid-point approximation;
+   coarse 3-point grid makes this exact at the boundary and near-exact
+   elsewhere).
+
+7. **Smoke test**: `smoke_test_v4()` verifies: sigma decomposition invariant,
+   6D array shapes, terminal slice health, shock block size and weight sum,
+   tx_cost computation (buy/sell/mixed), housing cost rule, nearest_xprev_idx
+   boundary cases, and hedge premium positivity check. All checks are
+   assertion-guarded; run with `julia src/vfi_solver_v4.jl --smoke-test`.
+
+**Expected hedge mechanism** (why Option 1 differs from Option 3):
+
+Under Option 1, an E2_2L household at ell=A who holds x_B_prev > 0 already
+*owns* those tokens — when it must (probabilistically) relocate to B, the
+increment it needs to buy in the next period is `1 - x_B_prev` instead of 1.
+The expected tau_buy saving per period per unit of x_B pre-held is:
+`p_relocate_working * tau_buy = 0.06 * 0.025 = 0.0015`. Over the ~40-year
+working-age horizon this compounds into a measurable hedge premium. The
+household must optimally trade off: paying tau_buy now on x_B (incremental
+cost) vs. saving p_relocate * tau_buy per period in expectation. Under the
+spec's hypothesis, this motivates mean_xB > 0 at ell=A even without a
+rent-saving benefit from x_B.
+
+**Smoke test not run** (cloud env lacks Julia; server1 run queued as
+step 5 in next_actions.md Option 1 chain).
+
+**Compute estimate** (per spec):
+- 6D state: N_W=15, N_Z=5, N_X_PREV=3, n_ell=2 → 15×5×2×3×3 = 1350 state
+  points per period.
+- Per state: 3^7 = 2187 quadrature points × inner loops.
+- vs. v3 small-grid: N_W=21, N_Z=7, n_ell=2 = 294 state points per period.
+- Scaling: (1350/294) × (7/4)^2 ≈ 9× per period (x_grid reduced 5→4, asset 9→7).
+- Per-regime wall: ~2-3 h on server1 (vs. ~15 min for v3 full-grid).
+- Recommended run order: E1_2L first (~2h), then E2_2L (~2h).
+
+**Next step for user (server1)**:
+1. `bash scripts/run_option1_e1.sh` → `output/diagnostics/p6_option1_e1.json`
+2. `bash scripts/run_option1_e2.sh` → `output/diagnostics/p6_option1_e2.json`
+3. Check H1 (mean_xB > 0 at ellA in E2_2L?), H2 (CEV > 4.255%?), H3 (hedge
+   channel ≈ 0.5-1.5%?).
+4. If H1+H2+H3 hold → RFS-marginal; continue to Phase 2. If any fail → PATH D.
+
