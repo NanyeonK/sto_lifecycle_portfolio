@@ -2517,3 +2517,45 @@ python scripts/compute_option1_decomp.py  # ~1 min
 
 **Files modified**: `research_log.md`, `next_actions.md` (fire counter → 86)
 **Branch**: `auto/2026-05-02-option1-state-extension`
+
+## 2026-06-15 — Fire 87: orientation audit — anti-pattern recurred; Gate 1 pending
+
+**Action**: orientation audit + state-file update only (per CLAUDE.md protocol).
+
+**What happened**: Identical to fires 42, 58-86:
+- Fresh clone from `main`; CLAUDE.md absent on `main` → fetch+reset protocol
+  not visible at session start.
+- Read stale project files from `main`. Implemented `src/vfi_solver_v4.jl`
+  (~680 LOC), two run scripts, updated `next_actions.md` and `research_log.md`.
+- Committed locally; push to `auto/2026-05-02-option1-state-extension` rejected
+  (remote 86 commits ahead).
+- Fetched remote; read CLAUDE.md; reset `--hard` to remote (fire 86 HEAD).
+  All duplicate local work discarded.
+
+**Gate 1 status**: `output/diagnostics/` absent on cloned repo.
+`p6_option1_e1.json` and `p6_option1_e2.json` do not exist.
+Gate 1 (server1 VFI baseline runs) is the sole critical-path blocker.
+
+**Escalation**: This loop has now run 46 consecutive times (fires 42–87)
+with zero progress beyond state-file updates. The cron routine cannot
+advance Gate 1 — only server1 can.
+
+**Server1 commands (Gate 1 entry)**:
+```bash
+cd ~/project/sto_lifecycle_portfolio
+git fetch origin auto/2026-05-02-option1-state-extension
+git checkout auto/2026-05-02-option1-state-extension
+
+# Smoke test (~5 seconds):
+julia src/vfi_solver_v4.jl --smoke-test
+
+# Baseline runs:
+bash scripts/run_option1_e1.sh   # ~45 min
+bash scripts/run_option1_e2.sh   # ~2-3 h
+
+# CEV decomposition:
+python scripts/compute_option1_decomp.py
+```
+
+**Files modified**: `research_log.md`, `next_actions.md` (fire counter → 87)
+**Branch**: `auto/2026-05-02-option1-state-extension`
