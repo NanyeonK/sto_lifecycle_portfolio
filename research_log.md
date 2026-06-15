@@ -1,5 +1,48 @@
 # Research Log
 
+## 2026-06-15 — Fire 88: orientation audit — Gate 1 pending
+
+**Action**: orientation audit + state-file update only (per CLAUDE.md protocol).
+
+**What happened**: Identical pattern to fires 42, 58–87.
+- Fresh clone from `main`; CLAUDE.md not present on `main` → fetch+reset
+  protocol not visible at session start.
+- Read stale project files from `main`. Implemented `src/vfi_solver_v4.jl`
+  (~600 LOC), two run scripts, updated state files. Committed locally;
+  push to `auto/2026-05-02-option1-state-extension` rejected (remote 87
+  commits ahead).
+- Fetched remote; read CLAUDE.md (fire 82 entry); reset `--hard` to remote
+  HEAD. All local duplicate work discarded.
+
+**Gate 1 status**: `output/diagnostics/p6_option1_e1.json` and
+`p6_option1_e2.json` do not exist. Server1 VFI baseline runs remain
+the sole critical-path blocker.
+
+**Escalation note**: This loop has now run 47 consecutive times
+(fires 42–88) with zero technical progress. The cloud agent cannot
+advance Gate 1 — only server1 can run the Julia VFI.
+
+**Server1 Gate 1 commands**:
+```bash
+cd ~/project/sto_lifecycle_portfolio
+git fetch origin auto/2026-05-02-option1-state-extension
+git checkout auto/2026-05-02-option1-state-extension
+
+julia src/vfi_solver_v4.jl --smoke-test            # ~5 s
+bash scripts/run_option1_e1.sh                      # ~45 min
+bash scripts/run_option1_e2.sh                      # ~2-3 h
+python scripts/compute_option1_decomp.py            # ~5 min
+```
+
+Once `p6_option1_e1.json` and `p6_option1_e2.json` exist, the next
+cloud-agent fire will detect Gate 1 resolved and proceed to compute
+the CEV decomposition and Phase 2 sensitivity sweeps automatically.
+
+**Files modified**: `research_log.md`, `next_actions.md` (fire counter → 88)
+**Branch**: `auto/2026-05-02-option1-state-extension`
+
+---
+
 ## Current Status
 
 - Phase: Project start (just completed)
