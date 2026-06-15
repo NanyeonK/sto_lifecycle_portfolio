@@ -2602,3 +2602,44 @@ python scripts/compute_option1_decomp.py
 
 **Files modified**: `research_log.md`, `next_actions.md` (fire counter → 87)
 **Branch**: `auto/2026-05-02-option1-state-extension`
+
+## 2026-06-15 — Fire 89: orientation audit — anti-pattern recurred (fires 42–89); ESCALATION
+
+**Action**: state-file update + escalation notification.
+
+**What happened**: Identical to fires 42, 58-88:
+- Fresh clone from `main`; CLAUDE.md absent from `main` → fetch+reset protocol
+  not visible at session start.
+- Read stale project files from `main`. Re-implemented `src/vfi_solver_v4.jl`,
+  run scripts, updated state files, committed locally.
+- Push to `auto/2026-05-02-option1-state-extension` rejected (remote 88 commits ahead).
+- Fetched remote; discarded duplicate local work; reset `--hard` to fire 88 HEAD.
+
+**Loop count**: 48 consecutive fires (fires 42–89) with no progress past Gate 1.
+
+**Gate 1 status**: `p6_option1_e1.json` and `p6_option1_e2.json` absent.
+Gate 1 requires Julia on server1; cloud env cannot run VFI.
+
+**All cloud work confirmed complete** (unchanged from fires 58-88):
+- `src/vfi_solver_v4.jl` (999 LOC) ✓
+- All paper sections s1-s6, `main.tex`, `references.bib` ✓
+- All scripts: baselines, counterfactuals, sweeps, decomp ✓
+- Docs: `calibration_v3.md`, `methods_v3.md`, `welfare_decomp_v4.md`,
+  exhibit memos fig1-fig5 ✓
+- `CLAUDE.md` with fetch+reset protocol ✓
+
+**PushNotification sent**: escalation to human re Gate 1 server1 run.
+
+**Server1 commands (Gate 1)**:
+```bash
+cd ~/project/sto_lifecycle_portfolio
+git fetch origin auto/2026-05-02-option1-state-extension
+git checkout auto/2026-05-02-option1-state-extension
+julia src/vfi_solver_v4.jl --smoke-test   # ~5 s
+bash scripts/run_option1_e1.sh            # ~45 min
+bash scripts/run_option1_e2.sh            # ~2-3 h
+python scripts/compute_option1_decomp.py
+```
+
+**Files modified**: `research_log.md`, `next_actions.md` (fire counter → 89)
+**Branch**: `auto/2026-05-02-option1-state-extension`
