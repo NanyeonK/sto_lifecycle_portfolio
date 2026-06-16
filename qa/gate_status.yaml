@@ -1,0 +1,11 @@
+project_id: sto_lifecycle_portfolio
+stage: '01'
+gate_A:
+  skill: aer-topic-selection
+  status: OPEN
+gate_B:
+  skill: idea-evaluation-pipeline
+  status: OPEN
+ledger: {}
+advance_allowed: false
+_schema: aers_10stage
