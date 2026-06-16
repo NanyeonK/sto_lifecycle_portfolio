@@ -2683,3 +2683,12 @@ python scripts/compute_option1_decomp.py
 
 **Files modified**: `research_log.md`, `next_actions.md` (fire counter → 90)
 **Branch**: `auto/2026-05-02-option1-state-extension`
+
+## 2026-06-16 — Fire 91: Gate 1 still pending (50 consecutive stalls)
+
+**Action**: state-file update only. CLAUDE.md fetch+reset followed on entry.
+`p6_option1_e1.json` absent — Gate 1 unchanged. No code re-implemented.
+
+**Files modified**: `research_log.md`, `next_actions.md` (fire counter → 91)
+**Branch**: `auto/2026-05-02-option1-state-extension`
+**Branch**: `auto/2026-05-02-option1-state-extension`
