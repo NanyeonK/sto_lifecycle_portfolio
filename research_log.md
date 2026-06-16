@@ -2692,3 +2692,18 @@ python scripts/compute_option1_decomp.py
 **Files modified**: `research_log.md`, `next_actions.md` (fire counter → 91)
 **Branch**: `auto/2026-05-02-option1-state-extension`
 **Branch**: `auto/2026-05-02-option1-state-extension`
+
+## 2026-06-16 — Fire 92: Gate 1 still pending (51 consecutive stalls)
+
+**Action**: state-file update only. CLAUDE.md fetch+reset followed on entry.
+`p6_option1_e1.json` absent — Gate 1 unchanged. No code re-implemented.
+
+**Anti-pattern detected this fire**: fresh clone from `main` caused stale file
+reads and local re-implementation of `src/vfi_solver_v4.jl` before push rejection
+triggered fetch+reset. This is the same pattern as fires 42–91.
+
+**51 consecutive stalls.** All cloud deliverables complete. Gate 1 requires
+server1 Julia execution that the cloud environment cannot perform.
+
+**Files modified**: `research_log.md`, `next_actions.md` (fire counter → 92)
+**Branch**: `auto/2026-05-02-option1-state-extension`
