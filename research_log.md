@@ -991,3 +991,64 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-06-16 — v4 solver: Option 1 full state extension implemented
+
+**Action picked**: P0 in next_actions.md — create `src/vfi_solver_v4.jl`
+with 6D state `(t, w, z, ell, ix_A_prev, ix_B_prev)` and proper tau_buy
+on positive deltas. This is the correct implementation of Path B Option 1
+approved 2026-05-02.
+
+**Motivation**: Option 3 (tau_buy approximation at relocation) confirmed
+cross-location hedge mean_xB = 0 (hedge dead). Option 1 is the proper fix:
+pre-holding x_B at ell=A costs tau_buy once NOW and saves tau_buy on
+relocation to B. Under correct x_prev state tracking, this creates a
+genuine expected hedge premium of `p_relocate * tau_buy ≈ 0.0015/period`.
+
+**Files created**:
+- `src/vfi_solver_v4.jl` (~450 LOC) — 6D solver with full tx_cost on deltas
+- `scripts/run_option1_e1.sh` — E1_2L baseline run script
+- `scripts/run_option1_e2.sh` — E2_2L Option 1 run script
+
+**Key design decisions**:
+
+1. **State**: 6D arrays `(T, N_W, N_Z, 2, N_xp, N_xp)`. Default
+   N_X_PREV=3, X_PREV_MAX=2.0 → x_prev_grid = {0.0, 1.0, 2.0}.
+   Memory: ~2.5 MB for 6 arrays at small grids (N_W=15, N_Z=5, N_xp=3).
+   Total state points: 57 × 15 × 5 × 2 × 3 × 3 = 76,950.
+
+2. **Choices constrained to x_prev grid**: x_A_new and x_B_new must lie
+   on x_prev_grid = {0, 1, 2}. E2_2L: 9 (x_A, x_B) combinations per
+   state. This avoids interpolation in x_prev dimensions and keeps the
+   state transition exact (ix_A_new directly indexes next-period x_prev).
+
+3. **tx_cost rule**:
+   - E2_2L: `tau_buy * (max(delta_A,0) + max(delta_B,0)) + tau_token * (max(-delta_A,0) + max(-delta_B,0))`
+   - E1_2L: `tau_buy * max(delta_ell, 0)` only (selling handled via sell_factor)
+
+4. **E1_2L relocation state update**: after forced sale on relocation from
+   A→B, x_A_prev is set to 0 (index 1) for the next period (reflecting that
+   the asset was sold). This avoids tau_token double-count with sell_factor.
+
+5. **Housing cost**: corrected occupied-only rule (from the 2026-05-01 fix
+   merged to main): `kappa = rho - x_ell_local * (rho - m)` for E2_2L.
+
+6. **Smoke test**: `smoke_test_v4()` checks sigma decomposition, x_prev
+   grid shape, 6D array dimensions, terminal slice, shock block, tx_cost
+   spot-checks (6 cases), housing cost, state transition integrity,
+   p_relocate boundaries. Does NOT run VFI (server1 required).
+
+**Compute estimate (server1)**:
+- Per state-point: 9 (x,x) combos × 81 (b,s) pairs × 2187 quadrature pts = ~1.6M FLOPs
+- Total: 76,950 states × 1.6M ≈ 1.2 × 10^11 FLOPs per VFI (all periods)
+- At 2e9 FLOP/s (conservative, single thread): ~60 s per period? Too slow.
+- Actual: inner loop is simple arithmetic. Expect ~30-60 min per regime at N_W=15.
+  This is ~4.6x v3 (matches spec estimate).
+
+**Hypotheses to test** (on server1):
+- H1: mean_xB > 0 at ell=A in E2_2L_v4 (pre-holding hedge activates)
+- H2: CEV(E2_2L_v4 vs E1_2L_v4) > 4.255% (exceeds Option 3 baseline)
+- H3: hedge channel CEV(E2_2L_v4 vs E2_2L_v3) ≈ 0.5-1.5%
+
+**Next action**: run smoke test and VFI on server1 (user task).
+Branch: `auto/2026-06-16-option1-state-extension`.
+
