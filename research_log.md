@@ -991,3 +991,68 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-06-17 — v4 solver skeleton: Option 1 full state extension
+
+**Action picked**: P0 Option 1 — create `src/vfi_solver_v4.jl` with 6D
+state `(t, w, z, ell, x_A_prev, x_B_prev)` and proper transaction-cost
+mechanism via deltas. This is the highest-priority auto-allowed action in
+`next_actions.md` (P0 row, Steps 1-4 are cloud-agent owned).
+
+**Motivation**: Option 3 (v3 approximate tau_buy) was tested 2026-05-02
+and found dead (mean_xB still 0 at any p_relocate). Option 1 is the
+correct implementation: track previous-period x holdings as state; charge
+tau_buy on POSITIVE deltas every period; pre-holding x_B at ell=A then
+reduces the buying-cost increment on relocation. This is the only
+remaining path to activate the cross-location hedge channel.
+
+**Key design choices**:
+
+1. **6D state** `(t, w, z, ell, x_A_prev, x_B_prev)`: x_A_prev and
+   x_B_prev track holdings entering each period. Initial state at t=1:
+   x_A_prev = x_B_prev = 0 (no prior holdings).
+
+2. **x_new choices restricted to x_prev_grid** (default {0, 0.5, 1.0}):
+   ensures exact 6D state update without projection. 9 housing combos at
+   N_X_PREV=3. Configurable via N_X_PREV and X_PREV_MAX env vars.
+
+3. **tx_cost on deltas** (charged in budget each period):
+   - `tau_buy * max(delta_A, 0) + max(delta_B, 0)` for both regimes
+   - `tau_token * max(-delta_A, 0) + max(-delta_B, 0)` for E2_2L only
+   - E1_2L forced sell cost remains in sell_factor (wealth transition);
+     no double-counting.
+
+4. **E1_2L relocation state update**: (ixA_reloc, ixB_reloc) = (0, 0) —
+   forced sell zeroes x_A_prev at new location. E1_2L cannot pre-hold
+   future-location tokens; always arrives at new location with x_prev=0.
+
+5. **E2_2L relocation state update**: tokens portable — (ixA_reloc,
+   ixB_reloc) = (ixA_new, ixB_new). Pre-held x_B tokens carry over to
+   ell=B on relocation, reducing next-period delta_B and its tau_buy cost.
+
+6. **Housing cost FIXED rule** (from v3 falsification 2026-05-01):
+   only occupied-location x_ell reduces rent in E2_2L. x_{ell'} is a
+   purely financial asset (capital gain + portability).
+
+7. **Grid defaults reduced** to offset 6D memory: N_W=15 (was 21),
+   N_Z=5 (was 7). Net compute vs v3: ~4-5× per regime at N_X_PREV=3.
+   Expected ~2-3 hours/regime wall on server1.
+
+**Files created**:
+- `src/vfi_solver_v4.jl` (~590 LOC): full 6D VFI solver + smoke test
+- `scripts/run_option1_e1.sh`: E1_2L baseline run script for server1
+- `scripts/run_option1_e2.sh`: E2_2L Option 1 run script for server1
+
+**Smoke test** (`julia src/vfi_solver_v4.jl --smoke-test`):
+Not runnable in cloud env (Julia absent). Server1 run queued as next step.
+Checks: sigma decomposition, tx_cost invariants (buy/sell/hold/E1_2L),
+housing_cost_v4 FIXED rule, 6D array shape, terminal slice, shock block.
+
+**Feature branch**: `auto/2026-06-17-option1-state-extension`
+
+**Next steps (server1, user)**:
+1. `julia src/vfi_solver_v4.jl --smoke-test` — verify structural checks PASS
+2. `bash scripts/run_option1_e1.sh` — E1_2L baseline (~2-3h wall)
+3. `bash scripts/run_option1_e2.sh` — E2_2L Option 1 (~2-3h wall)
+4. Compare: check H1 (mean_xB > 0 at ellA in E2_2L), H2 (CEV > 4.255%), H3 (hedge ≈ 0.5-1.5%)
+5. If H1+H2+H3: RFS-credible; continue Phase 2. Else: fallback to Path D.
+
