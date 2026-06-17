@@ -1,0 +1,186 @@
+% s1_intro.tex — Introduction
+% Paper: "Tokenized Housing and Lifecycle Portfolio Choice:
+%         A Decoupling of Location from Housing Exposure"
+%
+% Source: paper/outline_v4.md §1 (sections 1.1–1.4)
+%         docs/welfare_decomp_v4.md §5–6 (contribution framing)
+%         docs/calibration_v3.md (empirical anchors)
+%
+% Status: skeleton complete; [PLACEHOLDER] marks require server1 numerical results.
+%         Fill in before submission: CEV headline, channel magnitudes, H1 evidence.
+%
+% Compilation: \input{sections/s1_intro} from main.tex
+%              Requires amsmath, hyperref, natbib (or biblatex).
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Introduction}
+\label{sec:intro}
+% ─────────────────────────────────────────────────────────────────────────────
+
+American households relocate frequently.
+The Panel Study of Income Dynamics (PSID) records inter-MSA mobility rates of
+5--7\% per year among working-age adults, implying that more than 70\% of
+households move at least once between ages~25 and~65.
+Each relocation under traditional homeownership forces a \emph{sell-and-buy
+round-trip}: the household sells the current residence, incurring a broker
+commission and closing costs of roughly 6\% of home value, then purchases at
+the new location, adding origination fees, title insurance, and inspection
+costs of a further 2--3\%.
+The aggregate round-trip transaction cost is approximately 8--10\% of home
+value per relocation event \citep{NAR2023, CFPB2022}.
+
+These frictions impose a compounding welfare loss over the lifecycle.
+A household that relocates four times between ages~25 and~65~---~a plausible
+modal count under PSID mobility rates---~faces cumulative round-trip costs
+of 32--40\% of a home's value, equivalent to multiple years of mortgage
+payments forgone.
+Beyond the direct cost, each forced sale severs the household's
+\emph{location-specific housing-market exposure}: upon arriving at
+location~$B$, the former location-$A$ owner no longer participates in
+location~$A$'s price appreciation, even if labor, family, or human-capital
+ties make future return migration likely.
+Diversified real estate investment trusts (REITs) aggregate at the
+portfolio level and provide no location-specific hedge.
+
+Fractional residential housing tokens---blockchain-registered claims to
+location-specific property cash flows, exemplified by RealT-class
+platforms---offer a structural remedy.
+A tokenized holding at location~$A$ can be \emph{retained across
+relocation} to location~$B$ at a transfer cost of approximately 1\%,
+versus the 8.5\% round-trip for direct ownership.
+More importantly, a forward-looking household at location~$A$ who
+anticipates a possible future relocation to~$B$ can \emph{pre-accumulate}
+fractional location-$B$ tokens incrementally, paying the 2.5\% buying cost
+in small installments rather than as a lump-sum at the moment of arrival.
+This pre-accumulation motive is the structurally novel mechanism that
+distinguishes token portability from both direct ownership and diversified REITs:
+the household \emph{decouples its geographic location from its housing-market exposure}.
+
+This paper provides the first lifecycle welfare quantification of
+location-decoupling.
+We build a two-location lifecycle portfolio model with stochastic relocation
+shocks, location-correlated house-price processes, and three ownership regimes:
+rent-only (E0), traditional binary homeownership that forces a full sell-and-buy
+at every relocation (E1\_2L), and continuous fractional token ownership that
+is portable across locations and priced correctly via a 6D state space that
+tracks prior-period token holdings (E2\_2L).
+The 6D state---which includes last period's token positions $(x_{A,\text{prev}},
+x_{B,\text{prev}})$ as explicit state variables---enables the model to price
+the per-period buying cost correctly and to generate the forward-looking
+pre-accumulation motive that is the paper's central mechanism.
+
+Our headline result is:
+\begin{equation}
+    \operatorname{CEV}(E2\_2L \text{ vs } E1\_2L) = \textsc{[x.xx\%]},
+    \label{eq:headline_cev}
+\end{equation}
+at baseline calibration ($p_{\text{reloc}} = 0.06$, $\tau_{\text{buy}} = 2.5\%$,
+$\rho_{AB} = 0.50$).
+[\textsc{Placeholder: fill in once server1 runs confirm.}]
+This gain decomposes into three channels:
+\begin{enumerate}
+    \item \emph{Avoided-transaction-cost channel}: \textsc{[x.x\%]}.
+        At each relocation event, the E1\_2L household pays
+        $\tau_{\text{sell}} + \tau_{\text{buy}} \approx 8.5\%$;
+        the E2\_2L household retains tokens at $\tau_{\text{token}} \approx 1\%$.
+        This channel is unique to token portability and has no analog in
+        \citet{Liu2021}, who abstracts from mobility.
+
+    \item \emph{Maintained-hedge channel}: \textsc{[x.x\%]}.
+        A household at location~$B$ who holds $x_{A,\text{prev}} > 0$ continues
+        to participate in location~$A$'s price appreciation.
+        The mechanism activates through the pre-accumulation motive enabled by
+        the 6D state: the household optimally builds $x_B > 0$ at location~$A$
+        to reduce future buying costs on relocation (the ``pre-buy hedge'').
+        [\textsc{Placeholder: confirm sign via $\bar{x}_B > 0$ at $\ell = A$
+        in server1 output (H1 test).}]
+
+    \item \emph{Continuous-ownership channel}: \textsc{[x.x\%]}.
+        Continuous fractional ownership of the occupied residence provides
+        rent saving of $\delta_{\text{own}} = \rho - m = 4\%$ per unit held.
+        This channel is common to \citet{Liu2021} and replicates his
+        MHS-relaxation result within our model.
+\end{enumerate}
+Channels~(1) and~(2) are the paper's structural contribution beyond
+\citet{Liu2021}: token portability uniquely provides (1) because direct
+owners face forced sales, and REITs provide no location-specific claims
+for channel~(2).
+The cross-term between channels is empirically negligible (\textsc{[x.xx\%]})
+as in our v3 channel-decomposition benchmark, confirming additive separability.
+
+\paragraph{Falsification structure.}
+We pre-register three mechanism tests that must pass for the token-portability
+claim to be credible.
+(r)~Setting $p_{\text{reloc}} = 0$ shuts off the mobility channel;
+    channels~(1) and~(2) must collapse to zero.
+(m)~Setting $\rho_{AB} \to 1$ eliminates diversification benefit;
+    the maintained-hedge channel must attenuate monotonically.
+(q)~Setting $\tau_{\text{buy}} = 0$ eliminates the pre-accumulation motive;
+    the pre-buy hedge channel must vanish.
+[\textsc{Placeholder: report $p$-values or CEV changes from server1 sweep results.}]
+
+\paragraph{Related literature.}
+Our paper connects four strands.
+
+\medskip\noindent
+\textbf{Lifecycle housing-portfolio choice.}
+\citet{YaoZhang2005} and \citet{Cocco2005} establish the canonical
+binary-tenure lifecycle model; we extend by adding a second location,
+stochastic relocation, and token portability.
+\citet{KraftMunk2011} and \citet{KMW2018} introduce habit and
+adjustment-cost extensions; we add geographic mobility.
+\citet{Liu2021} introduces the Mortgage-with-Housing-Supply (MHS)
+relaxation: continuous ownership fraction within a single location.
+Our continuous-$x$ channel (E2\_2L at a single location) replicates Liu's
+mechanism; our paper's novel contribution lies in channels~(1) and~(2)
+above, which are outside Liu's single-location framework.
+
+\medskip\noindent
+\textbf{Housing as hedge against mobility risk.}
+\citet{SinaiSouleles2005} show that homeownership hedges against rent-price
+risk for households who expect to remain in a location.
+\citet{Davidoff2006} documents income-housing correlation as a source of
+labor-market risk for owner-occupiers.
+\citet{BFN2014} (Bagliano, Fugazza, and Nicodano) show that housing and
+equity exposure interact through labor income in a lifecycle model.
+Our contribution is distinct: we model the \emph{loss} of location-specific
+hedge at relocation and quantify the welfare value of maintaining it via tokens.
+
+\medskip\noindent
+\textbf{Transaction costs in housing markets.}
+\citet{FlavinYamashita2002} document that transaction costs constrain
+portfolio rebalancing in a housing lifecycle context.
+\citet{Han2013} quantifies the lock-in effect of transaction costs on
+tenure choice.
+\citet{PiazzesiSchneider2016} embed transaction costs in an equilibrium
+housing-search model.
+Our model treats transaction costs as the \emph{source} of the E1\_2L
+welfare loss; token portability is valued precisely because it reduces these costs.
+
+\medskip\noindent
+\textbf{Tokenization and digital assets.}
+\citet{CongLiWang2021} provide the foundational theory of tokenomics in a
+general equilibrium setting.
+\citet{Swinkels2023} surveys the institutional structure of residential
+real estate tokenization platforms.
+Our contribution is a lifecycle welfare quantification \emph{within} a
+standard Cocco-class model, grounded in the PSID-/NAR-calibrated parameter
+space, rather than a platform mechanism design.
+
+\paragraph{Partial equilibrium caveat.}
+All results are partial-equilibrium: house prices are exogenous.
+We interpret $\operatorname{CEV}(E2\_2L \text{ vs } E1\_2L)$ as the
+household-level welfare value of \emph{access} to tokenized instruments,
+not as an aggregate welfare estimate.
+A general-equilibrium extension with endogenous prices and adoption externalities
+is left for future work.
+
+\paragraph{Road map.}
+Section~\ref{sec:model} presents the two-location lifecycle model.
+Section~\ref{sec:calibration} describes the calibration.
+Section~\ref{sec:results} reports baseline welfare results and the channel
+decomposition.
+Section~\ref{sec:discussion} discusses the contribution relative to
+\citet{Liu2021} and the robustness of the falsification structure.
+Section~\ref{sec:conclusion} concludes.
+All numerical details are in the appendices.

@@ -1,0 +1,506 @@
+% s2_model.tex — Model section
+% Paper: "Tokenized Housing and Lifecycle Portfolio Choice:
+%         A Decoupling of Location from Housing Exposure"
+%
+% Source: docs/methods_v3.md (v3/v4 spec, cloud agent fire 7)
+%         docs/calibration_v3.md (parameter table)
+%         paper/outline_v4.md (section structure)
+%
+% Status: complete draft; numerical placeholders ({\sc [X]}) to be filled
+%         once server1 baseline results are available.
+%
+% Compilation: included from main.tex via \input{sections/s2_model}
+%              Requires amsmath, booktabs, multirow, hyperref.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Model}
+\label{sec:model}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\subsection{Economic Environment}
+\label{sec:model:environment}
+
+The economy is populated by a unit mass of households who live for a
+finite horizon of $T$ periods, corresponding to ages $25$ through $80$
+(retirement at age $65$).
+There are two locations, $A$ and $B$, each associated with its own housing
+market.
+At every date $t$, each household occupies exactly one location
+$\ell_t \in \{A, B\}$.
+Households have Epstein-Zin preferences that reduce to CRRA over
+non-housing consumption in the baseline:
+\begin{equation}
+    U_t = \mathbb{E}_t\!\left[
+        \sum_{s=t}^{T} \beta^{s-t}\,\pi_s\,
+        u\!\left(\hat{c}_s\right)
+    \right],
+    \qquad
+    u(c) = \frac{c^{1-\gamma}}{1-\gamma},
+    \label{eq:utility}
+\end{equation}
+where $\beta$ is the time-preference factor, $\pi_s$ is the deterministic
+survival probability at age $s$, and $\hat{c}_t$ is non-housing consumption
+normalized by the house-price index.%
+\footnote{We abstract from housing services in utility and focus on the
+financial welfare gain from token portability. An extension with housing
+services in utility is discussed in Appendix~\ref{app:robustness}.}
+
+All quantities are normalized by the beginning-of-period house-price index
+$P_t$, so the model unit is one house.
+
+\subsection{State Space}
+\label{sec:model:state}
+
+The household's state vector in the baseline (\emph{v4 specification}) is
+six-dimensional:
+\begin{equation}
+    \mathbf{s}_t \;=\;
+    \bigl(t,\;w_t,\;z_t,\;\ell_t,\;x_{A,t-1},\;x_{B,t-1}\bigr),
+    \label{eq:state}
+\end{equation}
+where:
+\begin{itemize}[noitemsep]
+    \item $w_t \in [w_{\min}, w_{\max}]$: beginning-of-period normalized
+          financial wealth;
+    \item $z_t \in [z_{\min}, z_{\max}]$: persistent component of labor income;
+    \item $\ell_t \in \{A, B\}$: current location (discrete);
+    \item $x_{A,t-1},\, x_{B,t-1} \geq 0$: token holdings at locations $A$ and
+          $B$ carried forward from period $t-1$ (the \emph{lagged-position state}).
+\end{itemize}
+The lagged-position state $(x_{A,t-1}, x_{B,t-1})$ is the key novelty of the
+v4 specification.  Tracking prior holdings creates an \emph{intertemporal
+incentive}: a household at $\ell = A$ can pre-accumulate $x_{B,t-1} > 0$
+at low incremental cost, reducing the buying cost it would face upon
+relocation to $B$ in a future period.
+Without this state variable, per-period buying costs are approximated as
+zero (ignoring the pre-accumulation margin), which was the v3 Option~3
+approximation.
+
+At $t = 1$, all households enter with $x_{A,0} = x_{B,0} = 0$ (no prior
+token positions).
+
+\subsection{Stochastic Relocation Shock}
+\label{sec:model:relocation}
+
+Each period, the household receives a Bernoulli relocation shock:
+\begin{equation}
+    \mathbf{1}_{\text{reloc},t} \;\sim\; \operatorname{Bernoulli}\!\bigl(p_t^{\text{reloc}}\bigr),
+    \qquad
+    p_t^{\text{reloc}} = \begin{cases}
+        p_{\text{work}} & \text{if}\; t \leq \tau_{\text{ret}}, \\
+        p_{\text{ret}}  & \text{if}\; t  >  \tau_{\text{ret}},
+    \end{cases}
+    \label{eq:reloc_prob}
+\end{equation}
+where $\tau_{\text{ret}}$ is the retirement age.  In the baseline,
+$p_{\text{work}} = 0.06$ (6\,\% per year for working-age households) and
+$p_{\text{ret}} = 0.02$.  The working-age rate is anchored to
+inter-MSA annual mobility rates in the PSID; see
+Table~\ref{tab:calibration} and \citet{calibrationV3} for details.
+
+When relocation occurs ($\mathbf{1}_{\text{reloc},t} = 1$), the household's
+location toggles: $\ell_{t+1} = \ell_t' \neq \ell_t$.  The implications
+for housing positions differ by regime (Section~\ref{sec:model:regimes}).
+
+\subsection{Regime Taxonomy}
+\label{sec:model:regimes}
+
+We compare three regimes that differ in the admissible set of housing
+positions:
+
+\begin{table}[ht]
+    \centering
+    \caption{Regime Taxonomy}
+    \label{tab:regimes}
+    \renewcommand{\arraystretch}{1.20}
+    \begin{tabular}{llll}
+        \toprule
+        Regime & Description & $x_{A,t}$ admissible & $x_{B,t}$ admissible \\
+        \midrule
+        E0     & Rent-only         & $0$ & $0$ \\
+        E1\_2L & Binary ownership  & $\{0,1\}$ if $\ell=A$; $0$ if $\ell=B$
+                                   & $\{0,1\}$ if $\ell=B$; $0$ if $\ell=A$ \\
+        E2\_2L & Continuous tokens & $[0, \bar{x}]$ & $[0, \bar{x}]$ \\
+        \bottomrule
+    \end{tabular}
+    \smallskip
+    \begin{minipage}{\linewidth}
+        \footnotesize
+        Notes: $\bar{x}$ is the wealth-constrained maximum (Section~\ref{sec:model:budget}).
+        In E1\_2L, the household can own \emph{only} at its current location; the
+        non-occupied-location holding is zero by admissibility (reflecting the
+        physical-residence requirement of traditional homeownership).
+    \end{minipage}
+\end{table}
+
+\noindent\textbf{E0 (rent-only).}  The household never owns housing and pays
+the full rent-to-price ratio $\rho$ each period.  This regime serves as the
+no-ownership benchmark.
+
+\noindent\textbf{E1\_2L (binary homeownership).}  The household owns either
+zero or one unit of the property at its \emph{current} location.  It cannot
+hold the non-occupied-location property.  This regime represents traditional
+homeownership: a household at $A$ cannot hold a financial claim on a
+location-$B$ property.  On relocation, the entire owned unit is sold
+(at a discount, see Section~\ref{sec:model:txcost}), and the household
+arrives at the new location with no prior position ($x_{t-1} = 0$ at
+both locations).
+
+\noindent\textbf{E2\_2L (fractional tokens, portable).}  The household can
+hold any non-negative fractional amount at \emph{both} locations simultaneously.
+Tokens are portable across relocations: moving from $A$ to $B$ does not
+trigger a forced sale of location-$A$ tokens.  Transaction costs are charged
+on the \emph{change} in holdings each period (see Section~\ref{sec:model:txcost}),
+not as a lump-sum on relocation events.
+
+The headline welfare object is $\operatorname{CEV}(\text{E2\_2L vs E1\_2L})$
+--- the proportional consumption supplement that makes E1\_2L households
+indifferent to E2\_2L access.
+
+\subsection{Housing-Cost Rule}
+\label{sec:model:kappa}
+
+Net housing cost per period (as a fraction of house value) depends on the
+household's regime and current holdings:
+\begin{equation}
+    \kappa(x_{A,t}, x_{B,t}, \ell_t) = \begin{cases}
+        \rho                           & \text{(E0)} \\[4pt]
+        \rho\,\mathbf{1}[x_{\ell,t} < 1]
+        + m\,\mathbf{1}[x_{\ell,t} \geq 1]  & \text{(E1\_2L)} \\[4pt]
+        \rho - x_{\ell,t}\,(\rho - m) & \text{(E2\_2L)}
+    \end{cases}
+    \label{eq:kappa}
+\end{equation}
+where $x_{\ell,t} \equiv x_{A,t}\,\mathbf{1}[\ell_t = A] + x_{B,t}\,\mathbf{1}[\ell_t = B]$
+is the token holding at the occupied location, $\rho$ is the rent-to-price
+ratio, and $m$ is the maintenance cost.
+
+The parameter $\delta_{\text{own}} \equiv \rho - m$ is the per-unit annual
+welfare gain from owning the occupied residence.  In the baseline calibration,
+$\delta_{\text{own}} = 0.04$ (4\,\% per year).
+
+\paragraph{The fixed-kappa convention.}
+A key identifying restriction is that in E2\_2L, \emph{only} the
+occupied-location token $x_{\ell,t}$ reduces net rent.  The non-occupied
+token $x_{\ell',t}$ is a purely financial asset — it earns capital gains
+but does not reduce rent (the household cannot simultaneously occupy and
+rent out the same unit).  This convention, confirmed by falsification
+tests in \citet{researchLogMay01}, ensures that cross-location holdings
+are motivated exclusively by the financial return and the pre-accumulation
+motive, not by a mechanical rent-saving subsidy.
+
+\subsection{Period Budget Constraint}
+\label{sec:model:budget}
+
+Each period, the household allocates normalized wealth $w_t$ across
+non-housing consumption $\hat{c}_t$, bond savings $b_t$, equity $s_t$,
+and housing token purchases $(x_{A,t}, x_{B,t})$:
+\begin{equation}
+    \hat{c}_t + \kappa(x_{A,t}, x_{B,t}, \ell_t)
+    + b_t + s_t + x_{A,t} + x_{B,t} + \tau_t^{\text{tx}} = w_t,
+    \label{eq:budget}
+\end{equation}
+where $\tau_t^{\text{tx}}$ is the per-period transaction cost
+(Section~\ref{sec:model:txcost}).  We require $\hat{c}_t > 0$,
+$s_t \geq 0$, and $b_t \geq -\ell_{\max} \cdot x_{\ell,t}$ (LTV
+mortgage constraint; $\ell_{\max} = 0$ in the baseline).
+
+\subsection{Transaction Costs}
+\label{sec:model:txcost}
+
+\paragraph{E1\_2L forced-relocation sell.}
+When an E1\_2L household at location $\ell$ relocates to $\ell' \neq \ell$,
+it is forced to sell its housing unit.  The sell proceeds are discounted by
+a transaction cost $\tau_{\text{sell}} \approx 6\,\%$ (NAR commission):
+the sell \emph{factor} applied to location-$\ell$ holdings in the wealth
+transition is $(1 - \tau_{\text{sell}})$.
+Additionally, on arrival at the new location, the household pays a buying
+cost $\tau_{\text{buy}} \approx 2.5\,\%$ of the purchase price when
+acquiring a new unit.
+
+\paragraph{E2\_2L per-period transaction cost.}
+In the v4 specification, $x_{A,t-1}$ and $x_{B,t-1}$ are tracked as state
+variables.  Each period, the household pays a transaction cost based on the
+\emph{change} in holdings:
+\begin{align}
+    \Delta_A &= x_{A,t} - x_{A,t-1}, \qquad
+    \Delta_B = x_{B,t} - x_{B,t-1}, \notag \\
+    \tau_t^{\text{tx}} &= \tau_{\text{buy}} \,
+        \bigl[\max(\Delta_A, 0) + \max(\Delta_B, 0)\bigr]
+        + \tau_{\text{token}} \,
+        \bigl[\max(-\Delta_A, 0) + \max(-\Delta_B, 0)\bigr],
+    \label{eq:txcost}
+\end{align}
+where $\tau_{\text{buy}} = 0.025$ (per-unit buying cost) and
+$\tau_{\text{token}} = 0.01$ (per-unit token-sell cost).
+Tokens retained unchanged across periods incur no cost ($\Delta = 0$).
+
+\paragraph{The pre-accumulation motive.}
+Equation~\eqref{eq:txcost} creates an \emph{intertemporal incentive} absent
+from earlier specifications.  A household at $\ell = A$ today faces an
+expected future buying cost of $\tau_{\text{buy}} \cdot x_{B,t}^{*}$ upon
+relocation to $B$, where $x_{B,t}^{*}$ is the desired holding at $B$.
+By pre-accumulating $x_{B,t-1} > 0$ \emph{before} relocation, the household
+reduces this future cost by $\tau_{\text{buy}} \cdot x_{B,t-1}$ per unit
+pre-held.  The per-period expected saving is
+$p_{\text{work}} \cdot \tau_{\text{buy}} \approx 0.15\,\%$ per unit of
+$x_{B,t-1}$ held at $\ell = A$.
+
+Under E1\_2L, cross-location pre-accumulation is inadmissible
+(Table~\ref{tab:regimes}), so E1\_2L households cannot exploit this
+margin.  This asymmetry is the structural source of the welfare gap.
+
+\subsection{Asset Returns}
+\label{sec:model:returns}
+
+\paragraph{Housing returns.}
+We decompose the single-location log housing return into a shared aggregate
+factor and a location-specific idiosyncratic component:
+\begin{align}
+    \iota_{A,t+1} &= \sqrt{2}\,\sigma_\iota\,\xi_{A,t+1}, \notag \\
+    \iota_{B,t+1} &= \rho_{AB}\,\iota_{A,t+1}
+                     + \sqrt{1 - \rho_{AB}^2}\,\sqrt{2}\,\sigma_\iota\,\xi_{B,t+1},
+                     \label{eq:chol} \\
+    R_{A,t+1} &= \exp\!\bigl(\mu_h + \sqrt{2}\,\sigma_{\text{div}}\,\eta_{\text{div},t+1}
+                               + \iota_{A,t+1}\bigr), \notag \\
+    R_{B,t+1} &= \exp\!\bigl(\mu_h + \sqrt{2}\,\sigma_{\text{div}}\,\eta_{\text{div},t+1}
+                               + \iota_{B,t+1}\bigr), \notag
+\end{align}
+where $\eta_{\text{div},t+1}$ is the \emph{shared} aggregate housing factor
+(same realization for $A$ and $B$), $\xi_{A,t+1}$ and $\xi_{B,t+1}$ are
+independent standard normal shocks, and $\sigma_{\text{div}}^2 + \sigma_\iota^2 =
+\sigma_h^2$ (variance decomposition).
+The Cholesky factorization in~\eqref{eq:chol} implies
+$\operatorname{Corr}(\iota_{A,t+1}, \iota_{B,t+1}) = \rho_{AB}$.
+
+The baseline $\rho_{AB} = 0.50$ is the midpoint of the Case-Shiller MSA-pair
+idiosyncratic correlation range ($0.30$--$0.70$ for inter-regional US moves;
+see \citealt{calibrationV3}).  Sensitivity analysis over
+$\rho_{AB} \in \{0, 0.25, 0.50, 0.75, 0.95\}$ is reported in
+Section~\ref{sec:results:sensitivity}.
+
+\paragraph{Equity return.}
+$R_{S,t+1} = \exp(\mu_s + \sqrt{2}\,\sigma_s\,\eta_{s,t+1})$,
+where $\mu_s = \ln(R_f + \pi_s) - \frac{1}{2}\sigma_s^2$ and $\pi_s$
+is the equity premium.
+
+\paragraph{House-price normalization.}
+The house-price factor $\mathit{hp}_{t+1} = \exp(g_h + \sqrt{2}\,\sigma_\xi\,\xi_{h,t+1})$
+normalizes next-period wealth; all financial quantities are expressed in
+units of current house prices.
+
+\subsection{Income Process}
+\label{sec:model:income}
+
+Labor income follows the \citet{CoccoGomesMaenhout2005} specification.
+The deterministic age profile is:
+\begin{equation}
+    f(\text{age}) = -2.17042 + 0.16818\left(\tfrac{\text{age}}{10}\right)
+                   - 0.03230\left(\tfrac{\text{age}}{10}\right)^{\!2}
+                   + 0.00200\left(\tfrac{\text{age}}{10}\right)^{\!3}.
+    \label{eq:income_profile}
+\end{equation}
+The normalized persistent income component evolves as:
+\begin{align}
+    z_{t+1} &= z_t\,\exp\!\bigl(f(\text{age}_{t+1}) - f(\text{age}_t)
+               + u_{t+1}\bigr)\big/\mathit{hp}_{t+1},
+               & u_{t+1} &\sim \mathcal{N}(0, \sigma_u^2), \notag \\
+    y_{t+1} &= z_{t+1}\,\exp(\varepsilon_{t+1}),
+               & \varepsilon_{t+1} &\sim \mathcal{N}(0, \sigma_\varepsilon^2).
+               \label{eq:income}
+\end{align}
+At retirement, $z_{t+1} = \lambda_{\text{ret}} z_t / \mathit{hp}_{t+1}$
+(replacement rate $\lambda_{\text{ret}} = 0.65$); post-retirement income
+is constant at $y_{t+1} = z_t / \mathit{hp}_{t+1}$.
+
+\subsection{Wealth Transition}
+\label{sec:model:wealth}
+
+Beginning-of-next-period wealth is:
+\begin{equation}
+    w_{t+1} = \frac{b_t\,r_b + s_t\,R_{S,t+1}
+                    + x_{A,t}\,R_{A,t+1}\,\phi_{A,t+1}
+                    + x_{B,t}\,R_{B,t+1}\,\phi_{B,t+1}}
+                   {\mathit{hp}_{t+1}}
+              + y_{t+1},
+    \label{eq:wealth_transition}
+\end{equation}
+where $r_b = R_f$ for $b_t \geq 0$ and $r_b = R_f + r_{\text{prem}}$
+for $b_t < 0$, and $\phi_{\ell,t+1}$ is the sell factor:
+\begin{equation}
+    \phi_{\ell,t+1} = \begin{cases}
+        1 - \tau_{\text{sell}} & \text{if E1\_2L and relocating from } \ell, \\
+        1 & \text{otherwise.}
+    \end{cases}
+    \label{eq:sell_factor}
+\end{equation}
+Tokens in E2\_2L are portable: $\phi = 1$ always.  The forced-sell discount
+$(1 - \tau_{\text{sell}})$ under E1\_2L is the first component of the
+transaction-cost channel in the welfare decomposition
+(Section~\ref{sec:model:welfare}).
+
+\subsection{Bellman Equation}
+\label{sec:model:bellman}
+
+For regime $R \in \{\text{E0, E1\_2L, E2\_2L}\}$ and v4 state
+$\mathbf{s}_t = (t, w_t, z_t, \ell_t, x_{A,t-1}, x_{B,t-1})$:
+\begin{equation}
+    V_t^R\!\bigl(w, z, \ell, x_{Ap}, x_{Bp}\bigr)
+    = \max_{\hat{c},\, b,\, s,\, x_A,\, x_B \,\in\, \mathcal{A}_R}
+    \left[
+        u(\hat{c}) + \beta\,\pi_t\,
+        \mathcal{E}_t^R\!\bigl(w, z, \ell, x_A, x_B\bigr)
+    \right],
+    \label{eq:bellman}
+\end{equation}
+where $\mathcal{A}_R$ is the regime-specific admissible set
+(Table~\ref{tab:regimes} and budget constraint~\eqref{eq:budget}),
+and the continuation value is:
+\begin{multline}
+    \mathcal{E}_t^R\!\bigl(w, z, \ell, x_A, x_B\bigr) \\
+    = \sum_q \omega_q\,\mathit{hp}_q^{1-\gamma}
+    \Bigl[
+        (1 - p_t^{\text{reloc}})\,
+        V_{t+1}^R\!\bigl(w_q^{\text{stay}},  z_q', \ell,  x_A^{\ast}, x_B^{\ast}\bigr)
+        + p_t^{\text{reloc}}\,
+        V_{t+1}^R\!\bigl(w_q^{\text{reloc}}, z_q', \ell', x_A^{\dagger}, x_B^{\dagger}\bigr)
+    \Bigr],
+    \label{eq:ev}
+\end{multline}
+where $(\omega_q, \mathit{hp}_q, w_q^{\text{stay}}, w_q^{\text{reloc}}, z_q')$
+are Gauss-Hermite quadrature weights and realizations (7D; $3^7 = 2187$
+integration points), and the next-period $x$-state updates are:
+\begin{align}
+    (x_A^{\ast}, x_B^{\ast})   &= (x_A, x_B),
+        \quad &\text{(stay; E0, E2\_2L, E1\_2L)} \label{eq:xprev_stay} \\
+    (x_A^{\dagger}, x_B^{\dagger}) &= (x_A, x_B),
+        \quad &\text{(reloc; E0, E2\_2L — portable)} \label{eq:xprev_reloc_e2} \\
+    (x_A^{\dagger}, x_B^{\dagger}) &= (0, 0),
+        \quad &\text{(reloc; E1\_2L — forced sale, fresh start)}
+        \label{eq:xprev_reloc_e1}
+\end{align}
+Equation~\eqref{eq:xprev_reloc_e1} captures the key asymmetry: under
+E1\_2L, relocation resets the lagged-position state to zero (the household
+must buy fresh at the new location, paying $\tau_{\text{buy}}$ on the full
+amount), while under E2\_2L, equation~\eqref{eq:xprev_reloc_e2} shows that
+tokens carry forward unchanged.
+
+The terminal condition is $V_{T+1}^R(w, \cdot) = u(w)$
+(bequest-free, all wealth consumed at death).
+
+\subsection{Welfare Measure and Decomposition}
+\label{sec:model:welfare}
+
+\paragraph{Certainty-equivalent consumption (CEV).}
+The welfare comparison between regimes $R_a$ and $R_b$ is measured by the
+proportional consumption supplement $\lambda$ such that:
+\begin{equation}
+    V_1^{R_b}\!\bigl((1 + \lambda)\,w^{\ast}\bigr) = V_1^{R_a}\!\bigl(w^{\ast}\bigr),
+    \label{eq:cev_def}
+\end{equation}
+evaluated at the representative initial state $w^{\ast}$ (midpoint of the
+wealth grid, $z = z_{\text{mid}}$, $\ell = A$, $x_{Ap} = x_{Bp} = 0$).
+Under CRRA:
+\begin{equation}
+    1 + \lambda = \left(\frac{V_1^{R_a}}{V_1^{R_b}}\right)^{\!\!1/(1-\gamma)}.
+    \label{eq:cev_crra}
+\end{equation}
+
+\paragraph{Channel decomposition.}
+The headline CEV $\operatorname{CEV}(\text{E2\_2L vs E1\_2L})$ decomposes into
+two channels via the counterfactual regime E1\_2L$_{\text{NOTX}}$ (E1\_2L
+with $\tau_{\text{sell}} = 0$):
+\begin{align}
+    \underbrace{\operatorname{CEV}(\text{E2\_2L vs E1\_2L})}_{\text{total}}
+    &=
+    \underbrace{\operatorname{CEV}(\text{E1\_2L}_{\text{NOTX}} \text{ vs E1\_2L})}_{\text{avoided-tx channel}}
+    +
+    \underbrace{\operatorname{CEV}(\text{E2\_2L vs E1\_2L}_{\text{NOTX}})}_{\text{maintained-hedge channel}}
+    + \xi_{\text{cross}},
+    \label{eq:decomp}
+\end{align}
+where $\xi_{\text{cross}}$ is the cross-term, which was empirically near zero
+($< 0.1\%$) in the v3 specification and is expected to remain small in v4.
+We report $\xi_{\text{cross}}$ explicitly to verify separability.
+
+Table~\ref{tab:cev_decomp} reports the decomposition with numerical results
+to be filled after server1 baseline runs are complete.
+
+\begin{table}[ht]
+    \centering
+    \caption{CEV Decomposition: Tokenization Welfare Channels}
+    \label{tab:cev_decomp}
+    \renewcommand{\arraystretch}{1.20}
+    \begin{tabular}{lcc}
+        \toprule
+        Channel & CEV (\%) & Share (\%) \\
+        \midrule
+        Total tokenization gain:
+            $\operatorname{CEV}(\text{E2\_2L vs E1\_2L})$
+            & {\sc [x.xx]} & 100 \\
+        \quad Avoided-tx channel:
+            $\operatorname{CEV}(\text{E1\_2L}_{\text{NOTX}} \text{ vs E1\_2L})$
+            & {\sc [x.xx]} & {\sc [xx]} \\
+        \quad Maintained-hedge channel:
+            $\operatorname{CEV}(\text{E2\_2L vs E1\_2L}_{\text{NOTX}})$
+            & {\sc [x.xx]} & {\sc [xx]} \\
+        \quad Cross-term $\xi_{\text{cross}}$
+            & {\sc [x.xx]} & {\sc [xx]} \\
+        \midrule
+        Option 1 incremental gain:
+            $\operatorname{CEV}(\text{E2\_2L v4 vs E2\_2L v3})$
+            & {\sc [x.xx]} & --- \\
+        \bottomrule
+    \end{tabular}
+    \smallskip
+    \begin{minipage}{\linewidth}
+        \footnotesize
+        Notes: CEVs evaluated at representative initial state
+        $(w^{\ast}, z_{\text{mid}}, \ell = A, x_{Ap} = x_{Bp} = 0)$
+        using the v4 solver (6D state; $\text{N\_W}=15$,
+        $\text{N\_Z}=5$, $\text{N\_X\_PREV}=3$, $\text{GH\_NODES}=3$).
+        {\sc [x.xx]}: placeholder to be filled from server1 runs.
+        Baseline calibration: Table~\ref{tab:calibration}.
+    \end{minipage}
+\end{table}
+
+\paragraph{Hypothesis tests.}
+We pre-register three empirical hypotheses (H1--H3) that must hold for
+the option-1 mechanism to support the RFS-level contribution claim:
+\begin{description}[noitemsep]
+    \item[H1] $\overline{x}_{B,1}^{\text{E2}} > 0$ at $\ell = A$
+              (cross-location pre-accumulation activates).
+    \item[H2] $\operatorname{CEV}(\text{E2\_2L v4 vs E1\_2L v4}) > 4.255\,\%$
+              (beats the Option~3 approximation baseline).
+    \item[H3] $\operatorname{CEV}(\text{E2\_2L v4 vs E2\_2L v3}) \in [0.5, 1.5]\,\%$
+              (incremental hedge value from proper state extension).
+\end{description}
+If all three hold: the mechanism is RFS-credible and Phase~2
+(calibration, sensitivity, manuscript) proceeds.  If any fails, the
+paper targets Real Estate Economics or Journal of Housing Economics
+with the Option~3 result ($+4.26\,\%$).
+
+\subsection{Numerical Solution}
+\label{sec:model:numerical}
+
+We solve the Bellman equation~\eqref{eq:bellman} by backward induction
+(value function iteration) using the v4 Julia solver
+(\texttt{src/vfi\_solver\_v4.jl}, 954 LOC).
+The value function is approximated on a discrete 6D grid; continuation
+values are computed by 7D Gauss-Hermite quadrature ($3^7 = 2187$ points).
+
+\paragraph{Interpolation.}
+The continuation-value lookup interpolates in $(w, z)$ bilinearly for
+a given $(\ell, x_{Ap}, x_{Bp})$ grid cell.  The lagged-position state
+$(x_{Ap}, x_{Bp})$ uses a coarse grid with $\text{N\_X\_PREV} = 3$
+points ($\{0, 1, 2\}$ in the baseline), sufficient for the first-cut
+test of H1.  Sensitivity to grid refinement is reported in
+Appendix~\ref{app:grid}.
+
+\paragraph{Grid sizes and computation.}
+Baseline coarse grid: $\text{N\_W}=15$, $\text{N\_Z}=5$,
+$\text{N\_X\_PREV}=3$, $\text{ASSET\_GRID}=7$, $\text{X\_GRID}=4$.
+State-space size per period: $15 \times 5 \times 2 \times 3 \times 3 = 1350$
+points (versus 294 in v3 with $\text{N\_W}=21$, $\text{N\_Z}=7$,
+$\text{N\_ell}=2$).
+Estimated wall time per regime: 2--4 hours single-threaded on server1.
