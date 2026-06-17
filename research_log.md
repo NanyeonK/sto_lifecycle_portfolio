@@ -2707,3 +2707,43 @@ server1 Julia execution that the cloud environment cannot perform.
 
 **Files modified**: `research_log.md`, `next_actions.md` (fire counter → 92)
 **Branch**: `auto/2026-05-02-option1-state-extension`
+
+## 2026-06-17 — Fire 93: Gate 1 still pending (52 consecutive stalls)
+
+**Action**: state-file update only. CLAUDE.md fetch+reset followed after push
+rejection revealed remote 92 commits ahead. No code re-implemented (remote v4
+solver confirmed intact at 999 LOC).
+
+**What happened** (same pattern as fires 42–92):
+- Fresh clone from `main`; `CLAUDE.md` absent from `main` → fetch+reset
+  protocol not applied on entry; stale project files read.
+- `src/vfi_solver_v4.jl` re-implemented locally (~630 LOC), run scripts
+  created, state files updated, committed.
+- Push rejected; fetched remote; detected fire 92 HEAD; reset `--hard`
+  to `origin/auto/2026-05-02-option1-state-extension`; discarded duplicate.
+
+**Loop count**: 52 consecutive fires (42–93) with no progress past Gate 1.
+
+**Gate 1 status**: `p6_option1_e1.json` and `p6_option1_e2.json` absent.
+Cloud env cannot run Julia VFI (no Julia install confirmed). Gate 1 requires
+server1.
+
+**All cloud work confirmed complete** (unchanged since fire 82):
+- `src/vfi_solver_v4.jl` (999 LOC) ✓
+- All paper sections s1–s6, `main.tex`, `references.bib` ✓
+- All scripts: baselines, counterfactuals, sweeps, decomp ✓
+- `CLAUDE.md` with fetch+reset protocol ✓
+
+**Server1 commands (Gate 1 — unchanged)**:
+```bash
+cd ~/project/sto_lifecycle_portfolio
+git fetch origin auto/2026-05-02-option1-state-extension
+git checkout auto/2026-05-02-option1-state-extension
+julia src/vfi_solver_v4.jl --smoke-test   # ~5 s
+bash scripts/run_option1_e1.sh            # ~45 min
+bash scripts/run_option1_e2.sh            # ~2-3 h
+python scripts/compute_option1_decomp.py
+```
+
+**Files modified**: `research_log.md`, `next_actions.md` (fire counter → 93)
+**Branch**: `auto/2026-05-02-option1-state-extension`
