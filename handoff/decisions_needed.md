@@ -1,6 +1,6 @@
 # Decisions Needed (human gate items)
 
-Updated: 2026-05-01
+Updated: 2026-06-17
 
 ## STRATEGIC: v3 mechanism is empirically dead at symmetric calibration
 
@@ -68,6 +68,32 @@ probability. Option (C) is empirically against natural sign. Option
 hedge channel is < 1.5% lifetime CEV, fall back to (D).
 
 **Time**: (B) implementation ~2-4 weeks. Decision after run.
+
+---
+
+---
+
+## 2026-06-17: Two v4 solver implementations on separate branches
+
+Path B Option 1 now has TWO feature branches with different designs:
+
+| Branch | Design | Status |
+|---|---|---|
+| `auto/2026-06-17-option1-state-extension` | All tx costs via delta mechanism (including sell via tau_sell on negative deltas). No sell_factor in wealth transition. Cleaner uniform treatment. | Prior fire |
+| `auto/2026-06-17-option1-v4-refined` | E1_2L forced-sell cost in wealth transition sell_factor (v3 convention). Only tau_buy on positive deltas via tx_cost. E2_2L full tx_cost on both directions. | This fire (2026-06-17) |
+
+**Design difference for E1_2L sell cost**:
+- Prior branch: when at ell=B and E1_2L forces x_A_new=0 (sell A), pay `tau_sell * 1` from budget at t+1 period.
+- Refined branch: when relocating (t→t+1), sell cost captured as `sell_factor = (1-tau_sell)` reducing x_A's return in wealth transition.
+
+Both are economically reasonable. For the hedge mechanism test (H1: mean_xB > 0 at ell=A), both should behave similarly because E2_2L tokens are portable under both designs.
+
+**Recommended**: run the prior branch (`auto/2026-06-17-option1-state-extension`) first since it's already there. If results are unexpected, compare against refined branch.
+
+**Quick smoke test (either branch)**:
+```bash
+julia src/vfi_solver_v4.jl --smoke-test
+```
 
 ---
 
