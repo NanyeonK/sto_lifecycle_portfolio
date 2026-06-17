@@ -917,6 +917,72 @@ framework. REE/JHE submission with continuous-x channel is the
 realistic target.
 
 
+## 2026-06-17 — v4 solver (6D state) implemented: Path B Option 1 cloud fire
+
+**Action picked**: Step 2 of next_actions.md P0 queue — implement
+`src/vfi_solver_v4.jl` with 6D state `(t, w, z, ell, x_A_prev, x_B_prev)`.
+
+**Branch**: `auto/2026-05-02-option1-state-extension`
+
+**What was built:**
+
+1. **6D state arrays**: `(T, N_W, N_Z, 2, N_X_PREV, N_X_PREV)`. Default
+   coarse grids: N_W=15, N_Z=5, N_X_PREV=3 (9× expansion over N_x_prev=1,
+   offset by reducing N_W/N_Z vs v3's 21/7).
+
+2. **x_prev_grid as choice grid**: x choices (x_A_new, x_B_new) are
+   restricted to `x_prev_grid = linspace(0, X_PREV_MAX=1.0, N_X_PREV)`.
+   With N=3: `{0.0, 0.5, 1.0}`. This means no interpolation in the x_prev
+   dimension — next-period x_prev index is known exactly from the choice,
+   so continuation value only needs bilinear (w, z) interpolation.
+
+3. **Per-period tx_cost on deltas** (the core Option 1 mechanism):
+   ```
+   delta_A = x_A_new - x_A_prev
+   delta_B = x_B_new - x_B_prev
+   tx_cost = tau_buy  × (max(delta_A,0) + max(delta_B,0))
+           + sell_rate× (max(-delta_A,0) + max(-delta_B,0))
+   sell_rate = tau_sell  for E1_2L (illiquid traditional market)
+             = tau_token for E2_2L (liquid token market)
+   ```
+   Budget: `c + kappa + x_A_new + x_B_new + tx_cost = w`.
+
+4. **E1_2L admissibility**: at ell=A, choices restricted to (0,0) and
+   (x_prev_max=1.0, 0); at ell=B, (0,0) and (0, x_prev_max=1.0). Requires
+   X_PREV_MAX=1.0 (enforced in smoke test). E1_2L round-trip cost: tau_sell
+   + tau_buy = 6% + 2.5% = 8.5% per move.
+
+5. **E2_2L hedge mechanism (now properly modelled)**: pre-holding x_B=0.5
+   at ell=A saves `tau_buy × 0.5 - tau_token × 0.5 = (0.025 - 0.01) × 0.5
+   = 0.0075` per relocation event. Expected annual benefit: p_relocate × 0.0075
+   = 0.06 × 0.0075 = 0.00045/yr. Over lifetime with compounding: estimated
+   ~0.5–1.5% CEV contribution from hedge channel alone.
+
+6. **Smoke test stub** (`--smoke-test`): checks sigma decomposition, 6D array
+   shape + memory, tx_cost arithmetic, terminal slice, shock block, E1_2L
+   grid constraint. VFI not run (cloud env lacks Julia; server1 runs queued).
+
+7. **Run scripts** (steps 5–6 of P0 table):
+   - `scripts/run_option1_e1.sh` — E1_2L baseline
+   - `scripts/run_option1_e2.sh` — E2_2L Option 1
+
+**Timing estimate on server1**: ~50 min per regime single-thread (vs ~30 min
+v3 baseline). Net state-space factor vs v3: ~1.65× (6D state larger but x
+inner loop smaller than v3's X_total/alpha grid).
+
+**Files created/modified**:
+- `src/vfi_solver_v4.jl` (~600 LOC) — new
+- `scripts/run_option1_e1.sh` — new
+- `scripts/run_option1_e2.sh` — new
+- `research_log.md` — this entry
+- `next_actions.md` — step 2 marked DONE; steps 3–7 updated
+
+**Next queued** (user runs on server1):
+- Step 3: `julia src/vfi_solver_v4.jl --smoke-test`
+- Step 5: `bash scripts/run_option1_e1.sh`
+- Step 6: `bash scripts/run_option1_e2.sh`
+- Then Step 7: decomposition + hypothesis check (H1: mean_xB > 0; H2/H3: CEV targets)
+
 ## 2026-05-02 — Path B (tau_buy Option 3) FINAL: hedge dead, tx-cost channel alive
 
 Cloud agent overnight delivered 6 redundant feature branches (cron at
