@@ -991,3 +991,75 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-06-17 — v4 Option 1 solver implemented (6D state, tx_cost on deltas)
+
+**Action picked**: P0 Step 2-4 from `next_actions.md` — create
+`src/vfi_solver_v4.jl` with 6D state extension, smoke-test stub, and
+run scripts. This is the first cloud-agent fire on the Option 1 path.
+
+**Files created**:
+- `src/vfi_solver_v4.jl` (~540 LOC) — full 6D VFI solver
+- `scripts/run_option1_e1.sh` — E1_2L baseline runner for server1
+- `scripts/run_option1_e2.sh` — E2_2L baseline runner for server1
+
+**Key design decisions in v4**:
+
+1. **6D state** `(t, w, z, ell, x_A_prev, x_B_prev)`. Value and policy
+   arrays are 6D. At default grids (N_W=15, N_Z=5, N_X_PREV=3), the
+   value array is ~570 KB; total 7 arrays ~4 MB. Fits in RAM easily.
+
+2. **tx_cost in budget (not in wealth transition)**.
+   `tx_cost = tau_buy * max(delta, 0) + sell_rate * max(-delta, 0)`
+   where `sell_rate = tau_sell` for E1_2L (traditional housing, 6%),
+   `sell_rate = tau_token` for E2_2L (tokens, 0.5%). The sell_factor
+   from v3 is eliminated; the wealth transition uses full portfolio
+   returns for both regimes. Tx costs are endogenous at the choice
+   stage, not imposed at the relocation event.
+
+3. **4D linear interpolation** `interp4d_v4()` over `(w, z, xA_prev,
+   xB_prev)` — 16 corner values for each evaluation. Used in
+   `continuation_value_v4()` to look up next-period V given the
+   (xA_new, xB_new) choices (which become x_prev next period).
+
+4. **No sell_factor on relocation**. In v4, the forced-sale cost at
+   relocation in E1_2L is captured implicitly: at B after moving from
+   A, the state is `(x_A_prev = x_A_old, x_B_prev = 0)`. E1_2L
+   admissibility forces `x_A_new = 0` at B, incurring
+   `tau_sell * x_A_old` as tx_cost in that period's budget. This is
+   correctly absorbed into V(t+1, ell=B, x_A_prev=x_A_old, ...).
+
+5. **E1_2L admissibility**: at `ell=A`, only `x_A_new ∈ {0,1}`,
+   `x_B_new = 0`. At `ell=B`, only `x_B_new ∈ {0,1}`, `x_A_new = 0`.
+   Any non-zero `x_prev` at the "wrong" location incurs tau_sell to
+   liquidate — captured naturally by tx_cost.
+
+6. **Terminal slice**: `V_T(w, x_prev) = U(w)` for all x_prev —
+   end-of-life approximation (no explicit liquidation cost at T). This
+   is standard and means period T-1 will optimally choose x_new = 0.
+
+7. **x_prev grid**: {0.0, 0.75, 1.5} (default N_X_PREV=3,
+   X_PREV_MAX=1.5). Covers E1_2L natural choices {0,1} and allows
+   E2_2L fractional positions up to 1.5.
+
+**Mechanism check** (why v4 should activate hedge):
+- At `ell=A`, E2_2L household can set `x_B_new > 0` (paying tau_buy
+  on delta_B = x_B_new - x_B_prev).
+- Next period at B (relocation), state is `(x_B_prev = x_B_new > 0)`.
+  E2_2L at B: delta_B = x_B_target - x_B_prev. If x_B_prev > 0,
+  delta_B is smaller → tau_buy * delta_B is smaller.
+- Expected per-period saving: `p_relocate * tau_buy * x_B_pre_held`
+  ≈ `0.06 * 0.025 * 1.0 = 0.0015` per unit per period.
+- E1_2L cannot pre-hold x_B (admissibility); must pay full tau_buy * 1
+  on relocation. This asymmetry is the hedge channel.
+
+**Julia unavailable in cloud env** — smoke test not run here. Server1
+run queued as Step 5 in `next_actions.md`.
+
+**Feature branch**: `auto/2026-06-17-option1-state-extension`
+
+**Next queued (user must run on server1)**:
+- `julia src/vfi_solver_v4.jl --smoke-test` (Step 5)
+- `bash scripts/run_option1_e1.sh` (Step 6a, ~2.5 h wall)
+- `bash scripts/run_option1_e2.sh` (Step 6b, ~2.5 h wall)
+- Then cloud agent next fire: compute CEV decomposition from output JSONs
+
