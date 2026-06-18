@@ -991,3 +991,64 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-06-18 — v4 solver (6D state, Option 1) implemented
+
+**Action picked**: P0 Step 2-4 — create `src/vfi_solver_v4.jl` with
+full 6D state extension on branch `auto/2026-06-18-option1-state-extension`.
+
+**Rationale**: This is the single highest-priority auto-allowed action.
+The v3 solver showed the cross-location hedge mechanism is empirically
+dead under the v3 spec (mean_xB=0 even at p_relocate=0.30). Option 1
+is the path-saving implementation: track x_A_prev and x_B_prev as state
+variables, charge tau_buy on every positive delta. Pre-holding x_B
+while at ell=A then yields genuine savings (p_relocate * tau_buy ≈ 0.15%
+per period per unit) that motivates non-zero cross-location token holdings.
+
+**Files created/modified**:
+
+- `src/vfi_solver_v4.jl` (962 LOC) — complete self-contained VFI solver:
+  - **6D state**: `(t, w, z, ell, x_A_prev, x_B_prev)` where x_A_prev,
+    x_B_prev are discretised on a coarse grid (N_X_PREV=3: {0.0, 0.5, 1.0}).
+  - **tx_cost on every delta**: `tau_buy * max(delta_A_pos) + tau_token * max(delta_A_neg)`
+    applied inside budget every period, not just at relocation events.
+  - **State update on relocation**: E2_2L tokens portable (ix_next = ix_choice);
+    E1_2L forced sale resets x_prev to (0,0) → full tau_buy charged when
+    household buys at new location next period.
+  - **Nearest-neighbor projection**: x_A_new → ix_A_prev_next via
+    `nearest_xprev_idx()`. Grid {0, 0.5, 1.0} aligns with E1_2L {0,1}
+    and E2_2L interior choices (~0.5-1.0 from v3 evidence).
+  - **Continuation value**: takes precomputed (ix_A_stay, ix_B_stay,
+    ix_A_reloc, ix_B_reloc) — stay and relocate cases differ for E1_2L.
+  - **Smoke test** `smoke_test_v4()`: 6D array allocation check, tx_cost
+    spot-checks (5 cases), nearest_xprev_idx checks (6 cases), terminal
+    slice, housing_cost rule, p_relocate boundary. Run via `--smoke-test`.
+  - **Grid defaults (v4)**: N_W=15, N_Z=5, N_X_PREV=3, ASSET_GRID_SIZE=7,
+    X_GRID_SIZE=5. Compute ~4.6x v3; per-regime ~2.5 h wall (server1).
+  - All env-vars configurable: N_X_PREV, X_PREV_MAX, TAU_BUY, TAU_TOKEN,
+    TAU_SELL, RHO_AB, P_RELOCATE_WORKING, etc.
+
+- `scripts/run_option1_e1.sh` — server1 run script for E1_2L v4 baseline.
+- `scripts/run_option1_e2.sh` — server1 run script for E2_2L v4 baseline.
+- `next_actions.md` — Steps 1-4 marked DONE; Steps 5-7 remain for user.
+- `research_log.md` — this entry.
+
+**Hedge mechanism expected under v4**:
+
+The pre-buy hedge motive is now properly modelled. At ell=A:
+- x_B_new > x_B_prev: pays tau_buy * delta in current budget.
+- Benefit: if relocation to B occurs, x_B_prev_next = nearest(x_B_new)
+  → next period at B, delta_B = x_B_new_next - x_B_prev_next ≈ 0 →
+  zero or reduced tau_buy at the new location.
+- Expected hedge premium per unit: p_relocate_working * tau_buy = 0.15%/period.
+- Over 40-year working life, cumulative ≈ 6% per unit of x_B pre-held.
+- Optimal pre-holding depends on balance: opportunity cost of x_B vs
+  x_A (which saves rent delta_own=4%/year). Hedge activates when
+  p_relocate * tau_buy > 0 — should generate mean_xB > 0 at ell=A.
+
+**Next queued actions** (all server1 — user):
+- Step 5: `julia src/vfi_solver_v4.jl --smoke-test` → record to
+  `output/diagnostics/p6_option1_smoke.md`
+- Step 6: run `scripts/run_option1_e1.sh` then `run_option1_e2.sh`
+- Step 7: compute CEV(E2_2L_v4 vs E1_2L_v4); check H1/H2/H3 hypotheses
+
+**Branch**: `auto/2026-06-18-option1-state-extension`
