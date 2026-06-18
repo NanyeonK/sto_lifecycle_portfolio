@@ -1052,3 +1052,19 @@ The pre-buy hedge motive is now properly modelled. At ell=A:
 - Step 7: compute CEV(E2_2L_v4 vs E1_2L_v4); check H1/H2/H3 hypotheses
 
 **Branch**: `auto/2026-06-18-option1-state-extension`
+
+## 2026-06-18 — Second fire: v4 design review + route confirmation
+
+This fire picked up the same P0 task but found the prior fire on the same branch
+had already implemented `src/vfi_solver_v4.jl` (962 LOC) and the run scripts.
+
+**Design review completed.** The existing v4 has the correct architecture:
+- E1_2L relocation resets x_prev to (0, 0) so full tau_buy is charged at new location.
+- E2_2L relocation carries x_prev through (tokens portable).
+- Nearest-neighbor projection from x_new → ix_prev index (handles continuous alpha grid).
+- Continuation value takes separate (ix_A_stay, ix_B_stay) and (ix_A_reloc, ix_B_reloc)
+  correctly differentiating stay vs. relocate x_prev state.
+
+**Next step remains**: user runs smoke test on server1, then E1/E2 baselines.
+No additional implementation needed this fire. Branch confirmed ready for server1 step.
+
