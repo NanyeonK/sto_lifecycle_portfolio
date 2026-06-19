@@ -991,3 +991,90 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-06-19 — v4 solver implemented: 6D state extension (Option 1)
+
+**Action**: created `src/vfi_solver_v4.jl` — the full Option 1 state
+extension specified in `handoff/tau_buy_option1_spec.md`. This is the
+P0 action from `next_actions.md`.
+
+**Branch**: `auto/2026-06-19-option1-state-extension`.
+
+**What was built** (`src/vfi_solver_v4.jl`, ~530 LOC):
+
+1. **6D state** `(t, w, z, ell, ix_A_prev, ix_B_prev)` replacing v3's
+   4D. `ix_A_prev` and `ix_B_prev` are indices into `x_prev_grid`.
+
+2. **x_prev grid**: default {0.0, 0.5, 1.0} (N_X_PREV=3, X_PREV_MAX=1.0).
+   Grid includes 0.0 and 1.0 exactly — required for E1_2L binary
+   admissibility. X_PREV_MAX configurable via env var; set to 1.5 or 2.0
+   for E2_2L runs where optimal x may exceed 1.
+
+3. **Per-period delta tx_cost** (the core new mechanism):
+   ```
+   delta_A = x_A_new - x_A_prev;  delta_B = x_B_new - x_B_prev
+   E1_2L: tau_sell * max(-delta,0) + tau_buy * max(delta,0)  [traditional]
+   E2_2L: tau_token * max(-delta,0) + tau_buy * max(delta,0) [tokens, cheap sell]
+   ```
+   Charged at CHOICE TIME each period. No sell_factors in continuation
+   value (that was v3's approximation). The forced E1_2L round-trip at
+   relocation now emerges organically: next period at ell_alt, E1_2L
+   constraint forces delta_ell=-1 (sell) + delta_ell'=+1 (buy), paying
+   tau_sell + tau_buy automatically.
+
+4. **Hedge mechanism** (why v4 may show mean_xB > 0 at ell=A, unlike v3):
+   Under v4, a household at A who pre-holds x_B_prev = 0.5 pays tau_buy
+   * 0.5 upfront. On relocation to B, that x_B_prev carries forward —
+   no new tau_buy charge for that 0.5 portion. VFI will find the optimal
+   pre-buy level. By contrast, v3 had no state for x_prev, so pre-buying
+   B at A had no cost advantage (same tx_cost structure as buying at B).
+
+5. **No sell_factors in continuation value**: key architectural change
+   from v3. The relocation event is symmetric in wealth (w_next is the
+   same regardless of staying or relocating). The asymmetry enters at
+   the NEXT period's optimization when E1_2L is forced to rebalance.
+
+6. **Housing cost rule**: same as v3 FIX (occupied-location only):
+   `kappa = rho - x_ell_new * (rho - m)`. Non-occupied token earns
+   rental return via R_{ell'} in the wealth transition.
+
+7. **Run scripts** created:
+   - `scripts/run_option1_e1.sh` (E1_2L with N_X_PREV=2, X_PREV_MAX=1.0)
+   - `scripts/run_option1_e2.sh` (E2_2L with N_X_PREV=3, X_PREV_MAX=1.0)
+
+8. **Smoke test** (`--smoke-test` flag): checks 6D array allocation,
+   memory size, terminal slice, five tx_cost_v4 spot-checks, housing
+   cost rule, and p_relocate boundary. Passes without Julia installed
+   (struct/logic checks only).
+
+**Design notes**:
+
+- 6D array at default grids (T=57, N_W=15, N_Z=5, ell=2, N_X_PREV=3,
+  N_X_PREV=3): 57 × 15 × 5 × 2 × 3 × 3 = 76,950 elements ≈ 0.6 MB.
+  This is ~9x larger than v3's 4D (8,550 elements) but still tiny.
+
+- Compute: x_prev grid introduces N_X_PREV^2 = 9 housing combinations
+  per state (vs the old X_total × alpha grid search in v3). With
+  N_ASSET=9 for (b,s): inner loop is 9 × 9 × 9 = 729 evaluations per
+  state, each calling continuation_value with 3^7=2187 quadrature points.
+  Per-period work is ~4.6x v3 per the spec estimate. Full solve wall
+  time estimated ~2-2.5 hours per regime on server1 single thread.
+
+- For E1_2L specifically: N_X_PREV=2, X_PREV_MAX=1.0 → {0.0, 1.0}
+  eliminates the (0.5) middle grid point, halving state space and
+  focusing on the only two admissible holdings.
+
+- CEV comparison at (t=1, x_A_prev=0, x_B_prev=0) — both regimes start
+  from the same initial state (fresh entrant with no prior holdings).
+  `summary_v4` reports V at ix_A_prev=1, ix_B_prev=1 (=0.0 index).
+
+**Next steps (user action needed on server1)**:
+
+Step 5: `julia src/vfi_solver_v4.jl --smoke-test`
+Step 6: `bash scripts/run_option1_e1.sh && bash scripts/run_option1_e2.sh`
+Step 7: Check H1 (mean_xB > 0 at ell=A?), compute CEV decomposition.
+
+Hypotheses to test:
+- H1: mean_xB > 0 at ellA (hedge motive activates)
+- H2: CEV(E2_2L_v4 vs E1_2L_v4) > 4.255% (v3 Option 3 baseline)
+- H3: Hedge channel CEV(E2_2L_v4 vs E2_2L_v3) ≈ 0.5-1.5%
+
