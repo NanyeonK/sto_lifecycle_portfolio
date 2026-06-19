@@ -2897,3 +2897,24 @@ python scripts/compute_option1_decomp.py
 
 **Files modified**: `research_log.md`, `next_actions.md` (fire counter → 96)
 **Branch**: `auto/2026-05-02-option1-state-extension`
+
+## 2026-06-19 — Fire 97: Gate 1 still pending (55 consecutive stalls)
+
+Orientation audit complete. Remote branch is at fire 96. All cloud-agent
+work finished by fire 30 (2026-05-18). BLOCKED on Gate 1 (server1 runs).
+
+Everything needed is on the branch: vfi_solver_v4.jl (954 LOC), all six
+paper sections (s1-s6 + main.tex + references.bib), all run scripts
+(baselines + counterfactuals), sensitivity sweeps, decomp driver.
+
+**Action required from user on server1**:
+```
+julia src/vfi_solver_v4.jl --smoke-test
+bash scripts/run_option1_e1.sh          # ~2-3h
+bash scripts/run_option1_e2.sh          # ~2-3h
+bash scripts/run_option1_e1_notx.sh    # ~2-3h
+bash scripts/run_option1_e2_notau.sh   # ~2-3h
+git add output/diagnostics/p6_option1_*.json && git commit && git push
+```
+After JSONs land, cloud agent runs compute_option1_decomp.py → H1/H2/H3
+verdict → RFS or REE path decision. Stall count: 55.
