@@ -1078,3 +1078,16 @@ Hypotheses to test:
 - H2: CEV(E2_2L_v4 vs E1_2L_v4) > 4.255% (v3 Option 3 baseline)
 - H3: Hedge channel CEV(E2_2L_v4 vs E2_2L_v3) ≈ 0.5-1.5%
 
+## 2026-06-19 — v4 solver confirmed + run scripts updated (second fire)
+
+Prior fire (00:15 UTC) produced `src/vfi_solver_v4.jl` (~930 LOC) with
+regime-specific tx_cost (tau_sell for E1_2L downsize, tau_token for E2_2L
+token sell, tau_buy for all purchases) — architecturally correct, no
+sell_factor approximation needed. This fire confirmed the implementation,
+updated run scripts to best-of-both-fires (parameterized env vars,
+`time` command, key diagnostic note on `mean_xB`), and resolved branch
+conflict to push the merged state cleanly.
+
+`next_actions.md` steps 1-4b all marked DONE. Awaiting user server1 runs.
+
+

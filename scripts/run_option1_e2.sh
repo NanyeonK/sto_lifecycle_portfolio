@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # Run E2_2L baseline under v4 (Option 1 full state extension).
-# x_prev_grid = {0.0, 0.5, 1.0} — 3 points covering renter/partial/full-owner.
+# x_prev_grid = {0.0, 0.5, 1.0} — household can pre-hold x_B before relocating.
 # Hypothesis: mean_xB > 0 at ell=A will emerge with proper delta tx_cost.
 #
 # Usage (on server1):
 #   bash scripts/run_option1_e2.sh
 #   JULIA_NUM_THREADS=4 N_X_PREV=4 X_PREV_MAX=1.5 bash scripts/run_option1_e2.sh
 
-set -e
+set -euo pipefail
 
 OUTDIR="output/diagnostics"
 mkdir -p "$OUTDIR"
@@ -29,7 +29,7 @@ echo "=== v4 E2_2L baseline (Option 1) ==="
 echo "    N_W=$N_W  N_Z=$N_Z  N_X_PREV=$N_X_PREV  X_PREV_MAX=$X_PREV_MAX"
 echo "    tau_sell=$TAU_SELL  tau_buy=$TAU_BUY  tau_token=$TAU_TOKEN"
 echo "    Output: $OUTDIR/p6_option1_e2.json"
-echo "    Key check: mean_xB_t1_feasible_ellA > 0 (hedge motive activates)"
+echo "    Key check: mean_xB_t1_ellA > 0 (hedge motive activates)"
 echo ""
 
 time julia src/vfi_solver_v4.jl 2>&1 | tee "$OUTDIR/p6_option1_e2_stdout.log"

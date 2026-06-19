@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # Run E1_2L baseline under v4 (Option 1 full state extension).
-# x_prev_grid = {0.0, 1.0} — only two points needed for binary E1_2L.
+# x_prev_grid = {0.0, 0.5, 1.0} — covers renter/partial/full-owner.
 # Compare with v3 E1_2L_full (tau_buy Option 3) for CEV baseline.
 #
 # Usage (on server1):
 #   bash scripts/run_option1_e1.sh
 #   JULIA_NUM_THREADS=4 bash scripts/run_option1_e1.sh
 
-set -e
+set -euo pipefail
 
 OUTDIR="output/diagnostics"
 mkdir -p "$OUTDIR"
@@ -15,7 +15,7 @@ mkdir -p "$OUTDIR"
 export REGIME="E1_2L"
 export N_W="${N_W:-15}"
 export N_Z="${N_Z:-5}"
-export N_X_PREV="${N_X_PREV:-2}"
+export N_X_PREV="${N_X_PREV:-3}"
 export X_PREV_MAX="${X_PREV_MAX:-1.0}"
 export ASSET_GRID_SIZE="${ASSET_GRID_SIZE:-9}"
 export GH_NODES="${GH_NODES:-3}"
