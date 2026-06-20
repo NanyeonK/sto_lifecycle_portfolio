@@ -2977,3 +2977,45 @@ git add output/diagnostics/p6_option1_*.json && git commit && git push
 
 **Files modified**: `research_log.md`, `next_actions.md` (stall → 57, fire → 99)
 **Branch**: `auto/2026-05-02-option1-state-extension`
+
+## 2026-06-20 — Fire 100: Gate 1 still pending (58 consecutive stalls)
+
+Orientation audit complete per protocol: fetched remote, reset to remote HEAD
+(commit f602097, fire 99). All cloud-agent code work finished by fire 30
+(2026-05-18). BLOCKED on Gate 1 (server1 baselines). Stall count: 58.
+
+This fire again re-implemented vfi_solver_v4.jl before reading remote state
+(anti-pattern observed since fire 42). After reset to remote canonical state,
+confirmed: all 30+ deliverables on branch are complete. Nothing for cloud agent
+to add without server1 output JSONs.
+
+**100-fire milestone note**: At 6h cron frequency, 100 fires ≈ 25 days of
+wall time since the branch was created 2026-05-02. This is the first fire at
+or past the 100-fire mark. The gap strongly suggests server1 is either not
+accessible, the user is away, or the correct branch is not checked out there.
+
+**Full status of all artifacts on branch** (unchanged from fire 99):
+- `src/vfi_solver_v4.jl` — 6D state, per-period tx_cost, smoke test: **DONE**
+- `scripts/run_option1_smoke.sh`, `run_option1_e1.sh`, `run_option1_e2.sh`,
+  `run_option1_e1_notx.sh`, `run_option1_e2_notau.sh` — all ready: **DONE**
+- `scripts/compute_option1_decomp.py` — CEV decomp + H1/H2/H3: **DONE**
+- `paper/sections/s1-s6/*.tex` + `paper/main.tex` — complete: **DONE**
+- `docs/calibration_v3.md`, `methods_v3.md`, `welfare_decomp_v4.md`: **DONE**
+- `scripts/sweep_*.sh` + `scripts/plot_*.py`: **DONE**
+- `output/diagnostics/p6_option1_*.json`: **NOT YET** (server1 required)
+
+**Action required from user on server1** (unchanged):
+```bash
+cd ~/project/sto_lifecycle_portfolio
+git fetch origin auto/2026-05-02-option1-state-extension
+git checkout auto/2026-05-02-option1-state-extension
+julia src/vfi_solver_v4.jl --smoke-test
+bash scripts/run_option1_e1.sh
+bash scripts/run_option1_e2.sh
+bash scripts/run_option1_e1_notx.sh
+bash scripts/run_option1_e2_notau.sh
+git add output/diagnostics/p6_option1_*.json && git commit && git push
+```
+
+**Files modified**: `research_log.md`, `next_actions.md` (stall → 58, fire → 100)
+**Branch**: `auto/2026-05-02-option1-state-extension`
