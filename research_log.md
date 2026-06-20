@@ -3019,3 +3019,38 @@ git add output/diagnostics/p6_option1_*.json && git commit && git push
 
 **Files modified**: `research_log.md`, `next_actions.md` (stall → 58, fire → 100)
 **Branch**: `auto/2026-05-02-option1-state-extension`
+
+## 2026-06-20 — Fire 101: Gate 1 still pending (59 consecutive stalls)
+
+Orientation audit complete per CLAUDE.md protocol: fetched remote, reset to
+remote HEAD (commit 2ce3d3e, fire 100). All cloud-agent code work finished by
+fire 30 (2026-05-18). BLOCKED on Gate 1 (server1 baselines). Stall count: 59.
+
+This fire again re-implemented vfi_solver_v4.jl before reading CLAUDE.md
+(same anti-pattern noted since fire 42). After reset to remote canonical state,
+confirmed: all deliverables complete. Nothing new for cloud agent to add.
+
+**All artifacts on branch** (unchanged since fire 30):
+- `src/vfi_solver_v4.jl` — 6D state, per-period tx_cost, smoke test: **DONE**
+- `scripts/run_option1_e*.sh` (5 scripts) + `run_option1_smoke.sh`: **DONE**
+- `scripts/compute_option1_decomp.py` — CEV decomp + H1/H2/H3: **DONE**
+- `paper/sections/s1-s6/*.tex` + `paper/main.tex`: **DONE**
+- `docs/calibration_v3.md`, `methods_v3.md`, `welfare_decomp_v4.md`: **DONE**
+- `scripts/sweep_*.sh` + `scripts/plot_*.py`: **DONE**
+- `output/diagnostics/p6_option1_*.json`: **NOT YET** (server1 required)
+
+**Server1 commands to unblock** (5 commands):
+```bash
+cd ~/project/sto_lifecycle_portfolio
+git fetch origin auto/2026-05-02-option1-state-extension
+git checkout auto/2026-05-02-option1-state-extension
+julia src/vfi_solver_v4.jl --smoke-test
+bash scripts/run_option1_e1.sh
+bash scripts/run_option1_e2.sh
+bash scripts/run_option1_e1_notx.sh
+bash scripts/run_option1_e2_notau.sh
+git add output/diagnostics/p6_option1_*.json && git commit && git push
+```
+
+**Files modified**: `research_log.md`, `next_actions.md` (stall → 59, fire → 101)
+**Branch**: `auto/2026-05-02-option1-state-extension`
