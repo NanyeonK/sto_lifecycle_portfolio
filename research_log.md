@@ -991,3 +991,69 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-06-20 — v4 solver (Option 1 full state extension) implemented
+
+**Action picked**: Implement `src/vfi_solver_v4.jl` — Path B Option 1
+full 6D state extension. This was the P0 action in `next_actions.md`
+(approved by user 2026-05-02).
+
+**Key design decisions:**
+
+1. **6D state**: `(t, w, z, ell, x_A_prev, x_B_prev)`. x_prev tracks
+   previous-period housing positions. `x_new` choices are restricted to
+   `x_prev_grid` points → exact next-state lookup; no interpolation in
+   x_prev dimension. (w, z) continue to use bilinear interpolation.
+
+2. **Per-period transaction cost** (v4 key addition):
+   ```
+   tx_cost = tau_buy   * (max(Δx_A, 0) + max(Δx_B, 0))
+           + tau_token * (max(-Δx_A, 0) + max(-Δx_B, 0))
+   ```
+   Budget: `c + kappa(x_ell_new | ell) + x_A_new + x_B_new + tx_cost + b + s = w`
+
+3. **Hedge mechanism (structural difference)**:
+   - E1_2L relocation: next-period `x_prev → (0, 0)` (forced sale;
+     new-location household must pay `tau_buy * 1` to acquire ownership).
+   - E2_2L relocation: next-period `x_prev → (x_A_new, x_B_new)` (tokens
+     portable; no forced sale; carried position costs zero to maintain).
+   - Expected per-period saving per unit x_B pre-held at ell=A:
+     `p_relocate × tau_buy ≈ 0.06 × 0.025 = 0.0015`.
+
+4. **x_prev_grid** (default): {0.0, 0.5, 1.0}, N_X_PREV=3, X_PREV_MAX=1.0.
+   Coarser w/z grids (N_W=15, N_Z=5) compensate for 9× state factor.
+
+5. **E1_2L binary**: x_ell_new ∈ {x_prev_grid[1], x_prev_grid[end]} =
+   {0.0, 1.0} (requires X_PREV_MAX=1.0). x_{ell'}_new = 0.0 always.
+   E2_2L continuous: all 9 (ix_A_new, ix_B_new) combinations from grid.
+
+6. **Housing cost rule**: occupied unit only (fixed kappa rule from
+   `fix/2026-05-01-housing-cost-only-occupied`, already in main).
+
+7. **Smoke test** (`--smoke-test`): 6D array allocation, tx_cost spot
+   checks, terminal slice, housing cost, p_relocate, shock block.
+   VFI NOT run (cloud env lacks Julia; server1 runs queued as next step).
+
+**Files created:**
+- `src/vfi_solver_v4.jl` (~580 LOC)
+- `scripts/run_option1_e1.sh` (E1_2L baseline run script)
+- `scripts/run_option1_e2.sh` (E2_2L baseline run script)
+
+**Feature branch**: `auto/2026-06-20-v4-solver-option1`
+
+**Next queued actions** (user / server1 required):
+1. `julia src/vfi_solver_v4.jl --smoke-test` on server1.
+2. `bash scripts/run_option1_e1.sh` (E1_2L baseline, ~2-3h wall).
+3. `bash scripts/run_option1_e2.sh` (E2_2L baseline, ~2-3h wall).
+4. Compute CEV(E2_2L_v4 vs E1_2L_v4) and check hypotheses H1, H2, H3.
+5. If H1 (mean_xB > 0 at ell=A) confirmed: RFS-marginal mechanism alive.
+6. If H1 fails: mechanism exhausted; fall back to Path D (REE/JHE).
+
+**Note on hedge arithmetic**: The expected per-period benefit of
+pre-holding x_B = 0.5 at ell=A is 0.5 × p_relocate × tau_buy =
+0.5 × 0.0015 = 0.00075 per period. Over ~40 working periods, lifetime
+expected savings ≈ 3% of x_B held. Discounted at beta=0.96, net present
+value ≈ 2.4%. This is the theoretical ceiling on the hedge channel
+before risk aversion and portfolio substitution effects. The coarse grid
+(N_X_PREV=3) may quantize this imprecisely; a N_X_PREV=5 sensitivity
+run is queued as P1.
+
