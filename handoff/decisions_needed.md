@@ -225,3 +225,22 @@ via sell_factor. CEV estimates are conservative; true estimates
 **Next**: server1 baselines remain the critical path. No further
 cloud-agent work is available until output JSONs are committed.
 
+## 2026-06-21 — 60-stall escalation (fire 102)
+
+**Status**: 60 consecutive stalls (fires 43-102, ~15 days of wall time).
+All cloud deliverables complete. Blocked exclusively on server1 output JSONs.
+
+**No decision required** — the path is clear. The single unblocking action:
+
+```bash
+cd ~/project/sto_lifecycle_portfolio
+git fetch origin && git checkout auto/2026-05-02-option1-state-extension
+bash scripts/run_gate1_all.sh          # ~8-10h; or --small for 20-min sanity check
+git add output/diagnostics/p6_option1_*.json output/diagnostics/p6_option1_decomposition.md
+git commit -m "server1: Gate 1 baselines + decomposition"
+git push origin auto/2026-05-02-option1-state-extension
+```
+
+Once those JSONs are pushed, the cloud agent will automatically pick up
+Phase 2 (sensitivity sweeps, manuscript fill-in, PR) on the next fire.
+

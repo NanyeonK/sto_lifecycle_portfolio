@@ -3054,3 +3054,44 @@ git add output/diagnostics/p6_option1_*.json && git commit && git push
 
 **Files modified**: `research_log.md`, `next_actions.md` (stall → 59, fire → 101)
 **Branch**: `auto/2026-05-02-option1-state-extension`
+
+## 2026-06-21 — Fire 102: Gate 1 still pending (60 consecutive stalls)
+
+Orientation audit complete per CLAUDE.md protocol: fetched remote, reset to
+remote HEAD (commit on branch `auto/2026-05-02-option1-state-extension`, fire
+101). All cloud-agent code work finished by fire 30 (2026-05-18). BLOCKED on
+Gate 1 (server1 baselines). Stall count: **60**.
+
+**60-stall milestone — escalation**:
+60 consecutive stalls × 6h interval = 360 hours = 15 days of wall time.
+The project has been blocked since approximately 2026-05-03 waiting for server1
+Julia baselines. All code, scripts, paper sections, and analysis infrastructure
+are complete on the branch. The only missing artifact is:
+  `output/diagnostics/p6_option1_*.json`
+
+No duplicate work attempted this fire — read CLAUDE.md and remote state first,
+confirmed all deliverables complete, wrote state update only.
+
+**Full artifact status** (unchanged since fire 30):
+- `src/vfi_solver_v4.jl` — 6D state, per-period tx_cost, smoke test: **DONE**
+- `scripts/run_option1_smoke.sh` + 5 baseline/counterfactual run scripts: **DONE**
+- `scripts/compute_option1_decomp.py` — CEV decomp + H1/H2/H3 tests: **DONE**
+- `scripts/run_gate1_all.sh` — master script (smoke → E1 → E2 → notx → notau → decomp): **DONE**
+- `paper/sections/s1-s6/*.tex` + `paper/main.tex` + `references.bib`: **DONE**
+- `docs/calibration_v3.md`, `methods_v3.md`, `welfare_decomp_v4.md`: **DONE**
+- `scripts/sweep_*.sh` + `scripts/plot_*.py` (5 sweep + 4 plot scripts): **DONE**
+- `output/diagnostics/p6_option1_*.json`: **NOT YET** (server1 required)
+
+**Single command to unblock** (runs all 6 Gate 1 steps, ~8-10h, or --small for ~20 min):
+```bash
+cd ~/project/sto_lifecycle_portfolio
+git fetch origin && git checkout auto/2026-05-02-option1-state-extension
+bash scripts/run_gate1_all.sh
+git add output/diagnostics/p6_option1_*.json output/diagnostics/p6_option1_decomposition.md
+git commit -m "server1: Gate 1 baselines + decomposition"
+git push origin auto/2026-05-02-option1-state-extension
+```
+
+**Files modified**: `research_log.md`, `next_actions.md` (stall → 60, fire → 102),
+`handoff/decisions_needed.md` (60-stall escalation note)
+**Branch**: `auto/2026-05-02-option1-state-extension`
