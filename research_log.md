@@ -991,3 +991,88 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-06-21 — v4 solver skeleton: 6D state Option 1 implementation
+
+**Action picked**: implement `src/vfi_solver_v4.jl` — Path B Option 1
+full state extension with proper per-period tau_buy on position changes.
+This is the P0 item from `next_actions.md` and `handoff/tau_buy_option1_spec.md`.
+
+**Why this action**: The cross-location hedge mechanism was dead in v3
+because tau_buy was only approximated at relocation events (Option 3).
+Option 1 tracks x_A_prev and x_B_prev as state variables, so households
+can pre-accumulate x_B tokens at ell=A before relocation, paying tau_buy
+incrementally. The expected hedge premium per unit x_B held pre-move is
+`p_relocate * tau_buy ≈ 0.06 * 0.025 = 0.0015/yr`, which over a
+working life can generate 0.5-1.5% additional CEV.
+
+**Files created on branch `auto/2026-06-21-option1-state-extension`**:
+- `src/vfi_solver_v4.jl` (~620 LOC) — complete standalone 6D solver
+- `scripts/run_option1_e1.sh` — server1 run script for E1_2L baseline
+- `scripts/run_option1_e2.sh` — server1 run script for E2_2L baseline
+
+**v4 design summary**:
+
+State: `(t, w, z, ell, x_A_prev, x_B_prev)` — 6D. Previous-period
+position carried as state so period-t tx_cost can be computed from
+`delta_A = x_A_new - x_A_prev` and `delta_B = x_B_new - x_B_prev`.
+
+Transaction cost formula:
+- E2_2L (tokens): `tx = tau_buy * pos_change + tau_token * neg_change`
+- E1_2L (physical): `tx = tau_buy * pos_change + tau_sell * neg_change`
+
+where `tau_token = 0.5%` (cheap; tokens) and `tau_sell = 6%` (NAR;
+physical property). This gives the round-trip wedge of `tau_sell + tau_buy
+= 8.5%` for E1_2L vs `tau_token + tau_buy = 2.5%` for E2_2L.
+
+Budget: `c + kappa(x_ell_new) + b + s + x_A_new + x_B_new + tx = w`.
+
+Housing cost rule: FIXED kappa (only occupied-location unit saves rent):
+`kappa(x_A, x_B, ell=A) = rho - x_A * (rho - m)`.
+
+Forced sales in E1_2L: handled AUTOMATICALLY at the next period's choice
+time. After relocation from A to B, the household arrives at (B,
+x_A_prev=x_A_new, x_B_prev=0). Admissibility forces x_A_new=0, paying
+`tau_sell * x_A_prev` via the tx_cost formula. No special sell_factor
+in the wealth transition.
+
+Wealth transition: clean, no sell_factors needed:
+`w_next = (b*rf + s*rs + x_A_new*ra + x_B_new*rb) / hp + y_next`.
+
+x_prev grid: `N_X_PREV=3` → `{0.0, 0.5, 1.0}` (X_PREV_MAX=1.0).
+x choices restricted to grid points → exact index lookup in continuation
+value, no interpolation in x_prev dims. Bilinear interp in (w, z) only.
+
+Result arrays: 6D `(T, n_w, n_z, 2, n_xA_prev, n_xB_prev)`.
+With T=57, N_W=15, N_Z=5, n_ell=2, N_X_PREV=3: ~56 million inner
+iterations per regime at quadrature n=3 (2187 pts/state). Expected
+wall time ~60-90 min per regime on server1 (vs ~30 min for v3).
+
+Smoke test: all structural checks implemented in `smoke_test_v4()`.
+Checks: sigma decomposition, x_prev grid bounds (must include 0 and 1),
+6D array shape + memory (~10 MB), terminal slice, tx_cost formula (5
+assertions), no-rebalance tx=0, housing_cost_v4 (4 spot-checks), shock
+block size + weight sum, p_relocate boundary. NO VFI run in smoke test.
+
+**What to run on server1** (next_actions.md steps 4-5):
+```bash
+# Structural smoke test (fast, ~seconds):
+julia src/vfi_solver_v4.jl --smoke-test
+
+# E1_2L baseline (~60-90 min):
+bash scripts/run_option1_e1.sh
+
+# E2_2L baseline (~60-90 min, run after E1 or in parallel):
+bash scripts/run_option1_e2.sh
+```
+
+After both baselines complete, compute
+`CEV(E2_2L_v4 vs E1_2L_v4)` and check hypotheses H1-H3 from
+`next_actions.md`.
+
+**Calibration baseline** (from `handoff/tau_buy_option1_spec.md`):
+gamma=5, beta=0.96, rf=1.02, rho=0.05, m=0.01, sigma_h=0.115,
+sigma_div=0.10, rho_AB=0.5, p_relocate_working=0.06, tau_sell=0.06,
+tau_buy=0.025, tau_token=0.005. All env-var configurable.
+
+**Branch**: `auto/2026-06-21-option1-state-extension` pushed to origin.
+Next fire: user runs smoke test + E1/E2 baselines on server1 (steps 4-6).
