@@ -991,3 +991,69 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-06-21 — v4 solver (6D state, Option 1 full tau_buy extension) implemented
+
+**Action picked**: P0 from `next_actions.md` — create `src/vfi_solver_v4.jl`
+implementing Path B Option 1 (full state extension with `x_A_prev`, `x_B_prev`).
+Spec: `handoff/tau_buy_option1_spec.md`.
+
+**Branch**: `auto/2026-05-02-option1-state-extension`
+
+**Core change vs v3**: State extends from `(t, w, z, ell)` [4D] to
+`(t, w, z, ell, x_A_prev, x_B_prev)` [6D]. Transaction costs charged
+per-period on position deltas:
+```
+tx_cost = tau_buy  * (max(dA,0) + max(dB,0))
+        + tau_token * (max(-dA,0) + max(-dB,0))
+```
+where `dA = x_A_new - x_A_prev` and `dB = x_B_new - x_B_prev`.
+
+**Why this should activate the hedge**: A household at ell=A who
+anticipates relocation to B can incrementally buy x_B NOW (cheap,
+at tau_buy * delta_xB), avoiding a lump-sum buy on arrival at B
+(tau_buy * 1 unit). Expected hedge premium ≈ p_relocate * tau_buy ≈
+0.06 * 0.025 = 0.15% per period per unit. Lifetime CEV estimate: +1-2%
+on top of Option 3 baseline (+4.255%).
+
+**Key design decisions**:
+
+1. **Discrete x_new choices**: x_A_new and x_B_new are restricted to
+   the x_prev grid (N_X_PREV=3, default {0, 0.5, 1.0} — env-var
+   `X_PREV_MAX` controls upper bound, default 1.5 so grid is
+   {0, 0.75, 1.5}). This makes state transitions exact (no
+   interpolation in the x_prev dimension).
+
+2. **Post-relocation x_prev reset (E1_2L)**: After forced sale on
+   relocation, x_A_prev and x_B_prev at t+1 reset to 0 (forced sale
+   clears the position). E2_2L tokens are portable: x_prev at t+1 =
+   x_new from this period.
+
+3. **E1_2L admissibility preserved**: x_{ell'} = 0 always. tau_buy
+   is now charged when x_ell increases (0→1), replacing the
+   `apply_tau_buy_at_reloc` approximation with proper per-period
+   accounting.
+
+4. **Grid defaults (resource-compensated from v3)**:
+   N_W=15 (was 21), N_Z=5 (was 7), N_X_PREV=3.
+   Net state factor: 9x (x_prev) × 0.51 (smaller w,z) ≈ 4.6x per spec.
+   Expected wall time per regime: ~2-3 hours on server1 (vs 30 min v3).
+
+**Files created**:
+- `src/vfi_solver_v4.jl` (~440 LOC) — full 6D solver
+- `scripts/run_option1_smoke.sh` — smoke test (no VFI, < 30s)
+- `scripts/run_option1_e1.sh` — E1_2L baseline run
+- `scripts/run_option1_e2.sh` — E2_2L baseline run
+
+**Smoke test**: run `bash scripts/run_option1_smoke.sh` on server1
+before the full baseline runs. Checks: 6D array allocation (~0.5 MB),
+tx_cost arithmetic, x_prev grid construction, terminal slice, housing
+cost rule, shock block.
+
+**Next queued for user (server1)**:
+1. `bash scripts/run_option1_smoke.sh` — verify struct and tx_cost
+2. `bash scripts/run_option1_e1.sh`   — E1_2L baseline (~2-3h)
+3. `bash scripts/run_option1_e2.sh`   — E2_2L baseline (~2-3h)
+4. Check `mean_xB_t1_ellA` in p6_option1_e2.json — should be > 0
+   if hedge mechanism activates (H1 hypothesis)
+5. Compute `CEV(E2_2L_v4 vs E1_2L_v4)` — should exceed +4.255% (H2)
+
