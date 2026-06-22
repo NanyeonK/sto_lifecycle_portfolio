@@ -26,6 +26,7 @@ P_RELOCATE_WORKING=0.06 \
 P_RELOCATE_RETIRED=0.02 \
 RHO_AB=0.50 \
 SUMMARY_JSON_PATH="$OUTDIR/p6_option1_e1.json" \
+SAVE_PATH="$OUTDIR/p6_option1_e1_result.jls" \
 JULIA_NUM_THREADS=1 \
 julia src/vfi_solver_v4.jl 2>&1 | tee "$OUTDIR/p6_option1_e1_stdout.log"
 

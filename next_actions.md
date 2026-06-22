@@ -1,7 +1,7 @@
 # Next Actions (Path B Option 1 in flight, ASAP-tempered to 6h cron)
 
 Project: sto_lifecycle_portfolio
-Updated: 2026-06-22 (cloud agent fire 104 — stall 62; pipeline verified, blocked on server1)
+Updated: 2026-06-22 (cloud agent fire 105 — stall 63; figure pipeline scripts added)
 
 ## ⭐ P0 — Option 1 full state extension (USER CHOSE B, OPTION 1)
 
@@ -99,6 +99,11 @@ If any fails: fall back to Path D (REE/JHE) at +4.26%.
 | P1-prep | `scripts/plot_sensitivity_heatmap.py` — Fig 2 two-panel CEV sensitivity script (rho_AB + p_reloc cross-sections); reads from p7_rhoAB_v4/ + p7_prelocate_v4/ | **DONE** 2026-05-17 (fire 28) |
 | P1-prep | `paper/references.bib` — BibTeX for all 16 citation keys used in paper sections | **DONE** 2026-05-17 (fire 29) |
 | P1-prep | `scripts/compute_option1_decomp.py` — reads 4 baseline JSONs, computes 3-channel CEV decomp, checks H1/H2/H3, writes `p6_option1_decomposition.md` | **DONE** 2026-05-18 (fire 30) |
+| P1-prep | `scripts/export_policy_csv.jl` — exports lifecycle policy means + V-slice CSVs from serialized .jls result files (needed for Fig 1, 4, 5) | **DONE** 2026-06-22 (fire 105) |
+| P1-prep | `scripts/plot_lifecycle_profiles.py` — Fig 1 two-panel lifecycle profiles (E1 vs E2 xA/xB by age) | **DONE** 2026-06-22 (fire 105) |
+| P1-prep | `scripts/fig4_v_slice.py` — Fig 4 V(w) slice (E0/E1/E2 at t=1, ellA); placeholder until CSVs land | **DONE** 2026-06-22 (fire 105) |
+| P1-prep | `scripts/fig5_mean_x_age.py` — Fig 5 mean xB by age with H1 annotation | **DONE** 2026-06-22 (fire 105) |
+| P1-prep | `scripts/run_option1_e{1,2}.sh` — added SAVE_PATH so full .jls result serialized alongside JSON | **DONE** 2026-06-22 (fire 105) |
 
 ## P1 (after Option 1 resolves)
 

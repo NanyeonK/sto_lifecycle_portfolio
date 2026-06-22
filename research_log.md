@@ -3170,3 +3170,54 @@ bash scripts/run_gate1_all.sh --small   # 20-min sanity check
 
 **Files modified**: `research_log.md` (this entry), `next_actions.md` (stall 62)
 **Branch**: `auto/2026-05-02-option1-state-extension`
+
+## 2026-06-22 — Fire 105: Figure pipeline scripts created (stall 63)
+
+**Orientation**: No new server1 output. Stall count: **63**. 63 × 6h = 378 h.
+
+**This fire's action**: Created the four missing figure pipeline scripts that
+sit between Gate 1 output and the camera-ready paper. These were specified in
+exhibit memos but had not been extracted into runnable files.
+
+**Created**:
+
+1. `scripts/export_policy_csv.jl` — Julia post-processor. Reads serialized
+   v4 result files (`p6_option1_e{1,2}_result.jls`) and exports:
+   - `p6_option1_e{1,2}_policy_summary.csv` — mean_xA, mean_xB by age × location
+     (entry state x_prev=(0,0) + all-x_prev average + frac_xB_pos)
+   - `p6_option1_e{1,2}_v_slice_t1.csv` — V(w, iz_mid, t=1, ellA, xprev=0) slice
+
+2. `scripts/fig5_mean_x_age.py` — Figure 5. Reads e2 policy CSV, plots
+   Panel A (mean_xA by age) + Panel B (mean_xB by age with H1 annotation).
+   Saves to `paper/figures/fig5_mean_x_age.pdf`.
+
+3. `scripts/plot_lifecycle_profiles.py` — Figure 1. Reads e1 + e2 policy
+   CSVs, plots Panel A (E1 lifecycle) + Panel B (E2 lifecycle with xB > 0
+   annotation). Saves to `paper/figures/fig1_lifecycle_profiles.pdf`.
+
+4. `scripts/fig4_v_slice.py` — Figure 4. Reads V-slice CSVs (e0, e1, e2);
+   falls back to schematic placeholder if CSVs absent. Saves to
+   `paper/figures/fig4_v_slice.pdf` (or `_placeholder.pdf`).
+
+**Modified**:
+
+5. `scripts/run_option1_e1.sh` — added `SAVE_PATH="$OUTDIR/p6_option1_e1_result.jls"`
+   so full serialized result is saved alongside the summary JSON.
+
+6. `scripts/run_option1_e2.sh` — same: `SAVE_PATH="$OUTDIR/p6_option1_e2_result.jls"`.
+
+**Post-Gate-1 figure pipeline** is now complete:
+```
+bash scripts/run_gate1_all.sh        # Gate 1 (server1 — still blocking)
+julia scripts/export_policy_csv.jl   # export policy + V-slice CSVs
+python scripts/fig5_mean_x_age.py    # Fig 5 → paper/figures/fig5_mean_x_age.pdf
+python scripts/plot_lifecycle_profiles.py  # Fig 1 → fig1_lifecycle_profiles.pdf
+python scripts/fig4_v_slice.py       # Fig 4 → fig4_v_slice.pdf
+python scripts/plot_channel_decomp.py      # Fig 3 (was already done)
+python scripts/plot_sensitivity_heatmap.py # Fig 2 (was already done)
+```
+
+**Gate 1 status**: Unchanged. Server1 Julia baselines remain the sole blocker.
+
+**Files created/modified**: see above.
+**Branch**: `auto/2026-05-02-option1-state-extension`
