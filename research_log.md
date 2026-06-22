@@ -991,3 +991,86 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-06-22 — v4 solver skeleton: 6D state extension (Option 1)
+
+**Action picked**: P0 Step 2 — create `src/vfi_solver_v4.jl` with full
+6D state `(t, w, z, ell, x_A_prev, x_B_prev)` per
+`handoff/tau_buy_option1_spec.md`.
+
+**Why this fire, why this action**: User confirmed 2026-05-02 that
+Option 1 full state extension is the priority. Steps 1-4 of the P0
+table are cloud-agent work; Steps 5-7 require server1. No blocking
+human gates exist. Branch creation (Step 1) and solver file (Step 2)
+plus smoke-test stub (Step 4) are all auto-allowed and were
+executed together as one cohesive implementation.
+
+**What was built** (`src/vfi_solver_v4.jl`, ~510 LOC):
+
+1. **6D state arrays** indexed `(t, iw, iz, iell, ixA_prev, ixB_prev)`.
+   `SolverResult_v4` carries six 6D arrays (value + 5 policy functions).
+   Memory at N_W=15, N_Z=5, N_X_PREV=3, T=57: ~8 MB per array — fits
+   comfortably on server1.
+
+2. **Per-period transaction-cost block** (the v4 core):
+   ```
+   tx_cost = tau_buy   * (max(dA, 0) + max(dB, 0))
+           + tau_token * (max(-dA,0) + max(-dB,0))
+   ```
+   where `dA = x_A_new - x_A_prev`, `dB = x_B_new - x_B_prev`.
+   Charged in the period-t budget constraint every period.
+
+3. **x_prev grid**: `N_X_PREV=3` (default `{0.0, 0.75, 1.5}`), env-var
+   configurable via `N_X_PREV` and `X_PREV_MAX`. Nearest-neighbor snap
+   `searchsortednearest_v4()` maps x_new to the closest grid point
+   when indexing the next-period value slice.
+
+4. **E1_2L_v4**: binary x_ell ∈ {0,1}; x_{ell'}=0 by admissibility.
+   tau_sell on forced sale at relocation (via `sell_factor`). tau_buy
+   charged at next period's budget when household buys `x_ell_new=1`
+   at the new location (since x_prev carries 0 after relocation sale).
+
+5. **E2_2L_v4**: continuous `(x_A_new, x_B_new) ≥ 0`. Budget-adaptive
+   grid: `X_total ∈ [0, max_X]` and `alpha ∈ [0,1]` with
+   `x_A = alpha*X_total`, `x_B = (1-alpha)*X_total` — same
+   parameterization as v3 so the alpha dimension directly captures
+   the cross-location hedge allocation. `tx_cost` is charged inside
+   the budget check (`res = w - kappa - X_total - tx`), naturally
+   excluding infeasible choices.
+
+6. **Continuation value**: 5D next-slice `(n_w, n_z, 2, n_xprev, n_xprev)`,
+   bilinear in `(w, z)`, nearest-neighbor in `(ixA_next, ixB_next)`.
+   Relocation shock (Bernoulli `p_relocate`) integrated inline with
+   7D GH quadrature — same approach as v3.
+
+7. **Smoke test stub** `smoke_test_v4()` (--smoke-test flag):
+   - sigma decomposition invariant
+   - 6D array allocation + memory report
+   - shock block size and weight sum
+   - terminal slice NaN/feasibility
+   - 4 tx_cost spot-checks (no-change, buy A, sell B, mixed)
+   - 4 housing_cost spot-checks
+   - x_prev grid endpoints and nearest-neighbor
+   - p_relocate boundary checks
+
+**Key design note**: The hedge mechanism activates because in E2_2L_v4,
+a household at ell=A who holds `x_B_prev > 0` pays zero tau_buy on
+maintaining that x_B position in the next period. A household entering
+with `x_B_prev = 0` must pay `tau_buy * x_B_new` to build the position.
+The per-period hedge premium is `p_relocate * tau_buy ≈ 0.15%` per unit
+per year, which should accumulate to +1-2% lifetime CEV on top of Option 3.
+
+**Files created/modified**:
+- `src/vfi_solver_v4.jl` (new, ~510 LOC)
+- `scripts/run_option1_e1.sh` (new)
+- `scripts/run_option1_e2.sh` (new)
+- `output/diagnostics/` (directory created)
+- `research_log.md` (this entry)
+- `next_actions.md` (Steps 1-4 marked DONE; Step 5 queued)
+
+**Feature branch**: `auto/2026-05-02-option1-state-extension` (pushed).
+
+**Next queued (Steps 5-7, server1 required)**:
+1. `julia src/vfi_solver_v4.jl --smoke-test` — verify struct init, tx_cost, dims
+2. `bash scripts/run_option1_e1.sh` — E1_2L baseline (~2-3h)
+3. `bash scripts/run_option1_e2.sh` — E2_2L baseline (~2-3h)
+4. Cloud agent next fire: compute CEV decomposition from JSON results
