@@ -991,3 +991,75 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-06-22 — v4 solver (6D state extension) implemented (cloud agent fire)
+
+**Action picked**: P0 from `next_actions.md` — create `src/vfi_solver_v4.jl`
+per spec in `handoff/tau_buy_option1_spec.md`.
+
+**Motivation**: Option 3 (synthetic tau_buy at relocation only) left the
+cross-location hedge empirically dead (mean_xB = 0 at ell=A for all
+p_relocate). The root cause: under Option 3, E2_2L households feel no
+per-period cost for NOT pre-holding x_B, so they concentrate in x_A.
+Option 1 charges tau_buy on every positive delta each period, making
+pre-holding x_B genuinely cheaper than a single large purchase on
+arrival. Expected pre-hold premium: p_relocate * tau_buy ≈ 0.15%/period.
+
+**What was implemented in `src/vfi_solver_v4.jl` (~350 LOC)**:
+
+1. **6D state** `(t, w, z, ell, x_A_prev, x_B_prev)`:
+   - `x_A_prev`, `x_B_prev` on discrete grid of N_X_PREV=3 points
+     (default {0.0, 0.5, 1.0}; env-var configurable via N_X_PREV, X_PREV_MAX)
+   - x_new choices constrained to x_prev_grid — eliminates need for 4D
+     interpolation; continuation value uses bilinear (w, z) + direct index
+     into (ell, x_A_prev, x_B_prev)
+
+2. **Per-period transaction costs on choice deltas**:
+   ```
+   tx_cost = tau_buy   * (max(x_A_new - x_A_prev, 0) + max(x_B_new - x_B_prev, 0))
+           + tau_token * (max(x_A_prev - x_A_new, 0) + max(x_B_prev - x_B_new, 0))
+   ```
+   Budget: `c + kappa(x_ell_new) + b + s + x_A_new + x_B_new + tx_cost = w`
+
+3. **State-update rules** (the core distinction from Option 3):
+   - E2_2L stay AND relocate: `x_prev_next = x_new` (tokens portable)
+   - E1_2L relocate: `x_prev_next = (0, 0)` (forced liquidation; tau_sell
+     on occupied-unit proceeds)
+   - E1_2L stay: `x_prev_next = x_new` (standard carry-over)
+
+4. **Reuses all v3 mechanics** via `include("vfi_solver_v3.jl")`:
+   income process, GH quadrature (7D), bilinear interpolation,
+   housing cost rule (fixed kappa — occupied-location only).
+
+5. **Smoke test** `smoke_test_v4()`: tx_cost spot-checks, 6D array
+   allocation, terminal slice, shock block weight sum, grid sanity.
+   Run: `julia src/vfi_solver_v4.jl --smoke-test`
+
+6. **Run scripts** (server1):
+   - `scripts/run_option1_e1.sh` — E1_2L at v4 settings
+   - `scripts/run_option1_e2.sh` — E2_2L at v4 settings
+   Grid: N_W=15, N_Z=5, N_X_PREV=3 → ~4.6x v3 compute; ~2-3h wall per regime.
+
+**Design notes**:
+- E1_2L x_B_prev is always 0 (admissibility), but the state dimension is
+  retained for unified array structure. Unreachable states are solved but
+  never visited in simulation.
+- x_prev_max defaults to 1.0 (grid {0, 0.5, 1.0}) so x=1.0 is an exact
+  grid point (required for E1_2L binary own/rent). For E2_2L holdings
+  above 1.0, set X_PREV_MAX env var.
+- tau_token is charged on decrements for both regimes (simplification;
+  E1_2L voluntary sells conceptually should use tau_sell, but this is a
+  second-order effect for the hedge mechanism test).
+
+**Feature branch**: `auto/2026-06-22-v4-state-extension`
+
+**Files modified this fire**:
+- `src/vfi_solver_v4.jl` (new, ~350 LOC)
+- `scripts/run_option1_e1.sh` (new)
+- `scripts/run_option1_e2.sh` (new)
+- `next_actions.md` (step 2 marked DONE; step 5 queued for user)
+- `research_log.md` (this entry)
+
+**Next queued (server1, user runs)**:
+- `julia src/vfi_solver_v4.jl --smoke-test` (step 4 in spec)
+- `bash scripts/run_option1_e1.sh` then `run_option1_e2.sh` (steps 5-6)
+- Check H1: mean_xB > 0 at ell=A; H2: CEV > 4.255%; H3: hedge channel ≈ 0.5-1.5%
