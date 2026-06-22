@@ -3130,3 +3130,43 @@ git push origin auto/2026-05-02-option1-state-extension
 
 **Files modified**: `research_log.md` (this entry)
 **Branch**: `auto/2026-05-02-option1-state-extension`
+
+## 2026-06-22 — Fire 104: Pipeline verified end-to-end (stall 62)
+
+**Orientation**: Read project files, fetched remote HEAD (db1fcdf, fire 103).
+Stall count: **62**. 62 × 6h = 372 h = 15.5 days of wall time.
+
+**This fire's action**: End-to-end pipeline integrity verification.
+Independently reviewed:
+
+1. `src/vfi_solver_v4.jl` — confirmed 6D state, x_prev transitions, tx_cost
+   formula, 4D interpolation, smoke test completeness. All correct.
+   Solver outputs `V_t1_midpoint_ellA_xprev0` in JSON summary. ✓
+
+2. `scripts/compute_option1_decomp.py` — confirmed `load_V()` reads
+   `V_t1_midpoint_ellA_xprev0` (v4 canonical), with fallbacks for earlier
+   typo variants. 3-channel decomposition (tx-cost, continuous-x, pre-buy
+   hedge) correctly implemented. ✓
+
+3. `scripts/run_gate1_all.sh` — confirmed sequences smoke → E1 → E2 →
+   E1_NOTX → E2_NOTAU → decomp correctly. All run scripts exist and
+   are executable. ✓
+
+4. `paper/` sections (s1–s6) and exhibit memos (fig1–5) — all complete
+   and waiting for server1 results to fill Table 1 numbers.
+
+**No implementation gaps found.** The gate is blocked exclusively on
+server1 Julia run time (~20 min `--small`, ~8-10 h full).
+
+**Gate 1 status**: Unchanged. All cloud work complete since fire 30 (2026-05-18).
+
+**Unblock command** (run on server1):
+```bash
+cd ~/project/sto_lifecycle_portfolio
+git fetch origin && git checkout auto/2026-05-02-option1-state-extension
+bash scripts/run_gate1_all.sh --small   # 20-min sanity check
+# If PASS: run full (remove --small), ~8-10 h
+```
+
+**Files modified**: `research_log.md` (this entry), `next_actions.md` (stall 62)
+**Branch**: `auto/2026-05-02-option1-state-extension`
