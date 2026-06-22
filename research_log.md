@@ -991,3 +991,83 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-06-22 — v4 solver (Option 1 state extension) implemented
+
+**Action picked**: create `src/vfi_solver_v4.jl` — P0 item from
+`next_actions.md` Option 1 chain; the only non-blocked auto-allowed
+action. Feature branch: `auto/2026-06-22-option1-state-extension`.
+
+**What was built**: `src/vfi_solver_v4.jl` (~540 LOC), a 6D-state VFI
+solver extending v3 with the proper tau_buy hedge mechanism.
+
+**Key design decisions:**
+
+1. **State**: `(t, w, z, ell, x_A_prev, x_B_prev)` — 6D. `x_prev`
+   tracks prior-period holdings so per-period deltas can be computed.
+   At t=1: `x_A_prev = x_B_prev = 0`.
+
+2. **Transaction costs in budget constraint** (not in wealth transition):
+   ```
+   delta_A = x_A_new - x_A_prev
+   delta_B = x_B_new - x_B_prev
+   tx_cost = tau_buy   * (max(delta_A,0) + max(delta_B,0))
+           + sell_rate * (max(-delta_A,0) + max(-delta_B,0))
+   sell_rate = tau_sell  (6%) for E1_2L  [NAR commission]
+   sell_rate = tau_token (1%) for E2_2L  [blockchain transfer]
+   ```
+   Key asymmetry: E1_2L forced sale costs 6x more than E2_2L token
+   transfer. Pre-holding x_B at ell=A avoids paying tau_buy (2.5%)
+   at future relocation.
+
+3. **Hedge mechanism (restored)**: expected premium for pre-holding
+   1 unit of x_B at ell=A = p_relocate × tau_buy ≈ 0.06 × 0.025
+   = 0.15% per period. Cumulative lifetime hedge CEV expected ~1-2%.
+
+4. **x choices constrained to x_prev_grid** for exact state tracking.
+   Default: N_X_PREV=3, X_PREV_MAX=1.0 → {0, 0.5, 1.0}. Both
+   x_A_new and x_B_new drawn from this grid. Refined by increasing
+   N_X_PREV for higher-fidelity runs (at ~N_X_PREV^2 compute cost).
+
+5. **Wealth transition simplified**: no sell_factor on relocation
+   (v3's `sell_factor_A = 1 - tau_sell` removed). All tx costs paid
+   via budget at time of portfolio adjustment. Approximation: sell
+   cost charged on unit count, not realized value. First-order approx
+   valid for small returns around 1.0.
+
+6. **FIXED kappa rule preserved**: `housing_cost_v4` uses only
+   `x_ell` (occupied-location token) for rent savings. Non-occupied
+   token is purely financial. This is the corrected rule from the
+   2026-05-01 kappa bug fix.
+
+7. **Continuation value**: `next_value_slice` is 5D
+   `(n_w, n_z, n_ell, n_xA_prev, n_xB_prev)`. Wealth w_next is the
+   same for stay and relocation paths (no sell_factor), so only `ell`
+   differs. Bilinear interpolation over (w, z); discrete lookup in
+   (ix_xA_new, ix_xB_new).
+
+**Memory estimate** at default settings (N_W=15, N_Z=5, N_X_PREV=3):
+- 6D array: 57 × 15 × 5 × 2 × 3 × 3 = 76,950 points
+- 7 arrays (value + 5 policies + feasible): ~4.5 MB total
+
+**Compute estimate**: ~2.5-3 h per regime on server1 single thread.
+Per state: 9 x-pairs × 81 (b,s) combos × 2187 quadrature = 1.6M ops.
+Total: 76,950 × 1.6M ≈ 120 billion FP ops.
+
+**Files created on branch `auto/2026-06-22-option1-state-extension`**:
+- `src/vfi_solver_v4.jl` (~540 LOC) — 6D solver
+- `scripts/run_option1_smoke.sh` — smoke test (< 30 s, no VFI)
+- `scripts/run_option1_e1.sh` — E1_2L baseline run
+- `scripts/run_option1_e2.sh` — E2_2L baseline run
+
+**Smoke test**: callable via `julia src/vfi_solver_v4.jl --smoke-test`
+(no Julia install needed to draft; server1 required to execute).
+10 checks: 6D allocation, terminal slice, tx_cost (5 cases), identity
+(zero tx), shock block, sigma decomposition, housing cost (6 cases),
+find_ix, p_relocate boundary.
+
+**Next queued** (next_actions.md Steps 3-7):
+- Step 3: server1 runs via `run_option1_smoke.sh` then `run_option1_e1.sh` + `run_option1_e2.sh` [USER]
+- Step 4: compute CEV(E2_2L_v4 vs E1_2L_v4); check H1 (mean_xB > 0) [USER]
+- If H1+H2+H3 pass: Phase 2 (calibration, sensitivity, manuscript)
+- If any fails: fall back to Path D (REE/JHE at +4.26%)
+
