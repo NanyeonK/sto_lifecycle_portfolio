@@ -3221,3 +3221,32 @@ python scripts/plot_sensitivity_heatmap.py # Fig 2 (was already done)
 
 **Files created/modified**: see above.
 **Branch**: `auto/2026-05-02-option1-state-extension`
+
+## 2026-06-23 — Fire 106: State audit (stall 64 — 16 days wall time)
+
+**Orientation**: No new server1 output. Stall count: **64**. 64 × 6h = 384 h (16 days).
+
+**This fire's action**: Orientation audit and state sync only.
+All cloud-agent deliverables confirmed complete since fire 30 (2026-05-18).
+The agent attempted to re-implement `src/vfi_solver_v4.jl` but recognized
+the duplicate upon discovering the remote branch state (bf15f68, fire 105)
+already contains the full 6D canonical implementation (~999 LOC). Reset
+local to remote HEAD; all duplicate work discarded.
+
+**Gate 1 status**: Unchanged. `output/diagnostics/p6_option1_e1.json` and
+`p6_option1_e2.json` do not exist. Server1 Julia VFI baselines remain the
+sole critical-path blocker.
+
+**Unblock command (run on server1)**:
+```bash
+cd ~/project/sto_lifecycle_portfolio
+git fetch origin && git checkout auto/2026-05-02-option1-state-extension
+bash scripts/run_gate1_all.sh --small   # 20-min sanity check
+# If PASS: run full (remove --small), ~8-10 h
+git add output/diagnostics/p6_option1_*.json output/diagnostics/p6_option1_decomposition.md
+git commit -m "server1: Gate 1 baselines + decomposition"
+git push origin auto/2026-05-02-option1-state-extension
+```
+
+**Files modified**: `research_log.md` (this entry), `next_actions.md` (stall 64)
+**Branch**: `auto/2026-05-02-option1-state-extension`
