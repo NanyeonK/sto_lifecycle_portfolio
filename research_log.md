@@ -3282,3 +3282,40 @@ git push origin auto/2026-05-02-option1-state-extension
 
 **Files modified**: `research_log.md` (this entry), `next_actions.md` (stall 65)
 **Branch**: `auto/2026-05-02-option1-state-extension`
+
+## 2026-06-23 — Fire 108: State audit (stall 66 — 16+ days wall time)
+
+**Orientation**: No new server1 output. Stall count: **66**. 66 × 6h = 396 h (16.5 days).
+
+**What happened this fire**: This fire read the project state files from the beginning
+(as required by orientation protocol) and attempted to implement `src/vfi_solver_v4.jl`
+again. Upon discovering the remote branch at fire 107, discarded the duplicate and reset
+to remote HEAD. All cloud-agent deliverables confirmed complete.
+
+**Complete inventory of what is done (no server1 needed):**
+- `src/vfi_solver_v4.jl` (999 LOC): 6D state (t,w,z,ell,x_A_prev,x_B_prev), 4D
+  multilinear interpolation, E0/E1_2L/E2_2L regimes, `smoke_test_v4()`, E1_2L
+  with proper tau_sell relocation via x_prev reset, E2_2L with delta-based
+  tau_buy/tau_token per period.
+- All paper sections s1–s6 (LaTeX), `paper/main.tex`, `paper/references.bib`,
+  `paper/outline_v4.md`.
+- All run/counterfactual/sweep/plot scripts.
+- All Phase 2 prep docs.
+
+**Gate 1 status**: Unchanged. 66 consecutive stall fires (396 h). Server1 Julia
+baselines `p6_option1_e{1,2}.json` do not exist. This is the ONLY blocker.
+
+**Unblock (5 min to start on server1):**
+```bash
+cd ~/project/sto_lifecycle_portfolio
+git fetch origin && git checkout auto/2026-05-02-option1-state-extension
+julia src/vfi_solver_v4.jl --smoke-test          # < 30 s; confirms code loads
+bash scripts/run_gate1_all.sh                    # ~8-10h full
+# After run completes:
+git add output/diagnostics/p6_option1_*.json
+git commit -m "server1: Gate 1 baselines"
+git push origin auto/2026-05-02-option1-state-extension
+```
+
+**Files modified**: `research_log.md` (this entry), `next_actions.md` (stall 66)
+**Branch**: `auto/2026-05-02-option1-state-extension`
