@@ -3319,3 +3319,34 @@ git push origin auto/2026-05-02-option1-state-extension
 
 **Files modified**: `research_log.md` (this entry), `next_actions.md` (stall 66)
 **Branch**: `auto/2026-05-02-option1-state-extension`
+
+## 2026-06-24 — Fire 109: Gate 1 stall 67 (16.75 days); all cloud prep verified complete
+
+**Action picked**: status audit + state update. All auto-allowed actions are either
+already DONE or blocked by Gate 1 (server1 run). No new cloud-side work is possible.
+
+**Audit of completed cloud deliverables** (fires 1-108):
+- `src/vfi_solver_v4.jl` (999 LOC, 6D state, 4D interpolation, smoke test with mini-VFI)
+- All run scripts: `run_gate1_all.sh`, `run_option1_e{0,1,2}.sh`, `run_option1_e{1_notx,2_notau}.sh`
+- All sensitivity sweep scripts: `sweep_rhoAB.sh`, `sweep_prelocate.sh`, `sweep_txcost.sh`, `sweep_asymmetric.sh`, `sweep_mortgage.sh`
+- All figure scripts: `plot_channel_decomp.py`, `plot_sensitivity_heatmap.py`, `plot_lifecycle_profiles.py`, `fig4_v_slice.py`, `fig5_mean_x_age.py`
+- `scripts/export_policy_csv.jl`, `scripts/compute_option1_decomp.py`
+- All paper sections: `s1_intro.tex`, `s2_model.tex`, `s3_calibration.tex`, `s4_results.tex`, `s5_discussion.tex`, `s6_conclusion.tex`, `main.tex`
+- Docs: `calibration_v3.md`, `sensitivity_grid_v4.md`, `methods_v3.md`, `welfare_decomp_v4.md`
+- `paper/references.bib`, `paper/outline_v4.md`, all exhibit memos
+
+**Gate 1 blocker (server1, USER)**: run VFI baselines and push JSONs.
+```bash
+cd ~/project/sto_lifecycle_portfolio
+git fetch origin && git checkout auto/2026-05-02-option1-state-extension
+bash scripts/run_gate1_all.sh   # ~8-10h full; or add --small for 20-min sanity check
+git add output/diagnostics/p6_option1_*.json
+git commit -m "server1: Gate 1 baselines"
+git push origin auto/2026-05-02-option1-state-extension
+```
+
+Once JSONs land, cloud agent will run `compute_option1_decomp.py` → CEV decomp → check
+H1/H2/H3 → if all pass, kick off Phase 2 sensitivity sweeps and manuscript fill-in.
+
+**Files modified**: `research_log.md` (this entry), `next_actions.md` (stall 67)
+**Branch**: `auto/2026-05-02-option1-state-extension`
