@@ -991,3 +991,68 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-06-24 — v4 solver (Option 1 full state extension) implemented
+
+**Action picked**: P0 — create `src/vfi_solver_v4.jl`, the full 6D
+state extension per `handoff/tau_buy_option1_spec.md`. This is the
+mechanistically correct implementation of per-period tau_buy that
+v3 deferred.
+
+**What changed vs v3:**
+
+- **State**: `(t, w, z, ell)` → `(t, w, z, ell, x_A_prev, x_B_prev)` (6D).
+  x_prev tracks prior-period token holdings for both locations.
+- **Transaction cost**: charged every period on rebalancing deltas:
+  `tx_cost = tau_buy * max(ΔxA, 0) + tau_buy * max(ΔxB, 0)
+           + tau_token * max(-ΔxA, 0) + tau_token * max(-ΔxB, 0)`
+  Budget constraint: `c + kappa + x_A_new + x_B_new + tx_cost + b + s = w`.
+- **State update**: `x_prev_{t+1} = x_new_t` (carried into next period
+  via nearest-neighbour index on coarse x_prev grid).
+- **Continuation value**: interpolates over `(w, z)` bilinearly; looks
+  up `(ell, x_A_prev, x_B_prev)` slice via NN on x_prev grid.
+- **tau_sell**: still applied via `sell_factor = (1 - tau_sell)` in
+  wealth transition on relocation for E1_2L, same as v3.
+
+**Why this resurrects the hedge channel:**
+
+At ell=A, a household can incrementally pre-accumulate x_B tokens each
+period, paying `tau_buy * ΔxB` now in small amounts rather than paying
+`tau_buy * x_B_target` all at once on relocation. Expected saving per
+unit of x_B pre-held: `p_relocate * tau_buy ≈ 0.06 * 0.025 = 0.0015`
+per period. This makes pre-holding cross-location tokens genuinely
+valuable — unlike v3's Option 3 approximation where there was no
+incentive to pre-hold.
+
+**Files created:**
+
+- `src/vfi_solver_v4.jl` (~530 LOC): 6D VFI solver with per-period
+  tx_cost on rebalancing. Includes smoke test stub.
+- `scripts/run_option1_e1.sh`: E1_2L baseline run script.
+- `scripts/run_option1_e2.sh`: E2_2L baseline run script.
+
+**Grid sizing (first-cut, coarse x_prev):**
+
+- `N_X_PREV=3` (x_prev ∈ {0, 0.75, 1.5})
+- `N_W=15`, `N_Z=5`, `ASSET_GRID_SIZE=7`, `X_GRID_SIZE=4`
+- Net factor vs v3: ~4-5x per regime; expected ~2-3 hours wall / regime.
+- Memory (value array, 7 arrays × 6D): ~30-50 MB at these settings.
+
+**Smoke test checks included:**
+
+- sigma decomposition invariant (sqrt(sigma_div^2 + sigma_iota^2) = sigma_h)
+- 6D array shape and memory estimate
+- Terminal slice: no NaN, all feasible
+- `tx_cost_v4` checks: buy / sell / no-rebalance / double-buy cases
+- `housing_cost_v4` spot-checks for both E1_2L and E2_2L
+- `nearest_idx` boundary checks
+- Shock block: size, weight sum, R_A ≠ R_B
+
+**Branch:** `auto/2026-06-24-option1-state-extension`
+
+**Next actions (require server1):**
+
+1. Run `julia src/vfi_solver_v4.jl --smoke-test` on server1.
+2. Run E1_2L v4 baseline via `bash scripts/run_option1_e1.sh`.
+3. Run E2_2L v4 baseline via `bash scripts/run_option1_e2.sh`.
+4. Compute `CEV(E2_2L_v4 vs E1_2L_v4)` and check H1 (mean_xB > 0 at ell=A).
+5. If H1+H2+H3 confirmed: writing kickoff.
