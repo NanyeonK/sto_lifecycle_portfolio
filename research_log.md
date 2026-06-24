@@ -1056,3 +1056,50 @@ incentive to pre-hold.
 3. Run E2_2L v4 baseline via `bash scripts/run_option1_e2.sh`.
 4. Compute `CEV(E2_2L_v4 vs E1_2L_v4)` and check H1 (mean_xB > 0 at ell=A).
 5. If H1+H2+H3 confirmed: writing kickoff.
+
+## 2026-06-24 (fire 2) — v4 bug fixes: E1_2L relocation state reset + X_PREV_MAX correction
+
+Second cloud fire of the day. The prior fire (00:19 UTC, commit 64f6cae)
+produced a working v4 skeleton but with two correctness bugs:
+
+**Bug 1 — E1_2L relocation does not reset x_prev (critical).**
+In `continuation_value_v4`, the prior implementation used the same
+`(ixAp, ixBp)` for both the stay and relocate branches:
+```julia
+# Prior (buggy): both stay and relocate use x_A_new as next-period x_prev
+ixAp = nearest_idx(grids.x_prev, x_A_new)  # same for stay AND relocate
+wz_reloc = view(next_value_slice, :, :, ell_alt, ixAp, ixBp)  # should be ix0, ix0 for E1_2L
+```
+For E1_2L, when relocating from A to B, the A-position is SOLD (sell_factor
+captures 6% cost). Next period at B, the household has x_A_prev=0 and x_B_prev=0
+(sold everything). But the prior code set x_A_prev_next = ixAp = round(x_A_new) ≠ 0.
+This caused the next period's tx_cost to DOUBLE-CHARGE tau_token for a position
+that was already sold via tau_sell. Net effect: E1_2L welfare is systematically
+undercounted (artificially penalized), inflating CEV(E2_2L vs E1_2L).
+
+**Fix** (this fire, `src/vfi_solver_v4.jl`):
+```julia
+# Fixed: E1_2L relocation resets x_prev to (ix0, ix0) = (0, 0)
+ix_A_reloc = regime == REGIME_E1_2L ? ix0 : ix_A_new  # reset for E1_2L
+ix_B_reloc = regime == REGIME_E1_2L ? ix0 : ix_B_new
+```
+
+**Bug 2 — X_PREV_MAX=1.5 puts E1_2L "own" state off-grid.**
+Prior run scripts used `X_PREV_MAX=1.5` with `N_X_PREV=3`, giving
+x_prev grid {0, 0.75, 1.5}. The E1_2L "own" choice (x=1.0) is not on
+this grid; nearest-neighbour lookup returns x=0.75, i.e., "own 0.75 units"
+which is not the binary own/rent dichotomy. This corrupts the E1_2L kappa
+rule (housing_cost_v4 checks `x_ell >= 1.0` for owner — 0.75 fails).
+
+**Fix**: Changed `X_PREV_MAX=1.0` in run scripts, giving grid {0, 0.5, 1.0}.
+The "own" state maps exactly to the last grid point. E1_2L binary choices
+(rent=0, own=1) are both exactly on-grid.
+
+**Additional v4 approach change**: This fire's solver also restricts E2_2L
+x choices to x_prev grid points (discrete VFI) rather than the continuous
+X_total/alpha grid of the prior fire. This makes the x_prev state transition
+exact (no nearest-neighbour approximation), at the cost of coarser
+continuous-x resolution (3 points vs many). Acceptable for the mechanism test.
+
+Both bugs corrected in `src/vfi_solver_v4.jl` and `scripts/run_option1_{e1,e2}.sh`.
+Branch: `auto/2026-06-24-option1-state-extension`.
