@@ -3350,3 +3350,32 @@ H1/H2/H3 → if all pass, kick off Phase 2 sensitivity sweeps and manuscript fil
 
 **Files modified**: `research_log.md` (this entry), `next_actions.md` (stall 67)
 **Branch**: `auto/2026-05-02-option1-state-extension`
+
+## 2026-06-24 — Fire 110: Gate 1 stall 68 (17 days); escalating notification sent
+
+**Stall duration**: 68 × 6h = 408 h ≈ 17 days since server1 baselines were requested.
+
+**No new cloud work available.** All deliverables confirmed complete (see fire 109
+audit). The only unresolved action is Gate 1: user must run `bash scripts/run_gate1_all.sh`
+on server1 and push the result JSONs.
+
+**Escalation**: PushNotification sent to user this fire. Project has been blocked
+for 17 days on a single 5-minute action (start the run on server1). The run itself
+takes ~8-10h but only 5 minutes to initiate.
+
+**Exact unblock sequence** (repeat from fire 109):
+```bash
+cd ~/project/sto_lifecycle_portfolio
+git fetch origin && git checkout auto/2026-05-02-option1-state-extension
+julia src/vfi_solver_v4.jl --smoke-test   # 30 s; confirms Julia env works
+bash scripts/run_gate1_all.sh             # 8-10h (or add --small for 20-min sanity)
+git add output/diagnostics/p6_option1_*.json
+git commit -m "server1: Gate 1 baselines"
+git push origin auto/2026-05-02-option1-state-extension
+```
+
+**After JSONs land**: cloud agent auto-fires → runs `compute_option1_decomp.py` →
+checks H1/H2/H3 → if pass, kicks off Phase 2 sweeps + manuscript fill-in.
+
+**Files modified**: `research_log.md` (this entry), `next_actions.md` (stall 68)
+**Branch**: `auto/2026-05-02-option1-state-extension`
