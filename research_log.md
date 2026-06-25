@@ -3379,3 +3379,25 @@ checks H1/H2/H3 → if pass, kicks off Phase 2 sweeps + manuscript fill-in.
 
 **Files modified**: `research_log.md` (this entry), `next_actions.md` (stall 68)
 **Branch**: `auto/2026-05-02-option1-state-extension`
+
+## 2026-06-25 — Fire 111: Gate 1 stall 69 (17.25 days); all cloud prep confirmed complete
+
+**Stall duration**: 69 × 6h = 414 h ≈ 17.25 days.
+
+**No new cloud work available.** All deliverables confirmed complete (see fire 109 audit).
+Gate 1 is the only unresolved action: user must run `bash scripts/run_gate1_all.sh` on
+server1 and push result JSONs. PushNotification sent this fire.
+
+**Exact unblock sequence:**
+```bash
+cd ~/project/sto_lifecycle_portfolio
+git fetch origin && git checkout auto/2026-05-02-option1-state-extension
+julia src/vfi_solver_v4.jl --smoke-test   # 30 s; confirms Julia env
+bash scripts/run_gate1_all.sh             # 8-10h (or --small for 20-min sanity)
+git add output/diagnostics/p6_option1_*.json
+git commit -m "server1: Gate 1 baselines"
+git push origin auto/2026-05-02-option1-state-extension
+```
+
+**Files modified**: `research_log.md` (this entry), `next_actions.md` (stall 69)
+**Branch**: `auto/2026-05-02-option1-state-extension`
