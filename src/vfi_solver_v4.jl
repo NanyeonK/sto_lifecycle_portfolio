@@ -415,8 +415,13 @@ end
 
 # next_value_slice: view of result.value[t+1, :, :, :, :, :], a 5D array (n_w, n_z, 2, n_xp, n_xp).
 # ix_A_new, ix_B_new: grid indices of chosen x_A_new and x_B_new (next period's x_prev state).
-# Since x choices are restricted to x_prev grid points, no x_prev interpolation needed —
-# we just index directly into the ix_A_new, ix_B_new dimensions.
+# ix_zero: index of x_prev=0.0 on the grid (always 1, since grid starts at 0.0).
+#
+# x_prev update after relocation:
+#   E2_2L: tokens portable — x_prev_next = (ix_A_new, ix_B_new) regardless of relocation.
+#   E1_2L: forced sale on relocation clears holdings — x_prev_next = (ix_zero, ix_zero).
+#          This prevents spurious tau_token charges in next period when the household
+#          correctly holds no housing at the new location.
 function continuation_value_v4(
     p::ModelParams_v4, grids::Grids_v4, shock::ShockBlock_v4,
     f_profile::Vector{Float64},
@@ -424,7 +429,7 @@ function continuation_value_v4(
     t::Int, z::Float64, ell::Int,
     b::Float64, s::Float64,
     x_A::Float64, x_B::Float64,
-    ix_A_new::Int, ix_B_new::Int,
+    ix_A_new::Int, ix_B_new::Int, ix_zero::Int,
     regime::Int,
 )
     p_reloc  = p_relocate_v4(p, t)
@@ -454,12 +459,15 @@ function continuation_value_v4(
                                   sf_A_reloc, sf_B_reloc, y_next)
 
         # Index directly into x_prev dimensions (no interpolation needed).
-        # view(..., ell, ix_A_new, ix_B_new) is a (n_w, n_z) matrix.
+        # For relocation: E1_2L resets x_prev to (0,0) (forced sale clears holdings);
+        #                 E2_2L keeps (ix_A_new, ix_B_new) (tokens portable).
+        ix_A_reloc = regime == REGIME_E1_2L ? ix_zero : ix_A_new
+        ix_B_reloc = regime == REGIME_E1_2L ? ix_zero : ix_B_new
         v_stay  = interp_bilinear_v4(
-            view(next_value_slice, :, :, ell,      ix_A_new, ix_B_new),
+            view(next_value_slice, :, :, ell,      ix_A_new,   ix_B_new),
             grids.w, grids.z, w_stay, z_next)
         v_reloc = interp_bilinear_v4(
-            view(next_value_slice, :, :, ell_alt,  ix_A_new, ix_B_new),
+            view(next_value_slice, :, :, ell_alt,  ix_A_reloc, ix_B_reloc),
             grids.w, grids.z, w_reloc, z_next)
 
         ev += shock.weights[q] * hp_scale *
@@ -503,7 +511,7 @@ function solve_state_v4(
                 v = utility_crra(c, p.gamma) +
                     p.beta * continuation_value_v4(p, grids, shock, f_profile,
                                                    next_value_slice, t, z, ell,
-                                                   b, s, 0.0, 0.0, 1, 1, regime)
+                                                   b, s, 0.0, 0.0, 1, 1, 1, regime)
                 if v > best_v
                     best_v, best_c, best_b, best_s = v, c, b, s
                     best_xA = best_xB = 0.0
@@ -537,7 +545,7 @@ function solve_state_v4(
                         v = utility_crra(c, p.gamma) +
                             p.beta * continuation_value_v4(p, grids, shock, f_profile,
                                                            next_value_slice, t, z, ell,
-                                                           b, s, 0.0, 0.0, ix_zero, ix_zero, regime)
+                                                           b, s, 0.0, 0.0, ix_zero, ix_zero, ix_zero, regime)
                         if v > best_v
                             best_v, best_c, best_b, best_s = v, c, b, s
                             best_xA = best_xB = 0.0
@@ -573,7 +581,7 @@ function solve_state_v4(
                             p.beta * continuation_value_v4(p, grids, shock, f_profile,
                                                            next_value_slice, t, z, ell,
                                                            b, s, x_A_own, x_B_own,
-                                                           ix_A_n, ix_B_n, regime)
+                                                           ix_A_n, ix_B_n, ix_zero, regime)
                         if v > best_v
                             best_v, best_c, best_b, best_s = v, c, b, s
                             best_xA, best_xB = x_A_own, x_B_own
@@ -620,7 +628,7 @@ function solve_state_v4(
                         p.beta * continuation_value_v4(p, grids, shock, f_profile,
                                                        next_value_slice, t, z, ell,
                                                        b, s, x_A_new, x_B_new,
-                                                       ix_A, ix_B, regime)
+                                                       ix_A, ix_B, 1, regime)
                     if v > best_v
                         best_v, best_c, best_b, best_s = v, c, b, s
                         best_xA, best_xB = x_A_new, x_B_new
