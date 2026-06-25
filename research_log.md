@@ -3401,3 +3401,48 @@ git push origin auto/2026-05-02-option1-state-extension
 
 **Files modified**: `research_log.md` (this entry), `next_actions.md` (stall 69)
 **Branch**: `auto/2026-05-02-option1-state-extension`
+
+## 2026-06-25 — Fire 112: Gate 1 stall 70 (17.5 days); full orientation audit
+
+**Stall duration**: 70 × 6h = 420 h ≈ 17.5 days since server1 Gate 1 run was first
+requested.
+
+**Orientation**: This fire read all project files (README, project_state, next_actions,
+research_log, main_question, pivot memo, decision_log, methods) and audited the full
+branch state. Findings:
+
+- `src/vfi_solver_v4.jl`: 999 LOC — 6D state `(t, w, z, ell, x_A_prev, x_B_prev)` with
+  per-period tx_cost on deltas, 4D interpolation over (w, z, x_A_prev, x_B_prev),
+  E1_2L forced-sale reset to (0,0) at relocation, E2_2L token portability. Verified
+  complete per spec in `handoff/tau_buy_option1_spec.md`.
+- All run scripts present: `run_gate1_all.sh`, `run_option1_e{0,1,2}.sh`,
+  `run_option1_e1_notx.sh`, `run_option1_e2_notau.sh`, `run_option1_smoke.sh`.
+- Phase 2 prep docs: `docs/calibration_v3.md`, `docs/sensitivity_grid_v4.md`,
+  `docs/methods_v3.md`, `docs/welfare_decomp_v4.md` — all DONE.
+- Paper skeleton: `paper/main.tex` + sections s1–s6 + appendices A–C — all DONE.
+- Figure scripts: `scripts/plot_*.py`, `scripts/export_policy_csv.jl` — all DONE.
+- Decomposition script: `scripts/compute_option1_decomp.py` — DONE.
+- All 69 prior stall fires confirmed same conclusion: no cloud work remaining.
+
+**Nothing new to build.** The branch is complete on the cloud side. Gate 1 requires
+server1 execution only.
+
+**Unblock sequence (copy-paste on server1)**:
+```bash
+cd ~/project/sto_lifecycle_portfolio
+git fetch origin && git checkout auto/2026-05-02-option1-state-extension && git pull
+julia src/vfi_solver_v4.jl --smoke-test       # ~1 min; confirms Julia env
+bash scripts/run_gate1_all.sh --small         # ~20 min sanity check first
+# if smoke + small pass → full run:
+bash scripts/run_gate1_all.sh                 # ~8-10 h
+git add output/diagnostics/p6_option1_*.json output/diagnostics/p6_option1_*.log
+git add output/diagnostics/p6_option1_decomposition.md
+git commit -m "server1: Gate 1 v4 baselines + decomposition"
+git push origin auto/2026-05-02-option1-state-extension
+```
+
+**After JSONs land**: cloud agent fires → runs `compute_option1_decomp.py` →
+checks H1/H2/H3 → if all pass, Phase 2 sensitivity sweeps + manuscript fill-in.
+
+**Files modified**: `research_log.md` (this entry), `next_actions.md` (stall 70)
+**Branch**: `auto/2026-05-02-option1-state-extension`
