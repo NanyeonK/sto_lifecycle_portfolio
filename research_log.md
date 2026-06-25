@@ -1048,3 +1048,25 @@ at once upon arrival. This is the mechanism the spec describes as
 Key hypothesis: mean_xB > 0 at ell=A in E2_2L_v4 (hedge channel
 activates), and CEV(E2_2L_v4 vs E1_2L_v4) > 4.255% (Option 3 baseline).
 
+## 2026-06-25 — v4 E1_2L relocation bug fix (second fire)
+
+Prior fire (06:19 UTC) implemented v4 solver. This fire detected and fixed
+a bug in `continuation_value_v4`: after E1_2L relocation, the lookup used
+`(ix_A_new, ix_B_new)` as next-period x_prev even though the forced sale
+via `sell_factor` already realized the housing sale in the wealth transition.
+This caused next-period's budget to charge `tau_token * x_A_prev` when the
+household (correctly) sets x_A=0 at the new location — inflating E1_2L's
+costs and biasing CEV upward.
+
+**Fix**: added `ix_zero` parameter to `continuation_value_v4`. For E1_2L
+relocation, the v_reloc lookup now uses `(ix_zero, ix_zero)` — both cleared
+to 0 after forced sale. E2_2L still uses `(ix_A_new, ix_B_new)` (portable).
+
+Magnitude of the bug: ~tau_token × p_reloc × p_own = ~0.01 × 0.06 × 0.5 ≈ 0.03%
+per period, compounding slightly over the lifecycle. Small but directionally
+wrong (made E1_2L appear more expensive than it is).
+
+**Commit**: `9fc783c` on `auto/2026-06-25-option1-state-extension`.
+
+No new files; only `src/vfi_solver_v4.jl` modified (+18, -10 lines).
+
