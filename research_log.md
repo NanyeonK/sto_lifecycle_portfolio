@@ -991,3 +991,60 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-06-25 — v4 solver (6D state extension, Option 1) implemented
+
+**Action picked**: implement `src/vfi_solver_v4.jl` — the P0 action
+from `next_actions.md` (Path B Option 1 full state extension).
+
+**Why this action**: all prior empirical work showed mean_xB = 0 at
+ell=A in every v3 variant. Root cause: without tracking previous
+holdings as state, there is no per-period tax on *building up* x_B
+incrementally. Once tau_buy is charged at every positive increment
+(not just at a one-shot relocation event), pre-holding x_B before
+a relocation becomes genuinely cheap relative to buying x_B=1 all
+at once upon arrival. This is the mechanism the spec describes as
+"incremental cheapening via x_prev state."
+
+**Key design decisions**:
+
+1. **6D state** `(t, w, z, ell, ix_A_prev, ix_B_prev)`. x_prev
+   dimensions are *discrete grid indices*, not interpolated — x_new
+   choices are restricted to the same x_prev grid. No x_prev
+   interpolation needed in continuation value; only standard
+   bilinear (w, z) interpolation is retained.
+
+2. **x_prev grid**: coarse `N_X_PREV=3` → {0.0, 0.5, 1.0} (env-var
+   configurable). Compensate memory/compute by reducing N_W=15,
+   N_Z=5. Net factor relative to v3 baseline: ~4-5x.
+
+3. **tx_cost per period**:
+   ```
+   tx_cost = tau_buy   * (max(dA,0) + max(dB,0))   # buying increment
+           + tau_token * (max(-dA,0) + max(-dB,0))  # selling decrement
+   ```
+   Applied every period on deltas from x_prev. Removes v3's
+   approximation (`apply_tau_buy_at_reloc` flag).
+
+4. **E1_2L map to x_prev grid**: binary {0,1} choices map to
+   ix=1 (x=0.0) and ix=nxp (x=x_prev_max). tx_cost is charged
+   on any change from prior holdings.
+
+5. **Housing cost rule**: same corrected kappa as post-fix v3 —
+   only occupied-location token reduces rent.
+
+6. **Smoke test**: covers 6D shape, terminal slice, tx_cost
+   arithmetic (4 cases), housing cost spots, no-rebalance
+   invariant, shock block checks.
+
+**Files created**:
+- `src/vfi_solver_v4.jl` (~460 LOC)
+- `scripts/run_option1_e1.sh` (E1_2L baseline)
+- `scripts/run_option1_e2.sh` (E2_2L baseline)
+
+**Feature branch**: `auto/2026-06-25-option1-state-extension`
+
+**Next step (server1, human)**: run smoke test, then
+`scripts/run_option1_e1.sh` + `scripts/run_option1_e2.sh`.
+Key hypothesis: mean_xB > 0 at ell=A in E2_2L_v4 (hedge channel
+activates), and CEV(E2_2L_v4 vs E1_2L_v4) > 4.255% (Option 3 baseline).
+
