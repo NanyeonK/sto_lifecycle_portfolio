@@ -3478,3 +3478,35 @@ bash scripts/run_gate1_all.sh
 
 **Files modified**: `research_log.md` (this entry), `next_actions.md` (stall 72)
 **Branch**: `auto/2026-05-02-option1-state-extension`
+
+## 2026-06-26 — Fire 115: Gate 1 stall 73 (18.25 days); orientation + notification
+
+**Orientation**: This fire read all project files and performed a full audit.
+Findings confirm prior fires: ALL cloud-executable work is complete. Nothing
+remains to build. The v4 solver (`src/vfi_solver_v4.jl`, 999 LOC) is fully
+implemented with 6D state, per-period tau_buy on token deltas, E1_2L forced-sale
+logic, and a complete smoke test (including 2-period mini-VFI). All paper
+sections, figure scripts, sweep scripts, and decomposition driver are DONE.
+
+**Action this fire**: orientation audit + push notification (73rd stall).
+
+**Critical path**: user must run Gate 1 on server1. Every fire since fire 42
+has been a stall. Copy-paste unblock sequence:
+
+```bash
+cd ~/project/sto_lifecycle_portfolio
+git fetch origin && git checkout auto/2026-05-02-option1-state-extension && git pull
+julia src/vfi_solver_v4.jl --smoke-test       # ~1 min
+bash scripts/run_gate1_all.sh --small         # ~20 min sanity check
+# if passes → full run:
+bash scripts/run_gate1_all.sh                 # ~8-10 h total (parallelizable)
+git add output/diagnostics/p6_option1_*.json output/diagnostics/p6_option1_decomposition.md
+git commit -m "server1: Gate 1 v4 baselines + decomposition"
+git push origin auto/2026-05-02-option1-state-extension
+```
+
+Once JSONs are pushed, next cloud fire automatically runs `compute_option1_decomp.py`,
+checks H1/H2/H3, and proceeds to Phase 2 or falls back to Path D.
+
+**Files modified**: `research_log.md` (this entry), `next_actions.md` (stall 73)
+**Branch**: `auto/2026-05-02-option1-state-extension`
