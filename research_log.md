@@ -3462,3 +3462,19 @@ bash scripts/run_gate1_all.sh
 
 **Files modified**: `research_log.md` (this entry), `next_actions.md` (stall 71)
 **Branch**: `auto/2026-05-02-option1-state-extension`
+
+## 2026-06-26 — Fire 114: Gate 1 stall 72 (18 days)
+
+**Status unchanged**. All cloud-side work complete. Gate 1 server1 pending.
+No new JSONs detected in `output/diagnostics/`. No cloud-executable work available.
+
+**Unblock**: user runs on server1:
+```bash
+cd ~/project/sto_lifecycle_portfolio
+git fetch origin && git checkout auto/2026-05-02-option1-state-extension && git pull
+julia src/vfi_solver_v4.jl --smoke-test
+bash scripts/run_gate1_all.sh
+```
+
+**Files modified**: `research_log.md` (this entry), `next_actions.md` (stall 72)
+**Branch**: `auto/2026-05-02-option1-state-extension`
