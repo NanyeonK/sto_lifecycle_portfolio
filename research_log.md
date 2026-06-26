@@ -991,3 +991,80 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-06-26 — v4 solver (6D state extension, Option 1) implemented
+
+**Action picked**: P0 Step 2 — create `src/vfi_solver_v4.jl` implementing Option 1
+full state extension with 6D state `(t, w, z, ell, x_A_prev, x_B_prev)` and
+per-period transaction costs on position deltas. This is the highest-priority
+auto-allowed action per `next_actions.md`.
+
+**Feature branch**: `auto/2026-06-26-vfi-solver-v4`.
+
+**What was implemented**:
+
+1. **6D state array**: `(T, N_W, N_Z, 2, N_X_PREV, N_X_PREV)` with default
+   N_W=15, N_Z=5, N_X_PREV=3 (x_prev grid = {0.0, 0.5, 1.0}). Total state
+   points at t=1: 15×5×2×3×3 = 1350 (vs v3 21×7×2 = 294). Compute factor
+   ~4.6x per regime per spec.
+
+2. **Per-period transaction costs on deltas**:
+   - `delta_A = x_A_new - x_A_prev`, `delta_B = x_B_new - x_B_prev`
+   - E2_2L: `tx = tau_buy*(max(dA,0)+max(dB,0)) + tau_token*(max(-dA,0)+max(-dB,0))`
+   - E1_2L: same but tau_sell replaces tau_token for the sell side (realtor commission)
+   - Applied in budget constraint at choice time (NOT in wealth transition)
+
+3. **x choices constrained to x_prev grid** (3 points each for both regimes):
+   - E2_2L: any of 9 combinations on grid × grid
+   - E1_2L: binary {0, x_prev_max} at current ell, 0 at other ell
+   - Constraint enables EXACT next-period state lookup (no interpolation in x_prev dims)
+
+4. **Relocation state update** (KEY MECHANISM):
+   - E2_2L: tokens portable → x_prev_next = x_new for BOTH stay and relocate events;
+     sell_factor = 1.0 always
+   - E1_2L: forced sale on relocation → x_prev_next = (0, 0) for relocate event;
+     sell_factor_ell = (1-tau_sell) in wealth transition
+   - This is the pre-buy hedge: E2_2L household at A can accumulate x_B_prev > 0,
+     so arrival at B has x_B_prev > 0 (saves tau_buy on future B purchases)
+
+5. **Corrected kappa rule** (from merged fix): only occupied-location token reduces rent.
+
+6. **`smoke_test_v4()`**: validates — sigma decomposition, x_prev grid construction,
+   6D array dims and memory estimate, terminal slice health, tx_cost_v4 spot checks
+   (6 cases), housing_cost_v4 spot checks, p_relocate_v4 boundary checks, shock block
+   weight sum and size, pre-buy hedge premium order-of-magnitude print-out.
+
+7. **Run scripts**: `scripts/run_option1_e1.sh` and `scripts/run_option1_e2.sh` with
+   all env vars set per spec calibration; output to `output/diagnostics/p6_option1_*.json`.
+
+**Design note — hedge mechanism expected magnitude**:
+
+Static expected savings per unit x_B pre-held at ell=A:
+`p_relocate * tau_buy = 0.06 × 0.025 = 0.0015` per year.
+Static opportunity cost (holding x_B vs x_A at A): `delta_own = rho - m = 0.04` per year.
+Static net per-period payoff: -0.0385 (strongly negative). The hedge is
+dynamically rational only via the OPTION VALUE of pre-buying: VFI correctly
+discounts future relocation events. Whether this option value is large enough
+to motivate non-zero x_B at A is an empirical question for server1 runs.
+
+**Design note — E1_2L in v4**:
+E1_2L now has PER-PERIOD tx_cost too: switching from renting to owning (delta=1)
+costs tau_buy; switching from owning to renting non-relocation costs tau_sell.
+This adds another channel: E2_2L tokens can be liquidated cheaply (tau_token ~1%)
+vs E1_2L traditional ownership sells cost tau_sell ~6%. This flexibility channel
+is new vs v3 Option 3.
+
+**Files created**:
+- `src/vfi_solver_v4.jl` (~700 LOC)
+- `scripts/run_option1_e1.sh`
+- `scripts/run_option1_e2.sh`
+
+**Updated files**:
+- `next_actions.md` (Steps 2-4 marked DONE; Step 5 queued for server1)
+- `research_log.md` (this entry)
+
+**Next queued (server1, USER)**:
+- `julia src/vfi_solver_v4.jl --smoke-test` → write `output/diagnostics/p6_option1_smoke.md`
+- `bash scripts/run_option1_e1.sh` → E1_2L_v4 baseline (~2.5h wall)
+- `bash scripts/run_option1_e2.sh` → E2_2L_v4 baseline (~2.5h wall)
+- Compute CEV decomposition and check H1 (mean_xB > 0), H2 (CEV > 4.255%), H3 (hedge channel ≈ 0.5-1.5%)
+
