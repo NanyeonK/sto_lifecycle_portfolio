@@ -1,5 +1,27 @@
 # Research Log
 
+## 2026-06-26 — Fire 116: smoke-test bugfix + v4 architectural review — Gate 1 server1 pending
+
+**Action**: fixed `utility_crra_v4` → `utility_crra` rename bug in smoke test; full review of v4 solver architecture.
+
+**Bug fixed**: `smoke_test_v4()` (line 917) called `utility_crra_v4(w, p.gamma)`, which is not defined — only `utility_crra` exists (line 296). This would cause `--smoke-test` to fail with `UndefVarError`. Fixed to `utility_crra(w, p.gamma)`.
+
+**v4 architectural review** (complete read, lines 1–999):
+- 6D state `(t, w, z, ell, x_A_prev, x_B_prev)` correctly implemented
+- `tx_cost_v4` uses `tau_token` for voluntary sells in both regimes (acknowledged conservative bias: E1_2L voluntary sells should be `tau_sell`; underestimates CEV by ~0.1–0.3%; documented at line 323–331 per fire-76 Option A decision)
+- E1_2L relocation: sell cost captured via `sf_reloc = 1 - tau_sell` in `next_wealth_v4`; x_prev resets to (0,0) in continuation — correct
+- E2_2L: x_prev carries over at relocation (hedge channel) — correct
+- 4D multilinear interpolation over `(w, z, x_A_new, x_B_new)` — correct
+- `default_grids_v4`: X_PREV_MAX=1.5, N_X_PREV=3 from env — correct
+- Run scripts `run_option1_e1.sh` / `run_option1_e2.sh` match spec
+
+**Gate 1 status**: `output/diagnostics/p6_option1_e1.json` and `p6_option1_e2.json` still absent. Server1 VFI runs remain sole critical-path blocker. Stall count: 74 (18.5 days since solver was ready).
+
+**Files modified**: `src/vfi_solver_v4.jl` (line 917 bugfix), `research_log.md`, `next_actions.md`
+**Branch**: `auto/2026-05-02-option1-state-extension`
+
+---
+
 ## 2026-06-15 — Fire 88: orientation audit — Gate 1 pending
 
 **Action**: orientation audit + state-file update only (per CLAUDE.md protocol).

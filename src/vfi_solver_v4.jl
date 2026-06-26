@@ -914,7 +914,7 @@ function smoke_test_v4()
     # terminal slice (t=2)
     for iw in 1:mini_spec.n_w, iz in 1:mini_spec.n_z, iell in 1:2, ixA in 1:nxp_m, ixB in 1:nxp_m
         w = mini_g.w[iw]
-        mini_val[T2, iw, iz, iell, ixA, ixB]  = utility_crra_v4(w, p.gamma)
+        mini_val[T2, iw, iz, iell, ixA, ixB]  = utility_crra(w, p.gamma)
         mini_feas[T2, iw, iz, iell, ixA, ixB] = (w >= 0.0)
     end
 
