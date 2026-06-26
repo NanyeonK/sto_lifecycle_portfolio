@@ -3446,3 +3446,19 @@ checks H1/H2/H3 → if all pass, Phase 2 sensitivity sweeps + manuscript fill-in
 
 **Files modified**: `research_log.md` (this entry), `next_actions.md` (stall 70)
 **Branch**: `auto/2026-05-02-option1-state-extension`
+
+## 2026-06-26 — Fire 113: Gate 1 stall 71 (17.75 days); push notification sent
+
+**Status unchanged from fire 112**. All cloud-side work complete. Gate 1 server1
+pending. Push notification sent to user (first explicit notification in this stall series).
+
+**Unblock**: see fire 112 entry for copy-paste server1 commands:
+```bash
+cd ~/project/sto_lifecycle_portfolio
+git fetch origin && git checkout auto/2026-05-02-option1-state-extension && git pull
+julia src/vfi_solver_v4.jl --smoke-test
+bash scripts/run_gate1_all.sh
+```
+
+**Files modified**: `research_log.md` (this entry), `next_actions.md` (stall 71)
+**Branch**: `auto/2026-05-02-option1-state-extension`
