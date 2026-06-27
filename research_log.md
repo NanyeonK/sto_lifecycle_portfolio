@@ -3576,3 +3576,27 @@ Once JSONs land, next cloud fire runs decomp automatically.
 
 **Files modified**: `research_log.md` (this entry), `next_actions.md` (stall 76)
 **Branch**: `auto/2026-05-02-option1-state-extension`
+
+## 2026-06-27 — Fire 119: stall audit + v4 solver re-review
+
+**Status**: Stall 77. Gate 1 (server1 baselines) still pending.
+
+**This fire's action**: Attempted to re-implement `src/vfi_solver_v4.jl` before
+discovering fire 102's version already on the remote branch. Reset to remote.
+Confirmed: the remote v4 solver is complete (954 LOC with 4D multilinear
+interpolation, correct `regime`-gated sell_factor, smoke test with mini-VFI).
+
+**Audit result**: NO new cloud-executable work found. All Phase 2 prep is done:
+- v4 solver (6D state, `tau_buy` active, portability mechanism) ✓
+- All 6 paper sections with `[P]` placeholders ready to fill ✓
+- `scripts/run_gate1_all.sh` — one command unblocks everything ✓
+- `scripts/compute_option1_decomp.py` — auto-fills placeholders on next fire ✓
+- All sensitivity sweep, figure, and export scripts ✓
+
+**Critical path remains**: user must run `bash scripts/run_gate1_all.sh` on
+server1 (~8-10h) or `bash scripts/run_gate1_all.sh --small` (~20 min sanity
+check). After JSONs are committed and pushed, next cloud fire completes
+Phase 2 automatically.
+
+**Files modified**: `research_log.md` (this entry), `next_actions.md` (stall 77)
+**Branch**: `auto/2026-05-02-option1-state-extension`

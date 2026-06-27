@@ -244,3 +244,22 @@ git push origin auto/2026-05-02-option1-state-extension
 Once those JSONs are pushed, the cloud agent will automatically pick up
 Phase 2 (sensitivity sweeps, manuscript fill-in, PR) on the next fire.
 
+
+## 2026-06-27 — Fire 119: stall 77, server1 still the critical path
+
+**No new decision needed.** This is fire 77 of consecutive stalls (fire 43
+through 119). All cloud work is done. One command unblocks everything:
+
+```bash
+cd ~/project/sto_lifecycle_portfolio
+git fetch origin && git checkout auto/2026-05-02-option1-state-extension
+bash scripts/run_gate1_all.sh --small   # 20 min sanity check first
+# if smoke test + small-grid run looks good (~20 min):
+bash scripts/run_gate1_all.sh           # full baselines ~8-10h
+git add output/diagnostics/p6_option1_*.json output/diagnostics/p6_option1_decomposition.md
+git commit -m "server1: v4 Gate 1 baselines + decomposition"
+git push origin auto/2026-05-02-option1-state-extension
+```
+
+After push: cloud agent next fire runs sensitivity sweeps, fills `[P]`
+placeholders in all paper sections, and prepares the draft PR.
