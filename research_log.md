@@ -3554,3 +3554,25 @@ checks H1/H2/H3, and proceeds to Phase 2 or falls back to Path D.
 
 **Files modified**: `research_log.md` (this entry), `next_actions.md` (stall 73)
 **Branch**: `auto/2026-05-02-option1-state-extension`
+
+## 2026-06-27 — Fire 118 stall 76 (Gate 1 server1 pending)
+
+All cloud deliverables remain complete (confirmed). No new work added.
+
+**Single unblocking action (user on server1):**
+
+```bash
+cd ~/project/sto_lifecycle_portfolio
+git fetch origin && git checkout auto/2026-05-02-option1-state-extension
+julia src/vfi_solver_v4.jl --smoke-test       # fast check (~10s)
+bash scripts/run_option1_e1.sh                 # E1_2L ~45 min
+bash scripts/run_option1_e2.sh                 # E2_2L ~2-3 h
+git add output/diagnostics/p6_option1_*.json
+git commit -m "server1: Gate 1 v4 baselines"
+git push origin auto/2026-05-02-option1-state-extension
+```
+
+Once JSONs land, next cloud fire runs decomp automatically.
+
+**Files modified**: `research_log.md` (this entry), `next_actions.md` (stall 76)
+**Branch**: `auto/2026-05-02-option1-state-extension`
