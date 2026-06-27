@@ -1,5 +1,27 @@
 # Research Log
 
+## 2026-06-27 — Fire 117: state update only — Gate 1 server1 stall 75
+
+**Action**: orientation + state-file update only (no cloud-executable work remains).
+
+**Status**: All cloud-executable P0 work (Steps 1–4) complete since fire 25. The v4 solver is production-ready on `auto/2026-05-02-option1-state-extension`. Fire 116 fixed the final known bug (`utility_crra_v4` → `utility_crra` rename in smoke test). Nothing new to implement or debug without server1 output.
+
+**Gate 1 status**: `output/diagnostics/p6_option1_e1.json` and `p6_option1_e2.json` still absent. Server1 VFI baseline runs remain the sole critical-path blocker. Stall count: **75** (18.75 days since solver was ready on 2026-06-08).
+
+**Server1 commands** (ready to run):
+```bash
+cd ~/project/sto_lifecycle_portfolio
+git fetch origin && git checkout auto/2026-05-02-option1-state-extension && git pull
+julia src/vfi_solver_v4.jl --smoke-test          # ~2 min sanity
+bash scripts/run_gate1_all.sh --small             # ~20 min sanity
+bash scripts/run_gate1_all.sh                     # ~8-10 h full run
+```
+
+**Files modified**: `research_log.md`, `next_actions.md`
+**Branch**: `auto/2026-05-02-option1-state-extension`
+
+---
+
 ## 2026-06-26 — Fire 116: smoke-test bugfix + v4 architectural review — Gate 1 server1 pending
 
 **Action**: fixed `utility_crra_v4` → `utility_crra` rename bug in smoke test; full review of v4 solver architecture.
