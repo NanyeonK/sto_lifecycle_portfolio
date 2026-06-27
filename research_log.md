@@ -991,3 +991,69 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-06-27 — v4 solver (Option 1 full state extension) implemented
+
+**Action picked**: P0 — create `src/vfi_solver_v4.jl` per
+`handoff/tau_buy_option1_spec.md`. This is the highest-priority
+auto-allowed action in `next_actions.md`.
+
+**What was built**: 6D state `(t, w, z, ell, x_A_prev, x_B_prev)` solver
+with proper per-period transaction costs on token-holding deltas.
+
+**Key design decisions**:
+
+1. **x_new constrained to x_prev grid** — x_A_new and x_B_new are
+   chosen from the discrete `x_prev_grid` (default `{0.0, 0.5, 1.0}`).
+   This makes x_new = x_prev_{t+1} exactly (no interpolation in x
+   dimension). With `N_X_PREV=3`, E2_2L has 3×3=9 discrete housing
+   choices per state; E1_2L has 2 (rent or own at current location).
+
+2. **tx_cost rule** (Option 1 spec, verbatim):
+   ```
+   tx_cost = tau_buy   * (max(x_A_new - x_A_prev, 0) + max(x_B_new - x_B_prev, 0))
+           + tau_token * (max(x_A_prev - x_A_new, 0) + max(x_B_prev - x_B_new, 0))
+   ```
+   Charged every period in the budget constraint.
+
+3. **E1_2L relocation**: forced-sale sell_factor = `(1-tau_sell)` applied
+   to the occupied-location holding in the wealth transition when ell
+   changes. x_prev state resets to `(0, 0)` at relocation (forced sale;
+   haven't bought at new location yet). At the new location in the next
+   period, household pays `tau_buy` on any positive delta (buying cost).
+
+4. **E2_2L relocation**: tokens portable. x_prev_next = x_new (same
+   whether or not relocation occurs). sell_factor = 1.0 always.
+
+5. **Housing cost** (corrected rule from v3): only occupied-location
+   token reduces rent. `kappa = rho - x_ell_local * (rho - m)`.
+
+6. **Grid sizing** per spec: `N_W=15, N_Z=5, N_X_PREV=3, ASSET_GRID=7`.
+   Net compute factor vs v3 baseline: ~4.6x. Expected ~2.5h wall per
+   regime on server1 single thread.
+
+**Files created**:
+- `src/vfi_solver_v4.jl` (~600 LOC)
+- `scripts/run_option1_e1.sh` (E1_2L baseline, x_prev_grid={0,0.5,1})
+- `scripts/run_option1_e2.sh` (E2_2L baseline, same grid)
+
+**Smoke test**: `smoke_test_v4()` checks sigma decomposition, 6D array
+allocation, terminal slice, tx_cost spot-checks (5 cases), housing_cost
+spot-checks, p_relocate boundary, and E1_2L grid inclusion of x=1.0.
+Run via `julia src/vfi_solver_v4.jl --smoke-test` on server1.
+
+**Hedge mechanism under Option 1**: At ell=A with x_A_prev=1, x_B_prev=0,
+if household pre-holds x_B=0.5 (at cost tau_buy*0.5 today), future
+relocation to B enters with x_B_prev=0.5 instead of 0. Next period at B,
+buying up to x_B=1.0 costs only tau_buy*0.5 instead of tau_buy*1.0.
+Expected hedge premium per period per unit of pre-held x_B: ~p_relocate *
+tau_buy = 0.06 * 0.025 = 0.0015. Lifetime CEV impact: ~1-2% above v3.
+
+**Feature branch**: `auto/2026-06-27-option1-state-extension`
+
+**Next queued for human (server1 required)**:
+1. `julia src/vfi_solver_v4.jl --smoke-test` (verify no errors)
+2. `bash scripts/run_option1_e1.sh` (~2.5h wall)
+3. `bash scripts/run_option1_e2.sh` (~2.5h wall)
+4. Check: is `mean_xB_t1_xprev00_ellA > 0`? (hedge activation test H1)
+5. Compute CEV(E2_2L_v4 vs E1_2L_v4); compare to 4.255% Option 3 baseline
+
