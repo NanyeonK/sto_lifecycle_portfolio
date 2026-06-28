@@ -3600,3 +3600,30 @@ Phase 2 automatically.
 
 **Files modified**: `research_log.md` (this entry), `next_actions.md` (stall 77)
 **Branch**: `auto/2026-05-02-option1-state-extension`
+
+---
+
+## 2026-06-28 — Fire 120 (stall 78, 19.5 days; Gate 1 server1 pending)
+
+**Status**: Stall continues at Gate 1. No new cloud-executable work found.
+All Phase 2 prep remains complete (v4 solver, paper sections, figure scripts,
+decomp script, sensitivity sweeps). Branch is clean on remote at fire 119 state.
+
+**This fire's action**: Stall-update only — incremented stall counter to 78
+(19.5 days since vfi_solver_v4.jl was completed on 2026-05-25). Sent push
+notification to user. No other changes.
+
+**Critical path**: User must run on server1 to unblock:
+```bash
+julia src/vfi_solver_v4.jl --smoke-test          # ~5 min, fast sanity check
+bash scripts/run_option1_e1.sh                    # ~45 min
+bash scripts/run_option1_e2.sh                    # ~2-3 h
+```
+Or one command: `bash scripts/run_gate1_all.sh`
+
+After JSONs arrive and are pushed, the next cloud fire runs
+`scripts/compute_option1_decomp.py` automatically to verify H1/H2/H3
+and fill all `[P]` placeholders in paper sections.
+
+**Files modified**: `research_log.md` (this entry), `next_actions.md` (stall 78)
+**Branch**: `auto/2026-05-02-option1-state-extension`
