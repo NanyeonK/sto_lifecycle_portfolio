@@ -991,3 +991,59 @@ paper a clean mechanism distinction.
 Multi-property tokens (alpha'') as separate companion paper if RFS
 target preserved.
 
+## 2026-06-28 — v4 solver (Option 1 state extension) implemented
+
+**Action picked**: P0 Step 2 from next_actions.md — create
+`src/vfi_solver_v4.jl` with 6D state `(t, w, z, ell, ix_A_prev, ix_B_prev)`.
+
+**Why this action**: Option 1 full state extension is the confirmed P0
+per user decision 2026-05-02. It is the only remaining untested path
+for activating the cross-location hedge mechanism.
+
+**Files created on branch `auto/2026-06-28-option1-state-extension`**:
+- `src/vfi_solver_v4.jl` (852 LOC) — full 6D state solver
+- `scripts/run_option1_e1.sh` — E1_2L baseline run command
+- `scripts/run_option1_e2.sh` — E2_2L baseline run command
+
+**Design summary**:
+
+State extension: `(t, w, z, ell, ix_A_prev, ix_B_prev)` where
+`ix_A_prev, ix_B_prev ∈ {1..N_X_PREV}` index the discrete x_prev_grid.
+Default: `N_X_PREV=3`, `X_PREV_MAX=1.0` → grid `{0.0, 0.5, 1.0}`.
+
+Per-period tx_cost on rebalancing:
+```
+tx_cost = tau_buy   * (max(ΔxA,0) + max(ΔxB,0))
+        + tau_token * (max(-ΔxA,0) + max(-ΔxB,0))
+```
+
+Key regime differences vs v3:
+- **E1_2L**: x_ell ∈ {0,1} at occupied location. On relocation: old-ell
+  token sold (tau_sell in wealth), next x_prev resets to (0,0).
+  Household faces full tau_buy cost to establish ownership at new location.
+- **E2_2L**: tokens portable; `ix_A_new, ix_B_new` carry through relocation
+  unchanged. Pre-holding x_B at ell=A saves `tau_buy * x_B_prev` on
+  arrival at B. This is the hedge mechanism Option 1 tests.
+
+Grid reduction to offset 9× state-space: N_W=15, N_Z=5 (from 21, 7 in v3).
+Net compute factor vs v3: ~4.6× per regime. Estimated wall time: 2-4 hours per
+regime on server1 single thread.
+
+**Smoke test**: `smoke_test_v4()` checks sigma decomposition, 6D array
+allocation (~1.6 MB), shock block size/weight-sum, tx_cost spot-checks,
+housing_cost spot-checks, zero-tx-no-rebalance invariant, terminal slice.
+Does NOT run VFI (cloud env lacks Julia).
+
+**Next queued (Steps 3-7 in next_actions.md)**:
+- Step 3: Confirm `N_X_PREV=3` default (env-var configurable) ✓ done
+- Step 4: Run smoke test on server1 via `julia src/vfi_solver_v4.jl --smoke-test`
+- Step 5: Run E1_2L and E2_2L baselines: `bash scripts/run_option1_e1.sh` etc.
+- Step 6-7: Compute decomposition + CEV; write p6_option1_decomposition.md
+
+**Hypothesis outlook**: Economic analysis predicts that the hedge premium
+per unit x_B held at ell=A is `p_relocate * tau_buy ≈ 0.0015/period`,
+while the opportunity cost vs x_A (rent-saving = 0.02/period via delta_own)
+is 13× larger. mean_xB > 0 requires wealth large enough to hold BOTH x_A=1
+AND x_B > 0. This is testable at coarse grid; outcome determines whether
+to proceed to full grid or fall to PATH D (REE/JHE).
+
