@@ -3696,3 +3696,20 @@ specified in `handoff/tau_buy_option1_spec.md`.
 5. If H1+H2+H3 hold: proceed to Phase 2 (calibration + manuscript prep)
 6. If any fail: fall back to Path D (REE/JHE at +4.26%)
 
+## 2026-06-28 — fire 121: rebase fix + tau_token spec correction
+
+**Action**: Resolved push conflict on `auto/2026-05-02-option1-state-extension`.
+Remote had 120 prior commits (stall fires 1-78 + Phase 2 prep work done by earlier
+fires). Rebased local v4 solver commit on top of remote; resolved 5 add/add conflicts
+by merging remote content with our 2026-06-28 entry.
+
+**Parameter fix**: corrected `tau_token=0.01 → 0.005` in `src/vfi_solver_v4.jl`
+(default) and in both run scripts. Spec line 109 specifies 0.005. Also added
+`SAVE_PATH` to run scripts for `.jls` serialization (needed by figure pipeline).
+
+**Branch state**: `auto/2026-05-02-option1-state-extension` now at commit 222ca11.
+All Phase 2 prep artifacts from prior fires present (paper sections, docs, scripts).
+Gate 1 (server1 smoke + baselines) still pending — user must run.
+
+**Files modified**: `src/vfi_solver_v4.jl`, `scripts/run_option1_e{1,2}.sh`, `research_log.md`
+
