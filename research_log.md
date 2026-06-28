@@ -3627,3 +3627,72 @@ and fill all `[P]` placeholders in paper sections.
 
 **Files modified**: `research_log.md` (this entry), `next_actions.md` (stall 78)
 **Branch**: `auto/2026-05-02-option1-state-extension`
+
+## 2026-06-28 — v4 solver implemented: 6D state extension (Option 1)
+
+**Action**: Implemented `src/vfi_solver_v4.jl` — the full 6D state extension
+specified in `handoff/tau_buy_option1_spec.md`.
+
+**What was built** (954 LOC):
+
+1. **6D state `(t, w, z, ell, x_A_prev, x_B_prev)`**: extends v3's 4D state
+   by tracking previous-period token holdings. Arrays are 6D; dimensions
+   T × N_W × N_Z × 2 × N_X_PREV × N_X_PREV. Default: 57×15×5×2×3×3
+   ≈ 77k total points per policy array.
+
+2. **x_prev grid**: coarse uniform grid {0.0, 0.5, 1.0} (N_X_PREV=3,
+   X_PREV_MAX=1.0 by default, both env-var configurable). Choices for
+   x_A_new and x_B_new are **restricted to x_prev grid points**, so the
+   continuation-value lookup in x_prev dimensions is exact (no interpolation
+   needed there; only bilinear interpolation in w, z as before).
+
+3. **Per-period transaction cost block** (`tx_cost_v4()`):
+   `delta_A = x_A_new - x_A_prev`, `delta_B = x_B_new - x_B_prev`
+   `tx_cost = tau_buy * (max(delta_A,0) + max(delta_B,0)) + tau_token * (max(-delta_A,0) + max(-delta_B,0))`
+   All three tx cost parameters now ACTIVE (tau_buy=0.025, tau_token=0.01,
+   tau_sell=0.06 for forced relocation sell_factor as before).
+
+4. **E2_2L hedge mechanism (Option 1 rationale)**: with x_B_prev tracked
+   as a state, pre-holding x_B at ell=A in period t saves `tau_buy * x_B`
+   per relocation event. Expected per-period premium per unit held:
+   `p_relocate * tau_buy = 0.06 * 0.025 = 0.0015`. Accumulated over a
+   working life, this motivates non-zero x_B holding at ell=A (hypothesis H1).
+
+5. **E1_2L state transition**: at relocation, ix_A_prev and ix_B_prev
+   reset to 1 (= 0.0) — forced sale liquidates prior position. sell_factor
+   (1-tau_sell) in wealth transition as in v3. Post-relocation purchase at
+   new location: next period x_prev=(0,0), choosing own triggers
+   `tx_cost = tau_buy * own_amt` naturally via the delta formula.
+
+6. **Continuation value** (`continuation_value_v4()`): takes ix_A_new,
+   ix_B_new (grid indices of chosen positions) and looks up
+   `next_value_slice[:, :, ell_next, ix_A_next, ix_B_next]` — a 2D
+   (w, z) subarray — for bilinear interpolation. E2_2L: ix_next = ix_new
+   (tokens portable); E1_2L at relocation: ix_next = (1,1) (reset to 0).
+
+7. **Smoke test** (`smoke_test_v4()`): ~40 assertions covering sigma
+   decomposition, x_prev grid shape, tx_cost spot-checks (buy/sell/noop/
+   mixed), 6D array allocation, memory estimate (<500 MB check), terminal
+   slice integrity, shock block weight-sum, housing cost, p_relocate,
+   zero-cost no-change property.
+
+8. **Run scripts** (`scripts/run_option1_e1.sh`, `scripts/run_option1_e2.sh`):
+   both configured with baseline calibration from spec; output to
+   `output/diagnostics/p6_option1_e{1,2}.json`.
+
+**Files created/modified**:
+- `src/vfi_solver_v4.jl` (NEW — 954 LOC)
+- `scripts/run_option1_e1.sh` (NEW)
+- `scripts/run_option1_e2.sh` (NEW)
+- `output/diagnostics/` (directory created)
+
+**Feature branch**: `auto/2026-05-02-option1-state-extension`
+
+**Next step (user, server1)**:
+1. Run smoke test: `julia src/vfi_solver_v4.jl --smoke-test`
+2. Run E1_2L baseline: `bash scripts/run_option1_e1.sh`
+3. Run E2_2L baseline: `bash scripts/run_option1_e2.sh`
+4. Verify H1 (`mean_xB > 0 at ell=A`), H2 (`CEV > 4.255%`), H3 (hedge channel)
+5. If H1+H2+H3 hold: proceed to Phase 2 (calibration + manuscript prep)
+6. If any fail: fall back to Path D (REE/JHE at +4.26%)
+
