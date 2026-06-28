@@ -1,5 +1,29 @@
 # Research Log
 
+## 2026-06-28 — Fire 122: orientation audit — Gate 1 server1 stall 80
+
+**Action**: orientation audit + state-file update only (no cloud-executable work remains).
+
+**Status**: All cloud-executable P0 work (Steps 1–4) complete. The v4 solver (`src/vfi_solver_v4.jl`, 954 LOC) is production-ready on `auto/2026-05-02-option1-state-extension`. Nothing new to implement or debug without server1 output.
+
+**Gate 1 status**: `output/diagnostics/p6_option1_*.json` still absent. Server1 VFI baseline runs remain the sole critical-path blocker. Stall count: **80** (~20 days since solver was ready on 2026-06-08).
+
+**Unblocking action** (user/server1 only):
+```bash
+cd ~/project/sto_lifecycle_portfolio
+git fetch origin && git checkout auto/2026-05-02-option1-state-extension && git pull
+bash scripts/run_gate1_all.sh --small   # 20-min sanity check
+bash scripts/run_gate1_all.sh           # ~8-10h full baselines
+git add output/diagnostics/p6_option1_*.json output/diagnostics/p6_option1_decomposition.md
+git commit -m "server1: v4 Gate 1 baselines + decomposition"
+git push origin auto/2026-05-02-option1-state-extension
+```
+
+**Files modified**: `research_log.md`, `next_actions.md`
+**Branch**: `auto/2026-05-02-option1-state-extension`
+
+---
+
 ## 2026-06-27 — Fire 117: state update only — Gate 1 server1 stall 75
 
 **Action**: orientation + state-file update only (no cloud-executable work remains).
