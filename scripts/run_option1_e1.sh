@@ -32,8 +32,9 @@ P_RELOCATE_WORKING=0.06 \
 P_RELOCATE_RETIRED=0.02 \
 TAU_SELL=0.06 \
 TAU_BUY=0.025 \
-TAU_TOKEN=0.01 \
+TAU_TOKEN=0.005 \
 LTV_MAX=0.0 \
+SAVE_PATH="$OUT_DIR/p6_option1_e1_result.jls" \
   julia "$REPO_DIR/src/vfi_solver_v4.jl" 2>&1 | tee "$OUT_DIR/p6_option1_e1_stdout.log"
 
 echo "E1_2L v4 run complete. Summary: $OUT_DIR/p6_option1_e1.json"

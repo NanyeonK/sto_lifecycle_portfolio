@@ -88,7 +88,7 @@ struct ModelParams_v4
     # v4: transaction costs — all NOW ACTIVE (tau_buy and tau_token applied per period)
     tau_sell::Float64    # forced-sale cost on E1_2L relocation (~0.06); in sell_factor
     tau_buy::Float64     # buying cost per unit purchased (~0.025); in tx_cost on +delta
-    tau_token::Float64   # token selling cost per unit sold (~0.01); in tx_cost on -delta
+    tau_token::Float64   # token selling cost per unit sold (spec: 0.005); in tx_cost on -delta
     # Mortgage
     ltv_max::Float64
     r_mort_premium::Float64
@@ -178,7 +178,7 @@ function default_params_v4()
         parse(Float64, get(ENV, "P_RELOCATE_RETIRED", "0.02")),
         parse(Float64, get(ENV, "TAU_SELL",           "0.06")),
         parse(Float64, get(ENV, "TAU_BUY",            "0.025")),
-        parse(Float64, get(ENV, "TAU_TOKEN",          "0.01")),
+        parse(Float64, get(ENV, "TAU_TOKEN",          "0.005")),
         parse(Float64, get(ENV, "LTV_MAX",            "0.0")),
         parse(Float64, get(ENV, "R_MORT_PREMIUM",     "0.005")),
     )
