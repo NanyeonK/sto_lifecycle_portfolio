@@ -3737,3 +3737,36 @@ Gate 1 (server1 smoke + baselines) still pending — user must run.
 
 **Files modified**: `src/vfi_solver_v4.jl`, `scripts/run_option1_e{1,2}.sh`, `research_log.md`
 
+## 2026-06-29 — fire 123: stall audit; v4 solver confirmed complete; server1 still pending
+
+**Action picked**: No new code deliverable — v4 solver (954 LOC, exact-grid approach)
+is complete and on branch per fires 120/121. Steps 1-4 DONE. Gate 1 (server1 smoke
+test + baseline runs) is blocking all further P0 action.
+
+**Stall diagnosis**: Branch `auto/2026-05-02-option1-state-extension` has been
+waiting at Gate 1 for ~20 days (fires 43-123). The cloud routine cannot run Julia
+(no Julia install in the remote environment); server1 is the only path to execute
+the smoke test and baseline VFI runs.
+
+**Code review this fire**: Confirmed v4 solver design is correct. The exact-grid
+approach (choices restricted to N_X_PREV=3 x_prev grid points {0, 0.5, 1.0} with
+X_PREV_MAX=1.0) is the right implementation — avoids 4D interpolation error and is
+conceptually cleaner for the first H1/H2/H3 test. tau_token=0.005 default is correct
+per spec. Run scripts include SAVE_PATH for .jls serialization.
+
+**No code changes this fire** — remote branch is already in the correct final state
+for server1 execution. The only cloud-executable work remaining was orientation.
+
+**Next action (user, server1)**:
+```
+# Pull branch and run on server1:
+git checkout auto/2026-05-02-option1-state-extension && git pull
+julia src/vfi_solver_v4.jl --smoke-test          # Step 5
+bash scripts/run_option1_e1.sh                    # Step 6a (~2.5h)
+bash scripts/run_option1_e2.sh                    # Step 6b (~2.5h)
+```
+Then compute CEV and check H1 (mean_xB > 0 at ellA), H2 (CEV > 4.255%),
+H3 (hedge channel > 0.5%). If all three hold: RFS-credible; proceed to Phase 2.
+If any fail: fall back to Path D (REE/JHE at +4.26%).
+
+**Files modified this fire**: `research_log.md` (this entry), `next_actions.md`
