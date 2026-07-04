@@ -9,8 +9,3 @@ gate_B:
 ledger: {}
 advance_allowed: false
 _schema: aers_10stage
-
-lifecycle_status: setup_design   # controlled enum (single-truth for registry sync)
-
-stage_name: "01 Ideation"
-enforcement: v2

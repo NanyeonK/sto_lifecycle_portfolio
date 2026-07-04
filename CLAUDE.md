@@ -60,3 +60,12 @@ Keep in Claude: 01/02/03, 05 claim_map+critique, 06/07 (voice), 10, all gate + h
 
 ## State surfaces (read before acting)
 project_state.md · CHANGELOG.md · decision_log.md · next_actions.md · qa/gate_status.yaml · handoff/*
+
+## Writing stages (06 draft / 07 revision / 08 typeset) — canonical workflows (added 2026-06-20)
+For any prose drafting, revision, or R&R round, load `~/second_brain/writing_system/START_HERE.md` and use:
+- **Progress tracking**: `writing_system/templates/writing_progress_ledger.md` — track every prose unit (⬜ not started / 🔶 draft / ✅ LOCKED / ⏸ blocked). Prose analogue of `qa/result_registry.yaml`; a fresh session resumes from the latest non-LOCKED row. One reviewable unit at a time; no silent multi-section dumps.
+- **Abstract / title**: `writing_system/workflows/abstract_title_workflow.md` — manuscript-level, locked LAST after contribution + intro.
+- **R&R / minor revision**: run the `strategic-revision` skill first (reviewer reports → DAG plan), then:
+  - manuscript SOT = LaTeX → `writing_system/workflows/latex_docx_coauthor_loop.md`
+  - FINAL manuscript = Word `.docx` → `writing_system/workflows/word_rnr_revision_loop.md` (locked text accumulates in `REVISION_DRAFT.md`; `.docx` compiled ONCE at the end; NEVER edit the live accepted `.docx` mid-stream; T3 = exhibits/equations/numbers frozen; claim/number/contribution changes are human-gated).
+- **Before submission-ready**: `writing_system/workflows/writing_submission_gate.md` (claim-audit + citation-audit + terminology/anonymity + R&R coverage).
